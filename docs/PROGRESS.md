@@ -803,3 +803,17 @@ Owner: create the private repository `secure-rdp-viewer` and push; then CI's fir
 (fix what it finds, commit `pubspec.lock` from its artifacts), then "Run workflow" on
 Release to build all packages without publishing, then the device checklist. Going
 public only after SA-5 and the checklist in `docs/RELEASING.md`.
+
+---
+
+## Privacy check before going public (29 Oct 2026)
+
+Checked the files that would be published and the whole git history:
+gitleaks (project rules over every commit; default rules with no exceptions over every
+file): clean. No email addresses other than `example.com` placeholders; every commit is
+by `Bensal <Bensalk@users.noreply.github.com>`; no personal names, organisations, local
+folder paths, real IP addresses or hostnames; no personal GitHub accounts in links;
+no real passwords anywhere. Changed: the one fixed dummy password in an app test is now
+random per run (SA-9). Added: "Created by Bensal" as the last line of Settings → About,
+in small plain text. Open point for the owner: each commit message ends with a link to
+the private Claude session used to build the project.

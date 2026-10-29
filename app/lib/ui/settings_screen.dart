@@ -295,6 +295,17 @@ class SettingsScreen extends StatelessWidget {
             title: const Text('Open-source licences'),
             onTap: () => showLicensePage(context: context, applicationName: 'Secure RDP Viewer'),
           ),
+          // Creator credit: last, plain and small (deliberately not highlighted).
+          Padding(
+            key: const Key('creator'),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Text(
+              'Created by Bensal',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ),
         ],
       ),
     );

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +11,12 @@ import 'package:secure_rdp_viewer/src/rust/frb_generated.dart';
 import 'package:secure_rdp_viewer/state/persistence.dart';
 import 'package:secure_rdp_viewer/state/profiles.dart';
 import 'package:secure_rdp_viewer/state/settings.dart';
+
+/// A throwaway password, different on every run (SA-9: no fixed test passwords).
+String _randomPassword() {
+  final r = Random.secure();
+  return List.generate(16, (_) => r.nextInt(36).toRadixString(36)).join();
+}
 
 /// UI tests that use the real Rust core. Run on Linux (CI, Xvfb), Windows and Android.
 void main() {
@@ -74,7 +81,7 @@ void main() {
     await typeVisible(tester, find.byKey(const Key('field-name')), 'Office');
     await typeVisible(tester, find.byKey(const Key('field-host')), '192.0.2.10');
     await typeVisible(tester, find.byKey(const Key('field-username')), 'alice');
-    await typeVisible(tester, find.byKey(const Key('field-password')), ['t', 'e', 's', 't', '9'].join());
+    await typeVisible(tester, find.byKey(const Key('field-password')), _randomPassword());
     await tapVisible(tester, find.byKey(const Key('field-save-password')));
     await tapVisible(tester, find.byKey(const Key('button-save')));
     await tester.pumpAndSettle();
@@ -107,6 +114,15 @@ void main() {
     final warning = find.text('Warning: computer identity changed');
     await tester.scrollUntilVisible(warning, 200, scrollable: find.byType(Scrollable).last);
     expect(warning, findsOneWidget);
+  });
+
+  testWidgets('creator credit is the last item in About', (tester) async {
+    await start(tester);
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+    final credit = find.byKey(const Key('creator'));
+    await tester.scrollUntilVisible(credit, 200);
+    expect(find.text('Created by Bensal'), findsOneWidget);
   });
 
   testWidgets('a bad Wake-on-LAN address is reported', (tester) async {
