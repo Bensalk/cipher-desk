@@ -38,13 +38,15 @@ pub enum ConnectionError {
     IdleTimeout,
     /// The OS vault could not be used (e.g. no keyring on Linux).
     VaultUnavailable,
+    /// Android: the app stayed in the background longer than the grace period.
+    AppInBackground,
     /// Anything not covered above.
     Unexpected,
 }
 
 impl ConnectionError {
     /// Every variant, for tests and the UI's help screen.
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 17] = [
         Self::WrongCredentials,
         Self::AccountProblem,
         Self::HostRefused,
@@ -60,6 +62,7 @@ impl ConnectionError {
         Self::SessionTakenOver,
         Self::IdleTimeout,
         Self::VaultUnavailable,
+        Self::AppInBackground,
         Self::Unexpected,
     ];
 
@@ -81,6 +84,7 @@ impl ConnectionError {
             Self::SessionTakenOver => "Someone else signed in",
             Self::IdleTimeout => "Disconnected after inactivity",
             Self::VaultUnavailable => "Saved password couldn't be used",
+            Self::AppInBackground => "Disconnected while in the background",
             Self::Unexpected => "Something went wrong",
         }
     }
@@ -93,7 +97,7 @@ impl ConnectionError {
             Self::HostRefused => "Make sure Remote Desktop is turned on for that computer and the port is correct.",
             Self::Timeout => "Check that the computer is on and awake, that you are on the same network or connected to the VPN, and that a firewall isn't blocking the connection.",
             Self::HostNotFound => "Check the computer name or use its IP address.",
-            Self::ConnectionLost => "The network dropped. The app will try to reconnect a few times.",
+            Self::ConnectionLost => "The network connection dropped and reconnecting automatically didn't work. Check your network or VPN, then reconnect.",
             Self::CertificateUnknown => "Compare the fingerprint shown with the one on the remote computer before trusting it. Only continue if they match.",
             Self::CertificateRejected => "You chose not to trust this computer's certificate, so the connection was stopped before your password was sent.",
             Self::CertificateChanged => "Its security certificate is different from last time. This can happen after reinstalling Windows, but it can also mean someone is intercepting the connection. The connection was blocked and no password was sent.",
@@ -103,13 +107,32 @@ impl ConnectionError {
             Self::SessionTakenOver => "Another sign-in to the same account ended this session. You can reconnect, which will end theirs.",
             Self::IdleTimeout => "The session was idle for too long. Reconnect when you need it.",
             Self::VaultUnavailable => "The saved password couldn't be read from this device's secure password storage (it may be locked, missing or unavailable). Type the password to connect, or edit the connection to save it again.",
+            Self::AppInBackground => "To save battery and keep the connection secure, a session ends 5 minutes after you leave the app. Reconnect to continue.",
             Self::Unexpected => "Try again. If it keeps happening, restart the app.",
         }
     }
 
     /// Whether the app may reconnect automatically after this error (SA-8, F13).
+    ///
+    /// Only network problems qualify. Anything about the password or account,
+    /// the certificate, or a decision by the user or the remote computer never
+    /// does, so a wrong password is never retried (account lockout).
+    /// `HostRefused` and `HostNotFound` only arise while reconnecting (the
+    /// computer restarting, or the network still coming back).
     pub const fn auto_reconnect_allowed(self) -> bool {
-        matches!(self, Self::ConnectionLost | Self::Timeout)
+        matches!(
+            self,
+            Self::ConnectionLost | Self::Timeout | Self::HostRefused | Self::HostNotFound
+        )
+    }
+
+    /// Wait before reconnect attempt `attempt` (1-based): 2 s, 5 s, then 10 s.
+    pub const fn reconnect_delay(attempt: u8) -> core::time::Duration {
+        core::time::Duration::from_secs(match attempt {
+            0 | 1 => 2,
+            2 => 5,
+            _ => 10,
+        })
     }
 
     /// Whether this error is a security warning that needs extra emphasis.
@@ -393,5 +416,53 @@ mod tests {
     #[test]
     fn rejected_certificate_never_retries() {
         assert!(!ConnectionError::CertificateRejected.auto_reconnect_allowed());
+    }
+
+    /// SA-8: the exact set of errors that may be retried automatically.
+    #[test]
+    fn only_network_errors_are_retried() {
+        let retried: Vec<_> = ConnectionError::ALL
+            .into_iter()
+            .filter(|e| e.auto_reconnect_allowed())
+            .collect();
+        assert_eq!(
+            retried,
+            [
+                ConnectionError::HostRefused,
+                ConnectionError::Timeout,
+                ConnectionError::HostNotFound,
+                ConnectionError::ConnectionLost,
+            ]
+        );
+    }
+
+    #[test]
+    fn reconnect_gives_up_after_the_limit() {
+        let lost = Event::Error(ConnectionError::ConnectionLost);
+        let s = run(&[
+            Event::ConnectRequested,
+            Event::SessionReady,
+            lost,
+            lost,
+            lost,
+        ]);
+        assert_eq!(s, Ok(Status::Reconnecting { attempt: 3 }));
+        let s = run(&[
+            Event::ConnectRequested,
+            Event::SessionReady,
+            lost,
+            lost,
+            lost,
+            lost,
+        ]);
+        assert_eq!(s, Ok(Status::Failed(ConnectionError::ConnectionLost)));
+    }
+
+    #[test]
+    fn reconnect_delays_grow() {
+        let d: Vec<u64> = (1..=4)
+            .map(|a| ConnectionError::reconnect_delay(a).as_secs())
+            .collect();
+        assert_eq!(d, [2, 5, 10, 10]);
     }
 }

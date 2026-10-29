@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../platform/remote_clipboard.dart';
+import '../platform/session_service.dart';
 import '../session/scancodes.dart';
 import '../src/rust/api/errors.dart';
 import '../src/rust/api/pins.dart';
@@ -21,8 +22,8 @@ import 'status_chip.dart';
 /// prompt, the remote screen, keyboard/mouse/touch input (direct touch or
 /// trackpad mode, with pinch-zoom) and a small bar of special keys.
 ///
-/// Pops with `true` when the user asks to reconnect after re-trusting a
-/// changed certificate.
+/// Pops with `true` when the user asks to connect again (the Reconnect button,
+/// or after re-trusting a changed certificate).
 class SessionScreen extends StatefulWidget {
   const SessionScreen({
     super.key,
@@ -95,6 +96,10 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   bool _decoding = false;
   bool _dirty = false;
 
+  // Android background grace period (decision 8).
+  Timer? _backgroundTimer;
+  bool _serviceStarted = false;
+
   // Clipboard (S6).
   Timer? _clipTimer;
   String? _lastLocalClip;
@@ -107,13 +112,16 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _start();
+    // Start after the first frame: _start reads the window size with View.of,
+    // which must not be called from initState.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _start());
   }
 
   /// Desktop: check this device's clipboard every second while connected.
   /// Android: only when the app comes back to the foreground or on request,
   /// because Android shows a notice every time an app reads the clipboard.
   void _startClipboardSync() {
+    _clipTimer?.cancel(); // also called again after an automatic reconnect
     if (!_sendsClipboard) return;
     _offerLocalClipboard();
     if (!_isAndroid) {
@@ -129,10 +137,27 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     _session.offerClipboardText(text: text);
   }
 
+  bool get _sessionOpen =>
+      _state == RdpConnectionState.connected || _state == RdpConnectionState.reconnecting;
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && _state == RdpConnectionState.connected) {
-      _offerLocalClipboard();
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _backgroundTimer?.cancel();
+        _backgroundTimer = null;
+        if (_state == RdpConnectionState.connected) _offerLocalClipboard();
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+        // Android: end the session if the app stays in the background (decision 8).
+        if (SessionService.isAndroid && _sessionOpen && !_ended) {
+          _backgroundTimer ??= Timer(SessionService.backgroundGrace, () {
+            if (!_ended) _session.disconnectInBackground();
+          });
+        }
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+        break;
     }
   }
 
@@ -183,6 +208,10 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
         });
         if (u.connected) {
           _wasConnected = true;
+          if (!_serviceStarted) {
+            _serviceStarted = true;
+            SessionService.start();
+          }
           _focus.requestFocus();
           _startClipboardSync();
         }
@@ -207,6 +236,13 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
           _lastLocalClip = text; // don't send it straight back
           RemoteClipboard.setText(text);
         }
+      case UpdateKind.reconnecting:
+        // The network dropped; Rust is reconnecting (F13). Input is ignored meanwhile.
+        _clipTimer?.cancel();
+        setState(() {
+          _state = RdpConnectionState.reconnecting;
+          _statusLabel = u.label ?? RdpConnectionState.reconnecting.label;
+        });
       case UpdateKind.remoteClipboardTooLarge:
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -253,6 +289,8 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
 
   void _onEnded(ErrorInfo? error) {
     _clipTimer?.cancel();
+    _backgroundTimer?.cancel();
+    if (_serviceStarted) SessionService.stop();
     if (_ended) return;
     widget.onOutcome?.call(error?.id ?? (_wasConnected ? 'connected' : 'cancelled'));
     setState(() {
@@ -332,6 +370,8 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _clipTimer?.cancel();
+    _backgroundTimer?.cancel();
+    if (_serviceStarted) SessionService.stop();
     if (!_ended) {
       // Leaving the screen ends the session; record it before the stream is cancelled.
       // Deferred: listeners must not rebuild widgets while the tree is locked.
@@ -346,13 +386,29 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     super.dispose();
   }
 
+  /// Errors after which one tap may connect again. Not offered for password,
+  /// account or certificate problems (those need the user to act first).
+  static const _reconnectable = {
+    'ConnectionLost',
+    'Timeout',
+    'HostRefused',
+    'HostNotFound',
+    'DisconnectedByHost',
+    'SessionTakenOver',
+    'IdleTimeout',
+    'AppInBackground',
+    'Unexpected',
+  };
+
+  bool get _canReconnect => _error != null && _reconnectable.contains(_error!.id);
+
   // ---------------------------------------------------------------- input
 
   static const maxZoom = 4.0;
 
   /// Scale with zoom 1 = whole desktop visible (like BoxFit.contain).
   double _baseScale(Size box) =>
-      (_width == 0 || _height == 0) ? 0 : math.min(box.width / _width, box.height / _height);
+      (_width == 0 || _height == 0) ? 0.0 : math.min(box.width / _width, box.height / _height);
 
   double _scale(Size box) => _baseScale(box) * _zoom;
 
@@ -589,7 +645,41 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
                   _session.wheel(vertical: true, delta: e.scrollDelta.dy > 0 ? -120 : 120);
                 }
               },
-              child: _desktop(image, box),
+              child: _state == RdpConnectionState.reconnecting
+                  ? Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        _desktop(image, box),
+                        // Blocks input while the connection is being restored.
+                        AbsorbPointer(
+                          child: ColoredBox(
+                            color: Colors.black54,
+                            child: Center(
+                              child: Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Flexible(
+                                        child: Text(_statusLabel, key: const Key('reconnecting-label')),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : _desktop(image, box),
             ),
           ),
         );
@@ -740,9 +830,23 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
           if (_ended)
             Padding(
               padding: const EdgeInsets.all(12),
-              child: FilledButton.tonal(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Back to connections'),
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  if (_canReconnect)
+                    FilledButton.icon(
+                      key: const Key('button-reconnect'),
+                      onPressed: () => Navigator.of(context).pop(true),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Reconnect'),
+                    ),
+                  FilledButton.tonal(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Back to connections'),
+                  ),
+                ],
               ),
             ),
           if (!_ended) Expanded(child: _remoteView()),

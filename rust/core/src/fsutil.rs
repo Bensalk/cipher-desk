@@ -12,10 +12,36 @@ use std::path::{Path, PathBuf};
 /// Largest app data file we read (protects against huge or hostile files).
 pub const MAX_FILE_BYTES: u64 = 4 * 1024 * 1024;
 
+/// Temporary file next to `path`, unique to this process and call, so two
+/// running copies of the app never write into the same temporary file.
+fn temp_path(path: &Path) -> PathBuf {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let mut name = std::ffi::OsString::from(".");
+    name.push(path.file_name().unwrap_or_default());
+    name.push(format!(".{}-{n}.tmp", std::process::id()));
+    path.with_file_name(name)
+}
+
 pub fn write_atomically(path: &Path, data: &[u8]) -> std::io::Result<()> {
     let dir = path.parent().unwrap_or_else(|| Path::new("."));
     std::fs::create_dir_all(dir)?;
-    let tmp = path.with_extension("tmp");
+    let tmp = temp_path(path);
+    let result = write_and_rename(&tmp, path, data);
+    if result.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    result?;
+    // Make the rename itself durable (Unix; Windows has no directory handles).
+    #[cfg(unix)]
+    if let Ok(d) = std::fs::File::open(dir) {
+        let _ = d.sync_all();
+    }
+    Ok(())
+}
+
+fn write_and_rename(tmp: &Path, path: &Path, data: &[u8]) -> std::io::Result<()> {
     {
         let mut opts = std::fs::OpenOptions::new();
         opts.write(true).create(true).truncate(true);
@@ -24,12 +50,11 @@ pub fn write_atomically(path: &Path, data: &[u8]) -> std::io::Result<()> {
             use std::os::unix::fs::OpenOptionsExt as _;
             opts.mode(0o600);
         }
-        let mut f = opts.open(&tmp)?;
+        let mut f = opts.open(tmp)?;
         f.write_all(data)?;
         f.sync_all()?;
     }
-    std::fs::rename(&tmp, path)?;
-    Ok(())
+    std::fs::rename(tmp, path)
 }
 
 /// Path of the backup kept next to `path`.
@@ -90,8 +115,25 @@ mod tests {
         write_with_backup(&p, b"two")?;
         assert_eq!(std::fs::read(&p)?, b"two");
         assert_eq!(std::fs::read(backup_path(&p))?, b"one");
-        assert!(!p.with_extension("tmp").exists());
+        // No temporary files are left behind.
+        let left: Vec<_> = std::fs::read_dir(dir.path())?
+            .filter_map(Result::ok)
+            .filter(|e| e.file_name().to_string_lossy().ends_with(".tmp"))
+            .collect();
+        assert!(left.is_empty());
         Ok(())
+    }
+
+    #[test]
+    fn temp_names_are_unique_and_hidden() {
+        let p = Path::new("/data/connections.json");
+        let a = temp_path(p);
+        let b = temp_path(p);
+        assert_ne!(a, b);
+        assert_eq!(a.parent(), p.parent());
+        assert!(a
+            .file_name()
+            .is_some_and(|n| n.to_string_lossy().starts_with(".connections.json.")));
     }
 
     #[test]

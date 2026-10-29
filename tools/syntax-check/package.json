@@ -1,7 +1,7 @@
 {
-  "name": "rdpv-dart-syntax",
+  "name": "rdpv-syntax-check",
   "private": true,
-  "description": "Syntax-only check of the app's Dart files, for machines without the Flutter SDK. Not a replacement for flutter analyze.",
+  "description": "Syntax-only check of the app's Dart and Kotlin files, for machines without the Flutter SDK. Not a replacement for flutter analyze.",
   "license": "Apache-2.0",
   "scripts": { "check": "node check.js" },
   "dependencies": {

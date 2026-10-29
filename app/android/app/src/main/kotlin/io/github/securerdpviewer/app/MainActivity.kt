@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.PersistableBundle
@@ -63,6 +64,28 @@ class MainActivity : FlutterFragmentActivity() {
             result.success(null)
         }
 
+        // Foreground service while a session is open (decision 8).
+        MethodChannel(messenger, "rdpv/session_service").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "start" -> {
+                    askForNotificationsOnce()
+                    try {
+                        SessionService.start(this)
+                        result.success(true)
+                    } catch (e: IllegalStateException) {
+                        // Android refused (e.g. started from the background): the
+                        // session still works while the app is open.
+                        result.success(false)
+                    }
+                }
+                "stop" -> {
+                    SessionService.stop(this)
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
         // Saved passwords in the Android Keystore (S4, S5).
         MethodChannel(messenger, "rdpv/vault").setMethodCallHandler { call, result ->
             val id = call.argument<String>("id")
@@ -87,6 +110,27 @@ class MainActivity : FlutterFragmentActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    /**
+     * Android 13+: the session notification needs permission to be shown. Asked
+     * when the first session starts; if refused, the session still works and
+     * the notification only appears in the system's task manager.
+     */
+    private fun askForNotificationsOnce() {
+        if (Build.VERSION.SDK_INT < 33) return
+        val permission = android.Manifest.permission.POST_NOTIFICATIONS
+        if (checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) return
+        val prefs = getSharedPreferences("rdpv_ui", Context.MODE_PRIVATE)
+        if (prefs.getBoolean("asked_notifications", false)) return
+        prefs.edit().putBoolean("asked_notifications", true).apply()
+        requestPermissions(arrayOf(permission), 1)
+    }
+
+    override fun onDestroy() {
+        // The Flutter engine (and the session) goes with the activity.
+        SessionService.stop(this)
+        super.onDestroy()
     }
 
     private fun setSecure(enabled: Boolean) {

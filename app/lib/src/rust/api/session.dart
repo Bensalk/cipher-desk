@@ -8,8 +8,8 @@ import 'errors.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 
-            // These functions are ignored because they are not marked as `pub`: `approval`, `changed`, `drive`, `ended`, `frame`, `new`, `policy`, `remote_clipboard`, `resized`, `run`, `send`, `spawn`, `status`, `union`, `wait_for_approval`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Command`, `Target`
+            // These functions are ignored because they are not marked as `pub`: `approval`, `changed`, `drive`, `ended`, `frame`, `new`, `pause`, `pending_disconnect`, `policy`, `reconnect`, `reconnecting`, `remote_clipboard`, `resized`, `run`, `send`, `spawn`, `status`, `union`, `wait_for_approval`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Command`, `Drive`, `Reconnect`, `Target`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`
 
 
@@ -32,6 +32,12 @@ static RdpSession  create()=>RustLib.instance.api.crateApiSessionRdpSessionCreat
 
 /// Disconnects politely.
  void  disconnect();
+
+
+/// Disconnects politely because the app stayed in the background too long
+/// (Android, decision 8). The session ends with that reason, so the UI can
+/// explain it and offer to reconnect.
+ void  disconnectInBackground();
 
 
 /// Presses or releases a key by PC scancode (set 1).
@@ -146,6 +152,9 @@ ended,
 remoteClipboard,
 /// Text copied on the remote computer was larger than allowed and was dropped.
 remoteClipboardTooLarge,
+/// The network dropped; reconnect attempt `x` of `y` is under way (`label`).
+/// Input is ignored until `Status` with `connected` arrives again.
+reconnecting,
                     ;
                     
                 }

@@ -28,6 +28,9 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 zeroize.workspace = true
 thiserror.workspace = true
+# TCP keepalive settings (detects silently dropped networks, F13). "all" enables
+# the probe count setting.
+socket2 = { version = "0.6", features = ["all"] }
 
 keyring-core = "1"
 

@@ -545,3 +545,92 @@ Stage 8 — reliability: reconnecting after network drops, Android background be
 | R25 | Leaving the session screen recorded no history entry, and recording it during the screen's disposal could rebuild widgets at a forbidden moment | Recorded when leaving, deferred until the screen is gone |
 | R26 | Saving could silently drop connections over 500, and an import could exceed the limit | The form refuses a new connection at the limit; import adds only what fits and says so |
 | R27 | Readiness check and shared-certificate check compared addresses case-sensitively, unlike the certificate store | Both ignore case now |
+
+---
+
+## Review of Stage 7 (29 Oct 2026, second pass)
+
+| # | Problem found | Fix |
+|---|---------------|-----|
+| R28 | **Sessions could not open:** Stage 7 removed the `await` before `View.of(context)` in the session screen, so it ran inside `initState`, which Flutter forbids (an exception in debug builds, no session started) | The session now starts after the first frame |
+| R29 | **Possible data loss:** if the connections file existed but couldn't be read (e.g. permissions), the app started with an empty list and the next change overwrote the file | After a read error nothing is saved in that run, and the notice says so |
+| R30 | Two running copies of the app used the same temporary file name when saving, so one could corrupt the other's write; a failed write left the temporary file behind | Temporary names are unique per process and write; they are removed on failure; the folder is synced after the rename (Unix) |
+| R31 | The "Connection lost" message promised automatic reconnecting, which did not exist yet | Built in Stage 8 (below); the message now describes what happens after the retries |
+
+---
+
+## Stage 8 — Reliability ✅ Engine verified live; Android service and Flutter parts awaiting first CI run (29 Oct 2026)
+
+### Objective
+Recover from network drops without risking account lockout, detect networks
+that vanish silently, handle Android's background rules (decision 8), and check
+that long sessions don't leak memory.
+
+### Completed
+- **Automatic reconnect (F13, SA-8):** after a network drop the session reconnects
+  up to **3 times** (after 2 s, 5 s, 10 s) to the same address. The computer must present
+  the **same trusted certificate**; a different one is blocked at once. A **wrong password,
+  account problem, refused certificate or any other non-network error stops immediately**
+  — it is never retried. The user can disconnect during the pauses. While reconnecting,
+  the screen stays visible behind a "Connection lost. Reconnecting (1 of 3)…" overlay
+  and input is ignored.
+- **Silent drops:** TCP keepalive (15 s idle, 5 s probes, 3 probes) plus `TCP_USER_TIMEOUT`
+  on Linux/Android, so a vanished network is noticed in about 30 s instead of never.
+  Read time-outs and dead connections are now told apart per platform.
+- **Android background (decision 8):** a foreground service with a notification keeps the
+  session while the app is in the background; after **5 minutes** in the background the
+  session ends with "Disconnected while in the background". The notification never names
+  the computer (lock-screen privacy). Notification permission is asked once (Android 13+);
+  if refused the session still works. Permissions now: network, foreground service
+  (special use, with the stated reason), notifications.
+- **Reconnect button** after a session ends for network, host, idle and background reasons
+  (not after password, account or certificate problems).
+- **Bridge refactor:** the session worker no longer depends on the Flutter stream type, so it
+  can be tested directly; the reconnect rules are a separate function tested with fake results.
+- **`tools/syntax-check`** (renamed from `dart-syntax`) now also checks Kotlin files.
+- `SECURITY.md` describes reconnecting (and that the password stays in memory, wiped at the
+  end, for the session) and the Android background behaviour.
+
+### Test results (Ubuntu 24.04, Rust 1.97.0)
+
+| Check | Result |
+|-------|--------|
+| fmt, clippy (`-D warnings`), policy, cargo-deny | ✅ PASS |
+| Unit tests | ✅ PASS — 102/102 (82 core + 20 bridge) |
+| Reconnect rules: wrong password / account problem → 1 attempt, stop; network errors → 3 attempts then "Connection lost"; changed certificate → blocked; unpinned certificate → no prompt; disconnect (and background disconnect) during a pause | ✅ |
+| Only network errors may be retried (exact list) | ✅ |
+| **L1** live: connection cut → "Reconnecting (1 of 3)" → reconnected without prompts; again after a second cut | ✅ |
+| **L2** live: after a drop a different computer answers → certificate change shown, blocked | ✅ |
+| **L3** live: network silently black-holed (iptables) → detected after **30.5 s**, reconnected when the network returned | ✅ |
+| **L4** live: background disconnect ends with its own reason | ✅ |
+| **L5** live: wrong password → ended, never retried | ✅ |
+| **L6** live: 60 s session with constant screen changes — memory flat (49.4 MB → 49.4 MB) | ✅ |
+| **L6** live for **10 minutes** (2,368 screen updates) — memory flat (33.9 MB → 33.9 MB) | ✅ |
+| Whole live suite on the final code: connection 10/10 (debug and release), vault, no-vault refusal, clipboard 6/6, L1–L6 (silent drop detected after 30.6 s; no firewall rules left behind) | ✅ PASS |
+| Dart and Kotlin syntax (all files) | ✅ PASS |
+| actionlint (CI now also runs L1, L2, L4–L6) | ✅ PASS |
+| Android foreground service, notification, 5-minute grace period, Reconnect button, overlay | ⛔ **NOT RUN** — needs Flutter / an Android device (CI) |
+| Wi-Fi ↔ mobile data switch on a phone | ⛔ **NOT RUN** — needs a device |
+| Reconnect against a **Windows** host | ⛔ **NOT RUN** — no Windows host here |
+
+### Known issues (end-of-stage review)
+- **KI-31:** To reconnect without asking, the password stays in the Rust worker's memory
+  (wiped on drop) for the whole session, not only while connecting (extends KI-13).
+- **KI-32:** If a session was started with a typed password, the Reconnect button asks for
+  it again (the app does not keep typed passwords after a session ends).
+- **KI-33:** Windows offers no setting for how long unacknowledged data is retried, so if
+  input was being sent when the network vanished, Windows may take longer than 30 s to
+  notice (Linux/Android: about 30 s either way).
+- **KI-34:** The Android service type is "special use", which Google Play reviews by hand;
+  the stated reason is in the manifest. Not an issue for direct APK installs.
+- **KI-35:** If Android destroys the app's screen while in the background, the session ends
+  at once rather than after 5 minutes (the session lives with the screen).
+- **Test note:** a keyring file left by an earlier local run (made with a different random
+  unlock password) made the keyring ask for a password and the vault tests fail; with a fresh
+  keyring they pass. CI always starts fresh, so this only affects repeated local runs.
+- **KI-25 (still open):** the Flutter app has still never been compiled; CI must run first.
+
+### Next step
+Stage 9 — security verification: run the full security checklist (SA-1…SA-9),
+threat-model review, dependency audit, fuzzing of the parsers we own, and the
+SF-2 report decision.

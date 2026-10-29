@@ -312,9 +312,15 @@ impl Session {
         while started.elapsed() < POLL_BUDGET {
             let (action, payload) = match self.framed.read_pdu() {
                 Ok(pdu) => pdu,
-                Err(e) if is_timeout(&e) => break,
+                Err(e) if is_idle_read(&e) => break,
                 Err(e) => {
-                    self.end(&mut events, Some(classify_io(&e)));
+                    // During a session every network failure is a lost connection,
+                    // including keepalive time-outs (it then reconnects, F13).
+                    let err = match classify_io(&e) {
+                        ConnectionError::Timeout => ConnectionError::ConnectionLost,
+                        other => other,
+                    };
+                    self.end(&mut events, Some(err));
                     break;
                 }
             };
@@ -807,7 +813,31 @@ fn resolve(endpoint: &Endpoint) -> Result<SocketAddr, ConnectionError> {
 fn set_timeouts(tcp: &TcpStream, t: Option<Duration>) -> io::Result<()> {
     tcp.set_read_timeout(t)?;
     tcp.set_write_timeout(Some(Duration::from_secs(10)))?;
-    tcp.set_nodelay(true)
+    tcp.set_nodelay(true)?;
+    set_keepalive(tcp)
+}
+
+/// Detects a network that disappears silently (Wi-Fi off, cable out, NAT
+/// dropped): after 15 s without traffic the system probes every 5 s, and after
+/// 3 unanswered probes (about 30 s) reads fail, the session ends with
+/// `ConnectionLost` and the app reconnects (F13).
+const KEEPALIVE_IDLE: Duration = Duration::from_secs(15);
+const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(5);
+const KEEPALIVE_PROBES: u32 = 3;
+
+fn set_keepalive(tcp: &TcpStream) -> io::Result<()> {
+    let ka = socket2::TcpKeepalive::new()
+        .with_time(KEEPALIVE_IDLE)
+        .with_interval(KEEPALIVE_INTERVAL)
+        .with_retries(KEEPALIVE_PROBES);
+    let sock = socket2::SockRef::from(tcp);
+    sock.set_tcp_keepalive(&ka)?;
+    // Keepalive only runs while nothing is waiting to be sent. If input was
+    // typed into a dead connection, this limits how long unacknowledged data
+    // is retried before the connection is declared lost (Linux and Android).
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    sock.set_tcp_user_timeout(Some(KEEPALIVE_IDLE + KEEPALIVE_INTERVAL * KEEPALIVE_PROBES))?;
+    Ok(())
 }
 
 fn tls_upgrade(
@@ -871,17 +901,32 @@ fn read_by_hint_blocking(
     loop {
         match framed.read_by_hint(hint) {
             Ok(pdu) => return Ok(pdu),
-            Err(e) if is_timeout(&e) && std::time::Instant::now() < deadline => continue,
+            Err(e) if is_idle_read(&e) && std::time::Instant::now() < deadline => continue,
             Err(e) => return Err(classify_io(&e)),
         }
     }
 }
 
+/// Any kind of time-out (used while connecting, where both mean "no answer").
 fn is_timeout(e: &io::Error) -> bool {
     matches!(
         e.kind(),
         io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
     )
+}
+
+/// A read during the session that simply found no data within the read timeout.
+///
+/// On Unix a read timeout is reported as `WouldBlock`; `TimedOut` there means
+/// the keepalive probes went unanswered, i.e. the connection is dead. Windows
+/// reports read timeouts as `TimedOut` (WSAETIMEDOUT) and keepalive failure as
+/// a reset or abort, which are classified as `ConnectionLost`.
+fn is_idle_read(e: &io::Error) -> bool {
+    if cfg!(windows) {
+        is_timeout(e)
+    } else {
+        e.kind() == io::ErrorKind::WouldBlock
+    }
 }
 
 // ---------------------------------------------------------------------------

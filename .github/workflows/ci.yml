@@ -84,6 +84,10 @@ jobs:
             cargo test -p rdpv-core --test live_clipboard -- --ignored --test-threads=1
             cargo test --release -p rdpv-core --test live_host -- --ignored --test-threads=1
           '
+      - name: Reliability tests (reconnect, certificate on reconnect, memory; Stage 8)
+        # L3 (silent network drop) needs root to change firewall rules; it is run
+        # locally and recorded in docs/PROGRESS.md.
+        run: cargo test -p rdpv-bridge --lib live_ -- --ignored --test-threads=1 --skip live_l3
       - name: Vault refuses to save when no keyring exists (I8)
         env:
           RDPV_TEST_VAULT: missing

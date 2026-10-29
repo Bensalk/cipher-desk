@@ -39,6 +39,15 @@ Only the latest release receives security fixes until version 1.0.
   Clipboard sharing is **opt-in per connection**, plain text only, up to 1 MB,
   in both or one direction. When it is off, the clipboard channel is not offered
   to the host at all. On Android, text from the host is marked sensitive.
+- **Automatic reconnect** after a network drop: at most 3 attempts, only to a
+  computer presenting the same trusted certificate, and **never after a wrong
+  password or account problem** (to avoid locking the account). To reconnect
+  without asking again, the password is kept in the app's memory (wiped when
+  the session ends) for the length of the session.
+- **Android:** while a session is open the app shows a notification (it never
+  names the computer) and keeps the session for at most 5 minutes in the
+  background, then disconnects. Permissions: network, foreground service and
+  notifications only.
 - Outside access is intended **only through a VPN** (e.g. WireGuard or
   Tailscale). Never expose RDP port 3389 to the internet.
 

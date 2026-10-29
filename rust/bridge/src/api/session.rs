@@ -1,8 +1,13 @@
 //! Remote desktop sessions for the UI (Stage 4).
 //!
-//! [`start_session`] runs the connection on a worker thread and streams
-//! [`SessionUpdate`]s to Flutter. The returned [`RdpSession`] handle sends
-//! input, answers the certificate prompt and disconnects.
+//! [`RdpSession::start`] runs the connection on a worker thread and streams
+//! [`SessionUpdate`]s to Flutter. The [`RdpSession`] handle sends input,
+//! answers the certificate prompt and disconnects.
+//!
+//! Stage 8: if the network drops during a session, the worker reconnects
+//! automatically (up to 3 tries, 2 s / 5 s / 10 s apart) to the same computer,
+//! which must present the same trusted certificate. It never retries after a
+//! password, account or certificate problem (SA-8).
 
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::time::Duration;
@@ -42,6 +47,9 @@ pub enum UpdateKind {
     RemoteClipboard,
     /// Text copied on the remote computer was larger than allowed and was dropped.
     RemoteClipboardTooLarge,
+    /// The network dropped; reconnect attempt `x` of `y` is under way (`label`).
+    /// Input is ignored until `Status` with `connected` arrives again.
+    Reconnecting,
 }
 
 /// Something the UI should show. Only the fields named for its `kind` are set.
@@ -94,6 +102,17 @@ impl SessionUpdate {
         }
     }
 
+    fn reconnecting(attempt: u8, max: u8) -> Self {
+        Self {
+            label: Some(format!(
+                "Connection lost. Reconnecting ({attempt} of {max})…"
+            )),
+            x: u16::from(attempt),
+            y: u16::from(max),
+            ..Self::new(UpdateKind::Reconnecting)
+        }
+    }
+
     fn approval(fingerprint: String) -> Self {
         Self {
             fingerprint: Some(fingerprint),
@@ -140,7 +159,9 @@ enum Command {
     Input(Vec<InputEvent>),
     OfferClipboard(String),
     ApproveCertificate(bool),
-    Disconnect,
+    /// End the session: `None` = the user disconnected; otherwise the reason
+    /// shown (e.g. the Android background grace period ended).
+    Disconnect(Option<ConnectionError>),
 }
 
 /// Handle to a session. Create it with [`RdpSession::create`], then call
@@ -253,7 +274,8 @@ impl RdpSession {
                         return;
                     }
                 };
-                run(&target, password, &sink, &rx);
+                let send = |u: SessionUpdate| sink.add(u).is_ok();
+                run(&target, password, &send, &rx);
             });
         if spawned.is_err() {
             tracing::error!("could not start the session thread");
@@ -355,7 +377,17 @@ impl RdpSession {
     /// Disconnects politely.
     #[flutter_rust_bridge::frb(sync)]
     pub fn disconnect(&self) {
-        let _ = self.tx.send(Command::Disconnect);
+        let _ = self.tx.send(Command::Disconnect(None));
+    }
+
+    /// Disconnects politely because the app stayed in the background too long
+    /// (Android, decision 8). The session ends with that reason, so the UI can
+    /// explain it and offer to reconnect.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn disconnect_in_background(&self) {
+        let _ = self
+            .tx
+            .send(Command::Disconnect(Some(ConnectionError::AppInBackground)));
     }
 
     fn send(&self, events: Vec<InputEvent>) {
@@ -402,12 +434,10 @@ struct Target {
     idle_minutes: u32,
 }
 
-fn run(
-    target: &Target,
-    password: SecretString,
-    sink: &StreamSink<SessionUpdate>,
-    rx: &Receiver<Command>,
-) {
+/// Sends an update to the UI; `false` means the UI has gone away.
+type Send<'a> = &'a dyn Fn(SessionUpdate) -> bool;
+
+fn run(target: &Target, password: SecretString, send: Send<'_>, rx: &Receiver<Command>) {
     let Target {
         host,
         port,
@@ -419,11 +449,8 @@ fn run(
         idle_minutes,
     } = target;
     let (port, width, height) = (*port, *width, *height);
-    let send = |u: SessionUpdate| {
-        let _ = sink.add(u);
-    };
     let fail = |e: ConnectionError| {
-        let _ = sink.add(SessionUpdate::ended(Some(e)));
+        send(SessionUpdate::ended(Some(e)));
     };
     send(SessionUpdate::status("Connecting…", false));
 
@@ -440,19 +467,21 @@ fn run(
     let key = endpoint.display();
     let policy = SecurityDefaults::secure();
     let mut pin = pins.get(&key).map(str::to_owned);
+    // The password stays in this thread (wiped when dropped) for the whole
+    // session, so a dropped network can be reconnected without asking again.
+    let params = |pin: Option<String>| ConnectParams {
+        endpoint: endpoint.clone(),
+        username: user.clone(),
+        password: SecretString::new(password.expose().to_owned()),
+        desktop_width: width,
+        desktop_height: height,
+        pinned_fingerprint: pin,
+        connect_timeout: policy.connect_timeout,
+        clipboard: clipboard.policy(),
+    };
 
-    let session = loop {
-        let params = ConnectParams {
-            endpoint: endpoint.clone(),
-            username: user.clone(),
-            password: SecretString::new(password.expose().to_owned()),
-            desktop_width: width,
-            desktop_height: height,
-            pinned_fingerprint: pin.clone(),
-            connect_timeout: policy.connect_timeout,
-            clipboard: clipboard.policy(),
-        };
-        match connect(params) {
+    let mut session = loop {
+        match connect(params(pin.clone())) {
             Ok(s) => break s,
             Err(ConnectFailure::CertificateNeedsApproval { fingerprint }) => {
                 send(SessionUpdate::status("Check computer identity", false));
@@ -467,7 +496,8 @@ fn run(
                     }
                     Some(false) => return fail(ConnectionError::CertificateRejected),
                     None => {
-                        return send(SessionUpdate::ended(None));
+                        send(SessionUpdate::ended(None));
+                        return;
                     }
                 }
             }
@@ -478,9 +508,127 @@ fn run(
             Err(ConnectFailure::Failed(e)) => return fail(e),
         }
     };
-    drop(password);
     let idle = (*idle_minutes > 0).then(|| Duration::from_secs(u64::from(*idle_minutes) * 60));
-    drive(session, sink, rx, idle);
+
+    loop {
+        match drive(session, send, rx, idle) {
+            Drive::Ended(err) => {
+                send(SessionUpdate::ended(err));
+                return;
+            }
+            Drive::UiGone => return,
+            Drive::Lost(err) => {
+                match reconnect(
+                    &|| connect(params(pin.clone())),
+                    send,
+                    rx,
+                    policy.max_auto_reconnects,
+                    &ConnectionError::reconnect_delay,
+                    err,
+                ) {
+                    Reconnect::Connected(s) => session = *s,
+                    Reconnect::Stopped => return,
+                }
+            }
+        }
+    }
+}
+
+/// How [`drive`] finished.
+enum Drive {
+    /// The session is over: user disconnect (`None`) or a final error.
+    Ended(Option<ConnectionError>),
+    /// The network dropped; reconnecting is allowed.
+    Lost(ConnectionError),
+    /// The UI went away (screen closed); nothing more to send.
+    UiGone,
+}
+
+enum Reconnect {
+    Connected(Box<Session>),
+    /// Gave up or the user disconnected; the final update was sent.
+    Stopped,
+}
+
+/// Reconnects after a network drop (F13, SA-8): up to `max` attempts with
+/// growing pauses. The computer must present the trusted certificate (the
+/// connection is pinned); a changed certificate or any password/account error
+/// stops at once. The user can disconnect during the pauses.
+fn reconnect(
+    connect_again: &dyn Fn() -> Result<Session, ConnectFailure>,
+    send: Send<'_>,
+    rx: &Receiver<Command>,
+    max: u8,
+    delay: &dyn Fn(u8) -> Duration,
+    first: ConnectionError,
+) -> Reconnect {
+    let stop = |err: Option<ConnectionError>| {
+        send(SessionUpdate::ended(err));
+        Reconnect::Stopped
+    };
+    tracing::info!(reason = ?first, "connection lost; reconnecting");
+    for attempt in 1..=max {
+        if !send(SessionUpdate::reconnecting(attempt, max)) {
+            return Reconnect::Stopped;
+        }
+        if let Some(reason) = pause(rx, delay(attempt)) {
+            return stop(reason);
+        }
+        match connect_again() {
+            Ok(s) => {
+                // A disconnect pressed while connecting still wins.
+                if let Some(reason) = pending_disconnect(rx) {
+                    s.disconnect();
+                    return stop(reason);
+                }
+                return Reconnect::Connected(Box::new(s));
+            }
+            Err(ConnectFailure::CertificateChanged { pinned, presented }) => {
+                send(SessionUpdate::changed(pinned, presented));
+                return stop(Some(ConnectionError::CertificateChanged));
+            }
+            Err(ConnectFailure::CertificateNeedsApproval { .. }) => {
+                // Cannot happen with a pinned certificate; never prompt silently.
+                return stop(Some(ConnectionError::CertificateUnknown));
+            }
+            Err(ConnectFailure::Failed(e)) if e.auto_reconnect_allowed() => {}
+            // Wrong password, account locked, etc.: stop at once (SA-8).
+            Err(ConnectFailure::Failed(e)) => return stop(Some(e)),
+        }
+    }
+    // Out of attempts: report the drop itself, whose advice says what to check.
+    stop(Some(ConnectionError::ConnectionLost))
+}
+
+/// Waits `d`, dropping input. Returns `Some(reason)` if a disconnect was
+/// requested (or the UI went away) meanwhile.
+fn pause(rx: &Receiver<Command>, d: Duration) -> Option<Option<ConnectionError>> {
+    let until = std::time::Instant::now() + d;
+    loop {
+        let left = until.saturating_duration_since(std::time::Instant::now());
+        if left.is_zero() {
+            return None;
+        }
+        match rx.recv_timeout(left) {
+            Ok(Command::Disconnect(reason)) => return Some(reason),
+            Err(RecvTimeoutError::Disconnected) => return Some(None),
+            Err(RecvTimeoutError::Timeout) => return None,
+            // Typing, clicks and clipboard offers during the outage are dropped.
+            Ok(_) => {}
+        }
+    }
+}
+
+/// A disconnect request already waiting in the queue, if any.
+fn pending_disconnect(rx: &Receiver<Command>) -> Option<Option<ConnectionError>> {
+    loop {
+        match rx.try_recv() {
+            Ok(Command::Disconnect(reason)) => return Some(reason),
+            Ok(_) => {}
+            Err(mpsc::TryRecvError::Empty) => return None,
+            Err(mpsc::TryRecvError::Disconnected) => return Some(None),
+        }
+    }
 }
 
 /// Waits for the user's answer. `None` means disconnect was requested.
@@ -488,7 +636,7 @@ fn wait_for_approval(rx: &Receiver<Command>) -> Option<bool> {
     loop {
         match rx.recv() {
             Ok(Command::ApproveCertificate(a)) => return Some(a),
-            Ok(Command::Disconnect) | Err(_) => return None,
+            Ok(Command::Disconnect(_)) | Err(_) => return None,
             // Input and clipboard offers before the session exists are dropped.
             Ok(Command::Input(_) | Command::OfferClipboard(_)) => {}
         }
@@ -497,15 +645,25 @@ fn wait_for_approval(rx: &Receiver<Command>) -> Option<bool> {
 
 fn drive(
     mut s: Session,
-    sink: &StreamSink<SessionUpdate>,
+    send: Send<'_>,
     rx: &Receiver<Command>,
     idle_limit: Option<Duration>,
-) {
-    let send = |u: SessionUpdate| sink.add(u).is_ok();
+) -> Drive {
     let (w, h) = s.size();
     send(SessionUpdate::resized(w, h));
-    send(SessionUpdate::status("Connected", true));
+    if !send(SessionUpdate::status("Connected", true)) {
+        s.disconnect();
+        return Drive::UiGone;
+    }
     let mut last_input = std::time::Instant::now();
+    // A session error: network drops may be reconnected, the rest end it.
+    let ended = |err: ConnectionError| {
+        if err.auto_reconnect_allowed() {
+            Drive::Lost(err)
+        } else {
+            Drive::Ended(Some(err))
+        }
+    };
 
     loop {
         // Input and control commands first, so typing stays responsive.
@@ -514,22 +672,23 @@ fn drive(
                 Ok(Command::Input(events)) => {
                     last_input = std::time::Instant::now();
                     if let Err(e) = s.send_input(events) {
-                        let _ = sink.add(SessionUpdate::ended(Some(e)));
-                        return;
+                        return ended(e);
                     }
                 }
                 Ok(Command::OfferClipboard(text)) => {
                     // Copying on this device is not user input to the session.
                     if let Err(e) = s.offer_local_clipboard(text) {
-                        let _ = sink.add(SessionUpdate::ended(Some(e)));
-                        return;
+                        return ended(e);
                     }
                 }
                 Ok(Command::ApproveCertificate(_)) => {}
-                Ok(Command::Disconnect) | Err(RecvTimeoutError::Disconnected) => {
+                Ok(Command::Disconnect(reason)) => {
                     s.disconnect();
-                    let _ = sink.add(SessionUpdate::ended(None));
-                    return;
+                    return Drive::Ended(reason);
+                }
+                Err(RecvTimeoutError::Disconnected) => {
+                    s.disconnect();
+                    return Drive::UiGone;
                 }
                 Err(RecvTimeoutError::Timeout) => break,
             }
@@ -538,8 +697,7 @@ fn drive(
         // S7: idle disconnect.
         if idle_limit.is_some_and(|limit| last_input.elapsed() >= limit) {
             s.disconnect();
-            let _ = sink.add(SessionUpdate::ended(Some(ConnectionError::IdleTimeout)));
-            return;
+            return Drive::Ended(Some(ConnectionError::IdleTimeout));
         }
 
         let mut dirty: Option<Region> = None;
@@ -549,7 +707,7 @@ fn drive(
                 SessionEvent::Resized { width, height } => {
                     if !send(SessionUpdate::resized(width, height)) {
                         s.disconnect();
-                        return;
+                        return Drive::UiGone;
                     }
                     let full = Region {
                         left: 0,
@@ -565,10 +723,8 @@ fn drive(
                 SessionEvent::RemoteClipboardTooLarge => {
                     send(SessionUpdate::new(UpdateKind::RemoteClipboardTooLarge));
                 }
-                SessionEvent::Ended(err) => {
-                    let _ = sink.add(SessionUpdate::ended(err));
-                    return;
-                }
+                SessionEvent::Ended(None) => return Drive::Ended(None),
+                SessionEvent::Ended(Some(err)) => return ended(err),
             }
         }
         if let Some(r) = dirty {
@@ -576,7 +732,7 @@ fn drive(
             // The UI went away: end the session.
             if !send(update) {
                 s.disconnect();
-                return;
+                return Drive::UiGone;
             }
         }
     }
@@ -623,4 +779,165 @@ mod tests {
         );
         assert_eq!(union(None, b), b);
     }
+
+    // ------------------------------------------------ reconnect rules (F13, SA-8)
+
+    use std::cell::{Cell, RefCell};
+
+    struct Run {
+        updates: Vec<SessionUpdate>,
+        attempts: u32,
+        stopped: bool,
+    }
+
+    /// Runs `reconnect` with a fake connector that fails with `results` in turn.
+    fn try_reconnect(results: Vec<ConnectFailure>, before: impl FnOnce(&Sender<Command>)) -> Run {
+        let (tx, rx) = mpsc::channel();
+        before(&tx);
+        let updates = RefCell::new(Vec::new());
+        let send = |u: SessionUpdate| {
+            updates.borrow_mut().push(u);
+            true
+        };
+        let attempts = Cell::new(0u32);
+        let results = RefCell::new(results.into_iter());
+        let connect_again = || {
+            attempts.set(attempts.get() + 1);
+            Err(results
+                .borrow_mut()
+                .next()
+                .unwrap_or(ConnectFailure::Failed(ConnectionError::Timeout)))
+        };
+        let out = reconnect(
+            &connect_again,
+            &send,
+            &rx,
+            3,
+            &|_| Duration::from_millis(1),
+            ConnectionError::ConnectionLost,
+        );
+        drop(tx);
+        Run {
+            updates: updates.into_inner(),
+            attempts: attempts.get(),
+            stopped: matches!(out, Reconnect::Stopped),
+        }
+    }
+
+    fn final_error(r: &Run) -> Option<String> {
+        let Some(last) = r.updates.last() else {
+            panic!("no updates were sent");
+        };
+        assert_eq!(last.kind, UpdateKind::Ended);
+        last.error.as_ref().map(|e| e.id.clone())
+    }
+
+    fn fail(e: ConnectionError) -> ConnectFailure {
+        ConnectFailure::Failed(e)
+    }
+
+    #[test]
+    fn wrong_password_while_reconnecting_stops_at_once() {
+        let r = try_reconnect(vec![fail(ConnectionError::WrongCredentials)], |_| {});
+        assert!(r.stopped);
+        assert_eq!(
+            r.attempts, 1,
+            "a wrong password must never be retried (SA-8)"
+        );
+        assert_eq!(final_error(&r).as_deref(), Some("WrongCredentials"));
+    }
+
+    #[test]
+    fn account_problem_while_reconnecting_stops_at_once() {
+        let r = try_reconnect(vec![fail(ConnectionError::AccountProblem)], |_| {});
+        assert_eq!(r.attempts, 1);
+        assert_eq!(final_error(&r).as_deref(), Some("AccountProblem"));
+    }
+
+    #[test]
+    fn network_errors_are_retried_up_to_the_limit() {
+        let r = try_reconnect(
+            vec![
+                fail(ConnectionError::Timeout),
+                fail(ConnectionError::HostRefused),
+                fail(ConnectionError::HostNotFound),
+            ],
+            |_| {},
+        );
+        assert_eq!(r.attempts, 3);
+        let shown: Vec<_> = r
+            .updates
+            .iter()
+            .filter(|u| u.kind == UpdateKind::Reconnecting)
+            .map(|u| (u.x, u.y))
+            .collect();
+        assert_eq!(shown, [(1, 3), (2, 3), (3, 3)]);
+        assert_eq!(final_error(&r).as_deref(), Some("ConnectionLost"));
+    }
+
+    #[test]
+    fn changed_certificate_while_reconnecting_is_blocked() {
+        let r = try_reconnect(
+            vec![ConnectFailure::CertificateChanged {
+                pinned: "AA".into(),
+                presented: "BB".into(),
+            }],
+            |_| {},
+        );
+        assert_eq!(r.attempts, 1);
+        assert!(r
+            .updates
+            .iter()
+            .any(|u| u.kind == UpdateKind::CertificateChanged));
+        assert_eq!(final_error(&r).as_deref(), Some("CertificateChanged"));
+    }
+
+    #[test]
+    fn unpinned_certificate_while_reconnecting_never_prompts() {
+        let r = try_reconnect(
+            vec![ConnectFailure::CertificateNeedsApproval {
+                fingerprint: "AA".into(),
+            }],
+            |_| {},
+        );
+        assert!(!r
+            .updates
+            .iter()
+            .any(|u| u.kind == UpdateKind::CertificateApproval));
+        assert_eq!(final_error(&r).as_deref(), Some("CertificateUnknown"));
+    }
+
+    #[test]
+    fn user_can_disconnect_while_waiting() {
+        let r = try_reconnect(vec![], |tx| {
+            let _ = tx.send(Command::Input(vec![InputEvent::MouseMove { x: 1, y: 1 }]));
+            let _ = tx.send(Command::Disconnect(None));
+        });
+        assert_eq!(
+            r.attempts, 0,
+            "no connection attempt after the user disconnected"
+        );
+        assert_eq!(final_error(&r), None);
+    }
+
+    #[test]
+    fn background_disconnect_while_waiting_keeps_its_reason() {
+        let r = try_reconnect(vec![], |tx| {
+            let _ = tx.send(Command::Disconnect(Some(ConnectionError::AppInBackground)));
+        });
+        assert_eq!(r.attempts, 0);
+        assert_eq!(final_error(&r).as_deref(), Some("AppInBackground"));
+    }
+
+    #[test]
+    fn reconnect_messages_contain_no_user_data() {
+        let u = SessionUpdate::reconnecting(2, 3);
+        assert_eq!(
+            u.label.as_deref(),
+            Some("Connection lost. Reconnecting (2 of 3)…")
+        );
+    }
 }
+
+#[cfg(test)]
+mod live_tests;

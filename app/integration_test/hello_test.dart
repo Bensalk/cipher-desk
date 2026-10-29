@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:secure_rdp_viewer/main.dart';
+import 'package:secure_rdp_viewer/platform/session_service.dart';
+import 'package:secure_rdp_viewer/src/rust/api/errors.dart';
 import 'package:secure_rdp_viewer/src/rust/frb_generated.dart';
 import 'package:secure_rdp_viewer/state/persistence.dart';
 import 'package:secure_rdp_viewer/state/profiles.dart';
@@ -158,5 +160,11 @@ void main() {
     await File(paths.connections).writeAsString('{ not json');
     final notice = ProfilePersistence(paths, ProfileStore()).start();
     expect(notice, isNotNull);
+  });
+
+  test('background grace period matches the message shown to the user', () {
+    final e = allConnectionErrors().firstWhere((e) => e.id == 'AppInBackground');
+    final minutes = SessionService.backgroundGrace.inMinutes;
+    expect(e.advice, contains('$minutes minutes'));
   });
 }

@@ -236,7 +236,8 @@ mod tests {
         assert_eq!(s.get("pc:3389"), Some(a.as_str()));
         s.forget("pc:3389")?;
         assert!(PinStore::open(&path)?.is_empty());
-        assert!(!path.with_extension("tmp").exists());
+        // Only the pin file remains: no temporary files left behind.
+        assert_eq!(std::fs::read_dir(dir.path())?.count(), 1);
         Ok(())
     }
 

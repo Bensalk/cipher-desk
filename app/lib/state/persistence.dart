@@ -52,8 +52,13 @@ class ProfilePersistence {
           ),
       ],
     );
+    if (r.readError) {
+      // The file exists but could not be read (for example, permissions). Saving
+      // now would overwrite it with an empty list, so nothing is saved this time.
+      return const LoadNotice("Saved connections couldn't be read. To protect them, changes "
+          "made now won't be saved. Restart the app to try again.");
+    }
     store.addListener(_saveOrReport);
-    if (r.readError) return const LoadNotice('Saved connections could not be read.');
     if (r.damagedAndReset) {
       return const LoadNotice('The saved connections file was damaged. It was kept aside and '
           'the list was started again.');
