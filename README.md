@@ -25,7 +25,9 @@ A secure, open-source remote desktop (RDP) viewer for **Windows, Linux and Andro
 | `app/` | Flutter app (Windows, Linux, Android) |
 | `app/rust_builder` | Builds the Rust library for each platform (Cargokit, from flutter_rust_bridge) |
 | `scripts/` | Git hooks, security policy checks, test hosts, release build helper |
+| `rust/fuzz` | Fuzzers for our parsers of untrusted input (test-only, separate workspace) |
 | `tools/rdp-test-host` | Test-only RDP host (NLA + scriptable clipboard) for live tests; never shipped |
+| `tools/syntax-check` | Syntax-only Dart/Kotlin checker for machines without Flutter (optional) |
 | `docs/` | Plan, progress record and design notes |
 
 ## Building
@@ -38,6 +40,8 @@ sh scripts/install-hooks.sh           # enable the secret-scanning pre-commit ho
 cargo test --workspace                # Rust core tests
 source scripts/start-test-hosts.sh    # optional: local RDP test hosts (Linux, bash)
 cargo test -p rdpv-core --test live_host -- --ignored --test-threads=1
+cargo test -p rdpv-bridge --lib live_ -- --ignored --test-threads=1 --skip live_l3
+bash rust/fuzz/run.sh 60              # optional: fuzz each parser for 60 s
 cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
 cd app
 flutter_rust_bridge_codegen generate --no-add-mod-to-lib
@@ -49,6 +53,10 @@ flutter run -d linux                  # or: -d windows, or an Android device
 
 Please read [`SECURITY.md`](SECURITY.md). Report vulnerabilities privately,
 never in a public issue.
+
+- [`docs/HOST_SETUP.md`](docs/HOST_SETUP.md): set up the remote computer safely (start here)
+- [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md): threats, mitigations and accepted risks
+- [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md): how each security requirement was verified
 
 ## Licence
 

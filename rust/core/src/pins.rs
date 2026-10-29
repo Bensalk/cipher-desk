@@ -64,6 +64,15 @@ pub struct PinStore {
     pins: BTreeMap<String, String>,
 }
 
+/// Parses the pin file's contents. Every fingerprint must be well formed.
+pub(crate) fn decode(bytes: &[u8]) -> Result<BTreeMap<String, String>, PinStoreError> {
+    let file: PinFile = serde_json::from_slice(bytes).map_err(|_| PinStoreError::Format)?;
+    if file.version != FORMAT_VERSION || !file.pins.values().all(|v| is_valid_fingerprint(v)) {
+        return Err(PinStoreError::Format);
+    }
+    Ok(file.pins)
+}
+
 /// Normalises an endpoint key so "Office-PC:3389" and "office-pc:3389" match.
 fn key(endpoint: &str) -> String {
     endpoint.trim().to_ascii_lowercase()
@@ -87,18 +96,13 @@ impl PinStore {
     /// would make every host look new and invite the user to re-approve.
     pub fn open(path: impl Into<PathBuf>) -> Result<Self, PinStoreError> {
         let path = path.into();
-        let pins = match std::fs::read(&path) {
-            Ok(bytes) => {
-                let file: PinFile =
-                    serde_json::from_slice(&bytes).map_err(|_| PinStoreError::Format)?;
-                if file.version != FORMAT_VERSION
-                    || !file.pins.values().all(|v| is_valid_fingerprint(v))
-                {
-                    return Err(PinStoreError::Format);
-                }
-                file.pins
+        // Size-limited like every app data file (a huge file is "damaged").
+        let pins = match crate::fsutil::read_limited(&path) {
+            Ok(Some(bytes)) => decode(&bytes)?,
+            Ok(None) => BTreeMap::new(),
+            Err(e) if e.kind() == std::io::ErrorKind::InvalidData => {
+                return Err(PinStoreError::Format)
             }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => BTreeMap::new(),
             Err(e) => return Err(e.into()),
         };
         Ok(Self {

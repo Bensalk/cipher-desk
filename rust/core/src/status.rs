@@ -135,6 +135,23 @@ impl ConnectionError {
         })
     }
 
+    /// Whether the UI offers a one-tap "Reconnect" after this error. Not after
+    /// password, account, vault or certificate problems, or when the computer
+    /// cannot host sessions: those need the user to act first.
+    pub const fn user_can_reconnect(self) -> bool {
+        !matches!(
+            self,
+            Self::WrongCredentials
+                | Self::AccountProblem
+                | Self::CertificateUnknown
+                | Self::CertificateRejected
+                | Self::CertificateChanged
+                | Self::SecurityNotSupported
+                | Self::RemoteDesktopUnavailable
+                | Self::VaultUnavailable
+        )
+    }
+
     /// Whether this error is a security warning that needs extra emphasis.
     pub const fn is_security_warning(self) -> bool {
         matches!(
@@ -416,6 +433,44 @@ mod tests {
     #[test]
     fn rejected_certificate_never_retries() {
         assert!(!ConnectionError::CertificateRejected.auto_reconnect_allowed());
+    }
+
+    /// Error matrix (Stage 8): for every error, whether it is retried
+    /// automatically, whether "Reconnect" is offered, and whether it is shown
+    /// as a security warning. Adding an error forces a decision here.
+    #[test]
+    fn error_matrix() {
+        use ConnectionError as E;
+        // (error, auto-retry, reconnect button, security warning)
+        let matrix = [
+            (E::WrongCredentials, false, false, false),
+            (E::AccountProblem, false, false, false),
+            (E::HostRefused, true, true, false),
+            (E::Timeout, true, true, false),
+            (E::HostNotFound, true, true, false),
+            (E::ConnectionLost, true, true, false),
+            (E::CertificateUnknown, false, false, true),
+            (E::CertificateRejected, false, false, false),
+            (E::CertificateChanged, false, false, true),
+            (E::SecurityNotSupported, false, false, true),
+            (E::RemoteDesktopUnavailable, false, false, false),
+            (E::DisconnectedByHost, false, true, false),
+            (E::SessionTakenOver, false, true, false),
+            (E::IdleTimeout, false, true, false),
+            (E::VaultUnavailable, false, false, false),
+            (E::AppInBackground, false, true, false),
+            (E::Unexpected, false, true, false),
+        ];
+        assert_eq!(
+            matrix.len(),
+            ConnectionError::ALL.len(),
+            "every error is in the matrix"
+        );
+        for (e, retry, button, warning) in matrix {
+            assert_eq!(e.auto_reconnect_allowed(), retry, "auto-retry for {e:?}");
+            assert_eq!(e.user_can_reconnect(), button, "reconnect button for {e:?}");
+            assert_eq!(e.is_security_warning(), warning, "warning for {e:?}");
+        }
     }
 
     /// SA-8: the exact set of errors that may be retried automatically.

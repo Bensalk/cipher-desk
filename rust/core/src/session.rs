@@ -231,6 +231,8 @@ pub fn connect(params: ConnectParams) -> Result<Session, ConnectFailure> {
     set_timeouts(&framed.get_inner().0.sock, Some(POLL_INTERVAL))
         .map_err(|e| ConnectFailure::Failed(classify_io(&e)))?;
 
+    check_desktop_size(result.desktop_size.width, result.desktop_size.height)
+        .map_err(ConnectFailure::Failed)?;
     let image = DecodedImage::new(
         PixelFormat::RgbA32,
         result.desktop_size.width,
@@ -272,16 +274,31 @@ impl Session {
     }
 
     /// Copies one region out of the frame as tightly packed RGBA rows.
-    pub fn region_pixels(&self, r: Region) -> Vec<u8> {
+    /// `r` limited to the desktop, or `None` if nothing of it is on screen.
+    /// Servers may report regions partly outside the desktop.
+    pub fn clamped(&self, r: Region) -> Option<Region> {
         let (w, h) = self.size();
-        let (w, h) = (usize::from(w), usize::from(h));
-        let left = usize::from(r.left).min(w.saturating_sub(1));
-        let right = usize::from(r.right).min(w.saturating_sub(1));
-        let top = usize::from(r.top).min(h.saturating_sub(1));
-        let bottom = usize::from(r.bottom).min(h.saturating_sub(1));
-        if w == 0 || h == 0 || right < left || bottom < top {
-            return Vec::new();
+        if w == 0 || h == 0 {
+            return None;
         }
+        let c = Region {
+            left: r.left.min(w - 1),
+            right: r.right.min(w - 1),
+            top: r.top.min(h - 1),
+            bottom: r.bottom.min(h - 1),
+        };
+        (c.right >= c.left && c.bottom >= c.top).then_some(c)
+    }
+
+    /// RGBA pixels of `r` (clamped to the desktop, see [`Session::clamped`]),
+    /// row by row.
+    pub fn region_pixels(&self, r: Region) -> Vec<u8> {
+        let Some(r) = self.clamped(r) else {
+            return Vec::new();
+        };
+        let w = usize::from(self.size().0);
+        let (left, right) = (usize::from(r.left), usize::from(r.right));
+        let (top, bottom) = (usize::from(r.top), usize::from(r.bottom));
         let data = self.image.data();
         let stride = w * 4;
         let mut out = Vec::with_capacity((right - left + 1) * (bottom - top + 1) * 4);
@@ -314,6 +331,7 @@ impl Session {
                 Ok(pdu) => pdu,
                 Err(e) if is_idle_read(&e) => break,
                 Err(e) => {
+                    tracing::info!(kind = ?e.kind(), "session read failed");
                     // During a session every network failure is a lost connection,
                     // including keepalive time-outs (it then reconnects, F13).
                     let err = match classify_io(&e) {
@@ -523,7 +541,9 @@ impl Session {
                     self.end(events, err);
                     return Ok(());
                 }
-                ActiveStageOutput::DeactivateAll => self.reactivate(events)?,
+                ActiveStageOutput::DeactivateAll => self.reactivate(events).inspect_err(|e| {
+                    tracing::info!(error = ?e, "session reactivation failed");
+                })?,
                 ActiveStageOutput::ServerRedirection(_) => {
                     // Redirection (RD Connection Broker) is not supported yet.
                     return Err(ConnectionError::Unexpected);
@@ -563,6 +583,7 @@ impl Session {
                     pointer_software_rendering,
                     ..
                 } => {
+                    check_desktop_size(desktop_size.width, desktop_size.height)?;
                     self.image = DecodedImage::new(
                         PixelFormat::RgbA32,
                         desktop_size.width,
@@ -639,7 +660,10 @@ impl Session {
     }
 
     fn write(&mut self, frame: &[u8]) -> Result<(), ConnectionError> {
-        self.framed.write_all(frame).map_err(|e| classify_io(&e))
+        self.framed.write_all(frame).map_err(|e| {
+            tracing::info!(kind = ?e.kind(), bytes = frame.len(), "session write failed");
+            classify_io(&e)
+        })
     }
 
     fn end(&mut self, events: &mut Vec<SessionEvent>, err: Option<ConnectionError>) {
@@ -882,7 +906,7 @@ fn tls_upgrade(
 }
 
 /// The certificate's subject public key, which CredSSP binds to (MS-CSSP).
-fn server_public_key(cert_der: &[u8]) -> Option<Vec<u8>> {
+pub(crate) fn server_public_key(cert_der: &[u8]) -> Option<Vec<u8>> {
     use x509_cert::der::Decode as _;
     let cert = x509_cert::Certificate::from_der(cert_der).ok()?;
     cert.tbs_certificate
@@ -904,6 +928,25 @@ fn read_by_hint_blocking(
             Err(e) if is_idle_read(&e) && std::time::Instant::now() < deadline => continue,
             Err(e) => return Err(classify_io(&e)),
         }
+    }
+}
+
+/// Largest desktop accepted from a server: 8K (7680 × 4320 pixels, about
+/// 133 MB as RGBA), and no side over 8192, the RDP maximum. A hostile or broken
+/// server could otherwise announce 65535 × 65535 and make the app try to
+/// allocate 17 GB, which would crash it.
+pub const MAX_DESKTOP_PIXELS: u32 = 7680 * 4320;
+pub const MAX_DESKTOP_SIDE: u16 = 8192;
+
+pub(crate) fn check_desktop_size(width: u16, height: u16) -> Result<(), ConnectionError> {
+    let ok = (1..=MAX_DESKTOP_SIDE).contains(&width)
+        && (1..=MAX_DESKTOP_SIDE).contains(&height)
+        && u32::from(width) * u32::from(height) <= MAX_DESKTOP_PIXELS;
+    if ok {
+        Ok(())
+    } else {
+        tracing::warn!(width, height, "server announced an unusable desktop size");
+        Err(ConnectionError::Unexpected)
     }
 }
 
@@ -970,7 +1013,7 @@ fn classify_connector(e: &ironrdp_connector::ConnectorError) -> ConnectionError 
 
 /// Classifies authentication/negotiation failures from library error text,
 /// using Windows NTSTATUS codes. The text itself is never shown to users.
-fn classify_text(text: &str) -> ConnectionError {
+pub(crate) fn classify_text(text: &str) -> ConnectionError {
     let t = text.to_ascii_lowercase();
     const ACCOUNT: &[&str] = &[
         "c0000234", // STATUS_ACCOUNT_LOCKED_OUT
@@ -1011,7 +1054,7 @@ fn classify_text(text: &str) -> ConnectionError {
 }
 
 /// Maps a server disconnect reason to a user-facing error.
-fn classify_disconnect_reason(text: &str) -> ConnectionError {
+pub(crate) fn classify_disconnect_reason(text: &str) -> ConnectionError {
     let t = text.to_ascii_lowercase();
     if t.contains("idle") {
         ConnectionError::IdleTimeout
@@ -1024,6 +1067,20 @@ fn classify_disconnect_reason(text: &str) -> ConnectionError {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn desktop_size_limits() {
+        use super::check_desktop_size as ok;
+        assert!(ok(1024, 768).is_ok());
+        assert!(ok(3840, 2160).is_ok());
+        assert!(ok(7680, 4320).is_ok());
+        assert!(ok(8192, 4050).is_ok());
+        assert!(ok(0, 768).is_err());
+        assert!(ok(1024, 0).is_err());
+        assert!(ok(8193, 100).is_err());
+        assert!(ok(8192, 8192).is_err(), "over the pixel budget");
+        assert!(ok(u16::MAX, u16::MAX).is_err());
+    }
+
     use super::*;
 
     #[test]

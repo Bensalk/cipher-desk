@@ -1165,11 +1165,12 @@ wakeMac: dco_decode_opt_String(arr[8]),); }
 
 @protected ErrorInfo dco_decode_error_info(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 final arr = raw as List<dynamic>;
-                if (arr.length != 4) throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+                if (arr.length != 5) throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
                 return ErrorInfo(id: dco_decode_String(arr[0]),
 title: dco_decode_String(arr[1]),
 advice: dco_decode_String(arr[2]),
-securityWarning: dco_decode_bool(arr[3]),); }
+securityWarning: dco_decode_bool(arr[3]),
+canReconnect: dco_decode_bool(arr[4]),); }
 
 @protected FieldProblem dco_decode_field_problem(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 final arr = raw as List<dynamic>;
@@ -1370,7 +1371,8 @@ var var_id = sse_decode_String(deserializer);
 var var_title = sse_decode_String(deserializer);
 var var_advice = sse_decode_String(deserializer);
 var var_securityWarning = sse_decode_bool(deserializer);
-return ErrorInfo(id: var_id, title: var_title, advice: var_advice, securityWarning: var_securityWarning); }
+var var_canReconnect = sse_decode_bool(deserializer);
+return ErrorInfo(id: var_id, title: var_title, advice: var_advice, securityWarning: var_securityWarning, canReconnect: var_canReconnect); }
 
 @protected FieldProblem sse_decode_field_problem(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 var var_field = sse_decode_String(deserializer);
@@ -1621,6 +1623,7 @@ sse_encode_String(self.id, serializer);
 sse_encode_String(self.title, serializer);
 sse_encode_String(self.advice, serializer);
 sse_encode_bool(self.securityWarning, serializer);
+sse_encode_bool(self.canReconnect, serializer);
  }
 
 @protected void sse_encode_field_problem(FieldProblem self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs

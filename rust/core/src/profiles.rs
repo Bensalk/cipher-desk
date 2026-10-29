@@ -127,16 +127,21 @@ fn clean(f: ConnectionsFile) -> (Vec<Connection>, Vec<HistoryEntry>, usize) {
     (connections, history.split_off(start), skipped)
 }
 
+/// Parses and validates the connections file's contents:
+/// (valid connections, their history, number of entries skipped).
+pub(crate) fn decode(bytes: &[u8]) -> Option<(Vec<Connection>, Vec<HistoryEntry>, usize)> {
+    parse(bytes).map(clean)
+}
+
 /// Loads `connections.json` from `path`, using the backup if needed.
 pub fn load(path: &Path) -> std::io::Result<Loaded> {
     let main = match fsutil::read_limited(path) {
-        Ok(Some(b)) => Some(parse(&b)),
+        Ok(Some(b)) => Some(decode(&b)),
         Ok(None) => return Ok(Loaded::default()),
         Err(e) if e.kind() == std::io::ErrorKind::InvalidData => Some(None),
         Err(e) => return Err(e),
     };
-    if let Some(Some(f)) = main {
-        let (connections, history, skipped) = clean(f);
+    if let Some(Some((connections, history, skipped))) = main {
         return Ok(Loaded {
             connections,
             history,
@@ -147,8 +152,7 @@ pub fn load(path: &Path) -> std::io::Result<Loaded> {
     // Main file damaged: try the backup.
     let bak = fsutil::backup_path(path);
     if let Ok(Some(b)) = fsutil::read_limited(&bak) {
-        if let Some(f) = parse(&b) {
-            let (connections, history, skipped) = clean(f);
+        if let Some((connections, history, skipped)) = decode(&b) {
             fsutil::set_aside(path)?;
             return Ok(Loaded {
                 connections,

@@ -41,6 +41,10 @@ windows-native-keyring-store = "1.1"
 [target.'cfg(target_os = "linux")'.dependencies]
 zbus-secret-service-keyring-store = { version = "1.0", features = ["rt-async-io-crypto-rust"] }
 
+[features]
+# Exposes internal parsers to the fuzzing crate only (rust/fuzz). Never used by the app.
+fuzzing = []
+
 [dev-dependencies]
 tempfile = "3"
 tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }

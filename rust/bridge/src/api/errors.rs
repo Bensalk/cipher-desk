@@ -11,6 +11,8 @@ pub struct ErrorInfo {
     pub advice: String,
     /// Show with warning colours and an icon.
     pub security_warning: bool,
+    /// Offer a one-tap "Reconnect" after this error.
+    pub can_reconnect: bool,
 }
 
 /// Converts an error to its UI text (used by the session stream).
@@ -20,6 +22,7 @@ pub(crate) fn error_info(e: ConnectionError) -> ErrorInfo {
         title: e.title().to_owned(),
         advice: e.advice().to_owned(),
         security_warning: e.is_security_warning(),
+        can_reconnect: e.user_can_reconnect(),
     }
 }
 

@@ -37,3 +37,9 @@ pub mod tls;
 pub mod vault;
 pub mod version;
 pub mod wol;
+
+/// Internal parsers exposed only to the fuzzing crate (`rust/fuzz`, SA-3).
+/// Never enabled in the app.
+#[cfg(feature = "fuzzing")]
+#[doc(hidden)]
+pub mod fuzzing;

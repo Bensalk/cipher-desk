@@ -22,15 +22,17 @@ final String title;
 final String advice;
 /// Show with warning colours and an icon.
 final bool securityWarning;
+/// Offer a one-tap "Reconnect" after this error.
+final bool canReconnect;
 
-                const ErrorInfo({required this.id ,required this.title ,required this.advice ,required this.securityWarning ,});
+                const ErrorInfo({required this.id ,required this.title ,required this.advice ,required this.securityWarning ,required this.canReconnect ,});
 
 
 
 
 
         @override
-        int get hashCode => id.hashCode^title.hashCode^advice.hashCode^securityWarning.hashCode;
+        int get hashCode => id.hashCode^title.hashCode^advice.hashCode^securityWarning.hashCode^canReconnect.hashCode;
 
 
 
@@ -39,7 +41,7 @@ final bool securityWarning;
             identical(this, other) ||
             other is ErrorInfo &&
                 runtimeType == other.runtimeType
-                && id == other.id&& title == other.title&& advice == other.advice&& securityWarning == other.securityWarning;
+                && id == other.id&& title == other.title&& advice == other.advice&& securityWarning == other.securityWarning&& canReconnect == other.canReconnect;
 
             }
             

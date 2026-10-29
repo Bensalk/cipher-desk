@@ -634,3 +634,81 @@ that long sessions don't leak memory.
 Stage 9 — security verification: run the full security checklist (SA-1…SA-9),
 threat-model review, dependency audit, fuzzing of the parsers we own, and the
 SF-2 report decision.
+
+---
+
+## Stage 9 — Security Verification ✅ No open critical or high issues (29 Oct 2026)
+
+### Objective
+Check every security requirement against the code, write the missing threat model,
+fuzz our own parsers, run static analysis and licence audits, and settle SF-2.
+
+### Review of Stage 8 (start of this stage)
+Findings R35–R39 (details in `docs/SECURITY_REVIEW.md`): frame rectangles not clamped
+like their pixels; the Reconnect-button rule duplicated in Dart (now in Rust, with an
+**error-matrix test** covering every error: auto-retry, Reconnect button, warning);
+**Android sessions that finished connecting in the background had no 5-minute limit**;
+the clipboard was not re-offered after a reconnect; one drop-detection path was not
+logged. Added live tests **L7** (no password in logs while reconnecting or after a
+wrong password, three encodings) and **L8** (a healthy idle session is not dropped
+for 90 s: no false alarms).
+
+The two silent-drop detection times seen in Stage 8 are now explained by the logs:
+**~30 s** = keepalive (read `TimedOut`); **10 s** = the time limit of a server
+"reactivation" exchange that happened to be in progress (this test host performs one
+right after connecting). Both are intended.
+
+### Completed
+- **`docs/THREAT_MODEL.md`** (SA-2): assets, attackers, trust boundaries, STRIDE table
+  with the code or test behind every mitigation, accepted risks. It was due before
+  Stage 4 (R32).
+- **`docs/HOST_SETUP.md`** (SA-1, SA-4, S13, SF-6): Windows editions, NLA, separate
+  non-admin account, lockout policy, updates, firewall limited to LAN/VPN, VPN with
+  two-factor, Wake-on-LAN.
+- **`docs/SECURITY_REVIEW.md`**: S1–S13, SA-1–SA-10 and SF-1–SF-6 each with status and
+  evidence; findings R32–R39; audits.
+- **Hostile-server hardening:** desktop sizes over 8K refused (R33, previously a possible
+  17 GB allocation crash); pin file size-limited (R34).
+- **Fuzzing (SA-3):** `rust/fuzz`, six libFuzzer targets for our parsers of untrusted
+  input (server texts, clipboard bytes, certificates, desktop sizes, all app data and
+  import files, form fields), built on the stable toolchain with coverage
+  instrumentation; Rust bounds and overflow checks on. Seeds checked in; weekly CI job
+  (60 s per target) keeps crashing inputs as artifacts. The core's `fuzzing` feature
+  exposes internal parsers to this crate only.
+- **Static analysis:** clippy (project lints) clean, also with the fuzzing feature;
+  pedantic review found only style notes in our code (cast warnings are all in the
+  generated FFI glue); no `unsafe` in our crates.
+- **Dependencies and licences:** cargo-deny clean. The `rsa` advisory exception was
+  re-checked for sspi 0.23.0 (its note still referred to 0.21.3).
+- **SF-2:** reproduced and pinpointed: the `encrypt_message` debug span in sspi 0.23.0
+  records the credentials buffer; still present in 0.23.1 (latest). A private report
+  is drafted for the owner (kept **outside** this repository until disclosure).
+- README and `SECURITY.md` link the new documents; `SECURITY.md` states that the
+  independent review (SA-5) is still to be done.
+
+### Test results (Ubuntu 24.04, Rust 1.97.0)
+
+| Check | Result |
+|-------|--------|
+| fmt, clippy (`-D warnings`, also `--features fuzzing`), policy, cargo-deny, actionlint | ✅ PASS |
+| Unit tests | ✅ PASS — 104/104 (84 core + 20 bridge) |
+| Live: connection 10/10 (debug and release), vault, no-vault refusal, clipboard 6/6 | ✅ PASS |
+| Live: bridge L1–L8 (reconnect, certificate on reconnect, silent drop, background reason, wrong password, memory, logs, idle) | ✅ PASS — 8/8 |
+| Fuzzing, 10 minutes per target — server_text 32.1 M inputs, clipboard_text 165.3 M, certificate 20.3 M, desktop_size 770.7 M, files 28.4 M, form_fields 35.1 M (≈1.05 billion in total) | ✅ PASS — **no crashes** |
+| OSV-Scanner, CodeQL | ⛔ **NOT RUN** here (CI only) |
+| Flutter/Android parts of R36–R38 | ⛔ **NOT RUN** — need Flutter / a device |
+
+### Known issues (end-of-stage review)
+- **KI-36:** Dart package versions are not locked: `pubspec.lock` can only be generated
+  with Flutter. Commit it from the first CI run.
+- **KI-37:** The sspi 0.23.1 patch release is available (we use 0.23.0); it does not fix
+  SF-2. Update together with IronRDP in a later dependency refresh.
+- **KI-38:** Fuzzing here runs without AddressSanitizer (stable toolchain). Our crates have
+  no `unsafe`, so Rust's own checks cover memory safety in the fuzzed code.
+- **SA-5 (open):** an independent security review is required before the first public
+  release.
+- **KI-25 (still open):** the Flutter app has still never been compiled; CI must run first.
+
+### Next step
+Stage 10 — packaging and release: MSI, .deb, AppImage, portable ZIP (SA-10), signed APK,
+checksums and SBOM (S8), and the steps to make the repository public.

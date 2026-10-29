@@ -10,9 +10,11 @@ yanked = "deny"
 unmaintained = "workspace"
 ignore = [
   # RUSTSEC-2023-0071 (rsa "Marvin" timing attack on RSA *private-key* operations; no fix
-  # exists upstream). Reached only through IronRDP -> sspi/picky. Reviewed 2026-10-29:
-  # sspi 0.21.3 has no RsaPrivateKey use outside tests; this client authenticates with
-  # passwords (NTLM/Kerberos over CredSSP) and performs only RSA public-key operations.
+  # exists upstream). Reached only through IronRDP -> sspi / picky / winscard.
+  # Re-reviewed 2026-10-29 for sspi 0.23.0: sspi uses `rsa` only to convert errors;
+  # smart-card signing goes through PKCS#11, and the emulated smart card (winscard) is
+  # never used: this client logs in with a password (CredSSP/NTLM/Kerberos), which
+  # performs no RSA private-key operations.
   # Re-review when smart-card/certificate login is added or when a patched rsa ships.
   { id = "RUSTSEC-2023-0071", reason = "Client performs RSA public-key ops only; no private keys. See docs/PROGRESS.md (KI-2)." },
 ]

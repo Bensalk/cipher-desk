@@ -123,6 +123,8 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   void _startClipboardSync() {
     _clipTimer?.cancel(); // also called again after an automatic reconnect
     if (!_sendsClipboard) return;
+    // A new (or restored) session knows nothing yet: offer the current text again.
+    _lastLocalClip = null;
     _offerLocalClipboard();
     if (!_isAndroid) {
       _clipTimer = Timer.periodic(const Duration(seconds: 1), (_) => _offerLocalClipboard());
@@ -149,16 +151,26 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
         if (_state == RdpConnectionState.connected) _offerLocalClipboard();
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
-        // Android: end the session if the app stays in the background (decision 8).
-        if (SessionService.isAndroid && _sessionOpen && !_ended) {
-          _backgroundTimer ??= Timer(SessionService.backgroundGrace, () {
-            if (!_ended) _session.disconnectInBackground();
-          });
-        }
+        _armBackgroundTimer();
       case AppLifecycleState.inactive:
       case AppLifecycleState.detached:
         break;
     }
+  }
+
+  bool get _inBackground {
+    final s = WidgetsBinding.instance.lifecycleState;
+    return s == AppLifecycleState.paused || s == AppLifecycleState.hidden;
+  }
+
+  /// Android: end the session if the app stays in the background (decision 8).
+  /// Also called when a connection completes while the app is already in the
+  /// background, so such a session is never left open without a time limit.
+  void _armBackgroundTimer() {
+    if (!SessionService.isAndroid || !_sessionOpen || _ended) return;
+    _backgroundTimer ??= Timer(SessionService.backgroundGrace, () {
+      if (!_ended) _session.disconnectInBackground();
+    });
   }
 
   Future<void> _start() async {
@@ -212,6 +224,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
             _serviceStarted = true;
             SessionService.start();
           }
+          if (_inBackground) _armBackgroundTimer();
           _focus.requestFocus();
           _startClipboardSync();
         }
@@ -386,21 +399,8 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     super.dispose();
   }
 
-  /// Errors after which one tap may connect again. Not offered for password,
-  /// account or certificate problems (those need the user to act first).
-  static const _reconnectable = {
-    'ConnectionLost',
-    'Timeout',
-    'HostRefused',
-    'HostNotFound',
-    'DisconnectedByHost',
-    'SessionTakenOver',
-    'IdleTimeout',
-    'AppInBackground',
-    'Unexpected',
-  };
-
-  bool get _canReconnect => _error != null && _reconnectable.contains(_error!.id);
+  /// Whether to offer "Reconnect" comes from the Rust error catalogue.
+  bool get _canReconnect => _error?.canReconnect ?? false;
 
   // ---------------------------------------------------------------- input
 

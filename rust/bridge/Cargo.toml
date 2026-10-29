@@ -20,6 +20,8 @@ tracing.workspace = true
 # so the generated FFI module alone can opt out (see src/lib.rs).
 [dev-dependencies]
 tempfile = "3"
+# Captures log output in the live tests (password-in-logs checks, SA-7).
+tracing-subscriber.workspace = true
 
 [lints.rust]
 unsafe_code = "deny"

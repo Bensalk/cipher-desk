@@ -1569,11 +1569,13 @@ impl SseDecode for crate::api::errors::ErrorInfo {
         let mut var_title = <String>::sse_decode(deserializer);
         let mut var_advice = <String>::sse_decode(deserializer);
         let mut var_securityWarning = <bool>::sse_decode(deserializer);
+        let mut var_canReconnect = <bool>::sse_decode(deserializer);
         return crate::api::errors::ErrorInfo {
             id: var_id,
             title: var_title,
             advice: var_advice,
             security_warning: var_securityWarning,
+            can_reconnect: var_canReconnect,
         };
     }
 }
@@ -2137,6 +2139,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::errors::ErrorInfo {
             self.title.into_into_dart().into_dart(),
             self.advice.into_into_dart().into_dart(),
             self.security_warning.into_into_dart().into_dart(),
+            self.can_reconnect.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2513,6 +2516,7 @@ impl SseEncode for crate::api::errors::ErrorInfo {
         <String>::sse_encode(self.title, serializer);
         <String>::sse_encode(self.advice, serializer);
         <bool>::sse_encode(self.security_warning, serializer);
+        <bool>::sse_encode(self.can_reconnect, serializer);
     }
 }
 

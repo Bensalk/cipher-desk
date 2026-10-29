@@ -139,6 +139,12 @@ struct Live {
 /// Starts `run` on a thread against `addr` with the given credentials.
 /// Certificates are approved automatically by [`Live::wait_for`].
 fn start(addr: SocketAddr, h: &Host) -> io::Result<Live> {
+    start_logged(addr, h, None)
+}
+
+/// Like [`start`]; with `capture`, everything the session thread logs (at the
+/// most detailed level the app allows) is collected for inspection.
+fn start_logged(addr: SocketAddr, h: &Host, capture: Option<Capture>) -> io::Result<Live> {
     let pins = tempfile::tempdir()?;
     let target = Target {
         host: addr.ip().to_string(),
@@ -155,7 +161,19 @@ fn start(addr: SocketAddr, h: &Host) -> io::Result<Live> {
     let (utx, urx) = mpsc::channel::<SessionUpdate>();
     thread::spawn(move || {
         let send = |u: SessionUpdate| utx.send(u).is_ok();
-        run(&target, password, &send, &crx);
+        match capture {
+            Some(cap) => {
+                let subscriber = tracing_subscriber::fmt()
+                    .with_env_filter(rdpv_core::logging::env_filter("trace"))
+                    .with_writer(cap)
+                    .with_ansi(false)
+                    .finish();
+                tracing::subscriber::with_default(subscriber, || {
+                    run(&target, password, &send, &crx);
+                });
+            }
+            None => run(&target, password, &send, &crx),
+        }
     });
     Ok(Live {
         commands: ctx,
@@ -285,7 +303,8 @@ fn live_l3_silently_dropped_network_is_detected() -> TestResult {
         return Err("set RDPV_TEST_IPTABLES=1 (needs root) to run this test".into());
     }
     let relay = Relay::start(h.addr).map_err(io_err("relay"))?;
-    let s = start(relay.addr(), &h).map_err(io_err("start"))?;
+    let cap = Capture::default();
+    let s = start_logged(relay.addr(), &h, Some(cap.clone())).map_err(io_err("start"))?;
     s.connected(Duration::from_secs(30))?;
 
     // Black-hole the relay port: packets vanish, no reset is ever sent.
@@ -298,6 +317,10 @@ fn live_l3_silently_dropped_network_is_detected() -> TestResult {
     )?;
     let detected = started.elapsed();
     eprintln!("silent drop detected after {:.1} s", detected.as_secs_f64());
+    // Which network error noticed it (no secrets: see L7).
+    for line in cap.text().lines().filter(|l| l.contains(" failed")) {
+        eprintln!("  {}", line.split_once("rdpv").map_or(line, |(_, r)| r));
+    }
     assert!(detected <= Duration::from_secs(50), "took {detected:?}");
 
     drop(wall); // the network comes back
@@ -332,6 +355,34 @@ fn live_l5_wrong_password_is_not_retried() -> TestResult {
         u.kind == UpdateKind::Ended
     })?;
     assert_eq!(u.error.map(|e| e.id).as_deref(), Some("WrongCredentials"));
+    Ok(())
+}
+
+/// No false alarms: a healthy but completely idle session (no input, static
+/// screen) must not be declared lost by the keepalive and time-out settings.
+/// Duration from RDPV_IDLE_SECS (default 90, well past the 30 s detection time).
+#[test]
+#[ignore = "needs the live test hosts"]
+fn live_l8_idle_healthy_session_is_not_dropped() -> TestResult {
+    let h = host("RDPV_TEST")?;
+    let secs: u64 = env("RDPV_IDLE_SECS")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(90);
+    let s = start(h.addr, &h).map_err(io_err("start"))?;
+    s.connected(Duration::from_secs(30))?;
+    let until = Instant::now() + Duration::from_secs(secs);
+    while Instant::now() < until {
+        if let Ok(u) = s.updates.recv_timeout(Duration::from_millis(200)) {
+            if is_reconnecting(&u) || u.kind == UpdateKind::Ended {
+                return Err(format!(
+                    "idle session was treated as lost ({:?})",
+                    u.error.map(|e| e.id)
+                ));
+            }
+        }
+    }
+    s.disconnect(None);
+    assert_eq!(s.ended(Duration::from_secs(10))?, None);
     Ok(())
 }
 
@@ -384,6 +435,92 @@ fn live_l6_long_session_memory_stays_flat() -> TestResult {
     );
     s.disconnect(None);
     assert_eq!(s.ended(Duration::from_secs(10))?, None);
+    Ok(())
+}
+
+/// Collects log output in memory.
+#[derive(Clone, Default)]
+struct Capture(Arc<Mutex<Vec<u8>>>);
+
+impl Capture {
+    fn text(&self) -> String {
+        let bytes = self.0.lock().map(|v| v.clone()).unwrap_or_default();
+        String::from_utf8_lossy(&bytes).to_ascii_lowercase()
+    }
+}
+
+impl io::Write for Capture {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if let Ok(mut v) = self.0.lock() {
+            v.extend_from_slice(buf);
+        }
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Capture {
+    type Writer = Capture;
+    fn make_writer(&'a self) -> Self::Writer {
+        self.clone()
+    }
+}
+
+/// The password in every form a log might contain it: plain, hex of UTF-8,
+/// hex of UTF-16 (how CredSSP buffers look, SF-2).
+fn password_forms(p: &str) -> [String; 3] {
+    let hex = |bytes: Vec<u8>| bytes.iter().map(|b| format!("{b:02x}")).collect::<String>();
+    [
+        p.to_ascii_lowercase(),
+        hex(p.as_bytes().to_vec()),
+        hex(p.encode_utf16().flat_map(u16::to_le_bytes).collect()),
+    ]
+}
+
+/// SA-7 for the Stage 8 paths: reconnecting after a drop, and a wrong
+/// password, at the most detailed log level the app allows.
+#[test]
+#[ignore = "needs the live test hosts"]
+fn live_l7_reconnect_and_failures_never_log_the_password() -> TestResult {
+    let h = host("RDPV_TEST")?;
+    let cap = Capture::default();
+
+    // Drop and reconnect.
+    let relay = Relay::start(h.addr).map_err(io_err("relay"))?;
+    let s = start_logged(relay.addr(), &h, Some(cap.clone())).map_err(io_err("start"))?;
+    s.connected(Duration::from_secs(30))?;
+    relay.cut();
+    s.wait_for("reconnecting", Duration::from_secs(15), is_reconnecting)?;
+    s.connected(Duration::from_secs(30))?;
+    s.disconnect(None);
+    s.ended(Duration::from_secs(10))?;
+
+    // Wrong password (logged by the same capture).
+    let mut wrong = host("RDPV_TEST")?;
+    wrong.password.push_str("Wrong9");
+    let w = start_logged(h.addr, &wrong, Some(cap.clone())).map_err(io_err("start"))?;
+    w.ended(Duration::from_secs(30))?;
+    thread::sleep(Duration::from_millis(200)); // let the thread finish logging
+
+    let logs = cap.text();
+    assert!(
+        logs.len() > 200,
+        "no logs captured; the test would prove nothing"
+    );
+    assert!(
+        logs.contains("reconnecting"),
+        "the reconnect was not logged"
+    );
+    for p in [&h.password, &wrong.password] {
+        for (form, needle) in ["plain", "UTF-8 hex", "UTF-16 hex"]
+            .iter()
+            .zip(password_forms(p))
+        {
+            assert!(!logs.contains(&needle), "password found in logs ({form})");
+        }
+    }
     Ok(())
 }
 

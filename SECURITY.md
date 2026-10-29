@@ -51,9 +51,16 @@ Only the latest release receives security fixes until version 1.0.
 - Outside access is intended **only through a VPN** (e.g. WireGuard or
   Tailscale). Never expose RDP port 3389 to the internet.
 
+See also `docs/THREAT_MODEL.md` (threats and accepted risks),
+`docs/SECURITY_REVIEW.md` (verification of each requirement) and
+`docs/HOST_SETUP.md` (securing the remote computer).
+
 ## Known limitations
 
-- A compromised host can read anything you send through the shared clipboard.
+- A compromised host can read anything you send through the shared clipboard,
+  and sees everything you type in the session.
+- An independent security review (SA-5) has not been done yet; it is required
+  before the first public release.
 - The first connection to a host relies on you checking the certificate
   fingerprint shown by the app against the host.
 - Malware on your own device (for example an Android app with accessibility

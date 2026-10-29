@@ -59,15 +59,19 @@ impl Settings {
 /// file is set aside).
 pub fn load(path: &Path) -> Settings {
     match fsutil::read_limited(path) {
-        Ok(Some(bytes)) => match serde_json::from_slice::<Settings>(&bytes) {
-            Ok(s) => s.sanitized(),
-            Err(_) => {
-                let _ = fsutil::set_aside(path);
-                Settings::default()
-            }
-        },
+        Ok(Some(bytes)) => decode(&bytes).unwrap_or_else(|| {
+            let _ = fsutil::set_aside(path);
+            Settings::default()
+        }),
         _ => Settings::default(),
     }
+}
+
+/// Parses settings; unknown or out-of-range values fall back to the defaults.
+pub(crate) fn decode(bytes: &[u8]) -> Option<Settings> {
+    serde_json::from_slice::<Settings>(bytes)
+        .ok()
+        .map(Settings::sanitized)
 }
 
 pub fn save(path: &Path, settings: &Settings) -> std::io::Result<()> {

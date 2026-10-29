@@ -727,7 +727,8 @@ fn drive(
                 SessionEvent::Ended(Some(err)) => return ended(err),
             }
         }
-        if let Some(r) = dirty {
+        // The rectangle sent to the UI is the one the pixels were copied from.
+        if let Some(r) = dirty.and_then(|r| s.clamped(r)) {
             let update = SessionUpdate::frame(r, s.region_pixels(r));
             // The UI went away: end the session.
             if !send(update) {

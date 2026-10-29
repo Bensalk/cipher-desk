@@ -1,0 +1,56 @@
+# Fuzzers for our own parsers of untrusted input (SA-3). Test-only: kept out of
+# the app's workspace and never shipped. See README.md in this folder.
+[package]
+name = "rdpv-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+license = "Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+rdpv-core = { path = "../core", features = ["fuzzing"] }
+
+[workspace]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "server_text"
+path = "fuzz_targets/server_text.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "clipboard_text"
+path = "fuzz_targets/clipboard_text.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "certificate"
+path = "fuzz_targets/certificate.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "desktop_size"
+path = "fuzz_targets/desktop_size.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "files"
+path = "fuzz_targets/files.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "form_fields"
+path = "fuzz_targets/form_fields.rs"
+test = false
+doc = false
