@@ -351,3 +351,19 @@ Optional saved passwords in the operating system's vault only; confirmation befo
 ### Next step
 Stage 6 — bidirectional text clipboard.
 
+---
+
+## Review of Stages 4–5 (29 Oct 2026)
+
+| # | Problem found | Fix |
+|---|---------------|-----|
+| R14 | The Flutter UI test "valid form saves a profile" expected the password to be saved, but CI machines usually have no OS vault or Windows Hello, so it would always fail there | The test now accepts either correct outcome: saved, or not saved with the "Password not saved" message shown |
+| R15 | When a saved password could not be read, the error said "the password was not saved", which describes saving, not reading | New title "Saved password couldn't be used" with advice to type it or save it again |
+| R16 | When Windows Hello was not set up, saving reported "confirmation was cancelled" | Message now covers both cases (cancelled, or Windows Hello not set up) |
+| R17 | The Save password text promised a confirmation prompt on every platform; on Linux there usually is none (KI-15) | Text now explains Windows/Android confirmation and Linux keyring protection |
+
+Re-checked and found correct: session/TLS/pinning code paths, error mapping, the
+bridge's reconnect-after-approval loop, vault id validation order, Kotlin vault logic
+(time-bound key, retry after prompt, invalidation reset), CI job steps and environment,
+dependency and secret checks.
+

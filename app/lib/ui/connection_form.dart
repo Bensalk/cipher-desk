@@ -98,7 +98,8 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
         // Never fall back to storing it anywhere else (I8).
         savePassword = widget.existing?.savePassword ?? false;
         vaultMessage = switch (outcome) {
-          VaultOutcome.locked => 'Password not saved: confirmation was cancelled.',
+          VaultOutcome.locked =>
+              "Password not saved: it couldn't be confirmed that it's you (cancelled, or Windows Hello isn't set up).",
           _ => 'Password not saved: this device has no secure password storage. '
               'You can still connect by typing it.',
         };
@@ -240,7 +241,9 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                   title: const Text('Save password'),
                   subtitle: const Text(
                     "Stored only in this device's secure password storage, never in the app's files. "
-                    "You'll unlock it (fingerprint, face, PIN or your device password) before it's used.",
+                    "On Windows and Android you confirm it's you (Windows Hello, fingerprint, face or "
+                    'screen lock) before it is used. On Linux it is protected by your keyring, which '
+                    'is usually unlocked when you log in.',
                   ),
                 ),
                 SwitchListTile(

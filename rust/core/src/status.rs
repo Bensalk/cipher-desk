@@ -80,7 +80,7 @@ impl ConnectionError {
             Self::DisconnectedByHost => "Disconnected by the remote computer",
             Self::SessionTakenOver => "Someone else signed in",
             Self::IdleTimeout => "Disconnected after inactivity",
-            Self::VaultUnavailable => "Password storage unavailable",
+            Self::VaultUnavailable => "Saved password couldn't be used",
             Self::Unexpected => "Something went wrong",
         }
     }
@@ -102,7 +102,7 @@ impl ConnectionError {
             Self::DisconnectedByHost => "The session was ended on the remote computer. You can reconnect.",
             Self::SessionTakenOver => "Another sign-in to the same account ended this session. You can reconnect, which will end theirs.",
             Self::IdleTimeout => "The session was idle for too long. Reconnect when you need it.",
-            Self::VaultUnavailable => "This device has no secure password storage available, so the password was not saved. You can still connect by typing it each time.",
+            Self::VaultUnavailable => "The saved password couldn't be read from this device's secure password storage (it may be locked, missing or unavailable). Type the password to connect, or edit the connection to save it again.",
             Self::Unexpected => "Try again. If it keeps happening, restart the app.",
         }
     }

@@ -77,7 +77,15 @@ void main() {
     final p = store.profiles.single;
     expect(p.name, 'Office');
     expect(p.endpoint, '192.0.2.10:3389');
-    expect(p.savePassword, isTrue);
+    // Saving needs the OS vault (and Windows Hello on Windows). Test machines may
+    // have neither: then the profile must say "not saved" and tell the user why,
+    // never pretend the password was kept.
+    final notSavedMessage = find.textContaining('Password not saved');
+    if (p.savePassword) {
+      expect(notSavedMessage, findsNothing);
+    } else {
+      expect(notSavedMessage, findsOneWidget);
+    }
     expect(p.clipboardEnabled, isFalse);
     expect(find.text('Office'), findsOneWidget);
   });
