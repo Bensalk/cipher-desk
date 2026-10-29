@@ -73,7 +73,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
                   String get codegenVersion => '2.13.0';
 
                   @override
-                  int get rustContentHash => 7256367;
+                  int get rustContentHash => -283280114;
 
                   static const kDefaultExternalLibraryLoaderConfig = ExternalLibraryLoaderConfig(
                     stem: 'rust_lib_secure_rdp_viewer',
@@ -99,9 +99,11 @@ void crateApiSessionRdpSessionMouseButton({required RdpSession that , required i
 
 void crateApiSessionRdpSessionMouseMove({required RdpSession that , required int x , required int y });
 
-Stream<SessionUpdate> crateApiSessionRdpSessionStart({required RdpSession that , required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath });
+void crateApiSessionRdpSessionOfferClipboardText({required RdpSession that , required String text });
 
-Stream<SessionUpdate> crateApiSessionRdpSessionStartWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath });
+Stream<SessionUpdate> crateApiSessionRdpSessionStart({required RdpSession that , required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection });
+
+Stream<SessionUpdate> crateApiSessionRdpSessionStartWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection });
 
 void crateApiSessionRdpSessionTypeText({required RdpSession that , required String text });
 
@@ -330,7 +332,33 @@ sse_encode_u_16(y, serializer);
         );
         
 
-@override Stream<SessionUpdate> crateApiSessionRdpSessionStart({required RdpSession that , required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath })  { 
+@override void crateApiSessionRdpSessionOfferClipboardText({required RdpSession that , required String text })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
+sse_encode_String(text, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiSessionRdpSessionOfferClipboardTextConstMeta,
+            argValues: [that, text],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiSessionRdpSessionOfferClipboardTextConstMeta => const TaskConstMeta(
+            debugName: "RdpSession_offer_clipboard_text",
+            argNames: ["that", "text"],
+        );
+        
+
+@override Stream<SessionUpdate> crateApiSessionRdpSessionStart({required RdpSession that , required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection })  { 
             final sink = RustStreamSink<SessionUpdate>();
             unawaited(handler.executeNormal(NormalTask(
             callFfi: (port_) {
@@ -343,8 +371,9 @@ sse_encode_String(password, serializer);
 sse_encode_u_16(width, serializer);
 sse_encode_u_16(height, serializer);
 sse_encode_String(pinsPath, serializer);
+sse_encode_clipboard_mode(clipboardDirection, serializer);
 sse_encode_StreamSink_session_update_Sse(sink, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9, port: port_);
             
             },
             codec: 
@@ -354,7 +383,7 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
         )
         ,
             constMeta: kCrateApiSessionRdpSessionStartConstMeta,
-            argValues: [that, host, port, username, password, width, height, pinsPath, sink],
+            argValues: [that, host, port, username, password, width, height, pinsPath, clipboardDirection, sink],
             apiImpl: this,
         )));
             return sink.stream;
@@ -363,11 +392,11 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
 
         TaskConstMeta get kCrateApiSessionRdpSessionStartConstMeta => const TaskConstMeta(
             debugName: "RdpSession_start",
-            argNames: ["that", "host", "port", "username", "password", "width", "height", "pinsPath", "sink"],
+            argNames: ["that", "host", "port", "username", "password", "width", "height", "pinsPath", "clipboardDirection", "sink"],
         );
         
 
-@override Stream<SessionUpdate> crateApiSessionRdpSessionStartWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath })  { 
+@override Stream<SessionUpdate> crateApiSessionRdpSessionStartWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection })  { 
             final sink = RustStreamSink<SessionUpdate>();
             unawaited(handler.executeNormal(NormalTask(
             callFfi: (port_) {
@@ -380,8 +409,9 @@ sse_encode_String(username, serializer);
 sse_encode_u_16(width, serializer);
 sse_encode_u_16(height, serializer);
 sse_encode_String(pinsPath, serializer);
+sse_encode_clipboard_mode(clipboardDirection, serializer);
 sse_encode_StreamSink_session_update_Sse(sink, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10, port: port_);
             
             },
             codec: 
@@ -391,7 +421,7 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
         )
         ,
             constMeta: kCrateApiSessionRdpSessionStartWithSavedPasswordConstMeta,
-            argValues: [that, connectionId, host, port, username, width, height, pinsPath, sink],
+            argValues: [that, connectionId, host, port, username, width, height, pinsPath, clipboardDirection, sink],
             apiImpl: this,
         )));
             return sink.stream;
@@ -400,7 +430,7 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
 
         TaskConstMeta get kCrateApiSessionRdpSessionStartWithSavedPasswordConstMeta => const TaskConstMeta(
             debugName: "RdpSession_start_with_saved_password",
-            argNames: ["that", "connectionId", "host", "port", "username", "width", "height", "pinsPath", "sink"],
+            argNames: ["that", "connectionId", "host", "port", "username", "width", "height", "pinsPath", "clipboardDirection", "sink"],
         );
         
 
@@ -409,7 +439,7 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
 sse_encode_String(text, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
             
             },
             codec: 
@@ -436,7 +466,7 @@ sse_encode_String(text, serializer);
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
 sse_encode_bool(vertical, serializer);
 sse_encode_i_16(delta, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
             
             },
             codec: 
@@ -461,7 +491,7 @@ sse_encode_i_16(delta, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13)!;
             
             },
             codec: 
@@ -491,7 +521,7 @@ sse_encode_String(port, serializer);
 sse_encode_String(username, serializer);
 sse_encode_String(password, serializer);
 sse_encode_bool(hasSavedPassword, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
             
             },
             codec: 
@@ -516,7 +546,7 @@ sse_encode_bool(hasSavedPassword, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15)!;
             
             },
             codec: 
@@ -541,7 +571,7 @@ sse_encode_bool(hasSavedPassword, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
             
             },
             codec: 
@@ -568,7 +598,7 @@ sse_encode_bool(hasSavedPassword, serializer);
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(pinsPath, serializer);
 sse_encode_String(host, serializer);
 sse_encode_u_16(port, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17)!;
             
             },
             codec: 
@@ -593,7 +623,7 @@ sse_encode_u_16(port, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18)!;
             
             },
             codec: 
@@ -618,7 +648,7 @@ sse_encode_u_16(port, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
             
             },
             codec: 
@@ -643,7 +673,7 @@ sse_encode_u_16(port, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(connectionId, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20)!;
             
             },
             codec: 
@@ -668,7 +698,7 @@ sse_encode_u_16(port, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(connectionId, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
             
             },
             codec: 
@@ -694,7 +724,7 @@ sse_encode_u_16(port, serializer);
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(connectionId, serializer);
 sse_encode_String(password, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 22)!;
             
             },
             codec: 
@@ -748,6 +778,9 @@ return dco_decode_error_info(raw); }
 @protected int dco_decode_box_autoadd_u_16(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw as int; }
 
+@protected ClipboardMode dco_decode_clipboard_mode(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return ClipboardMode.values[raw as int]; }
+
 @protected ErrorInfo dco_decode_error_info(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 final arr = raw as List<dynamic>;
                 if (arr.length != 4) throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
@@ -800,7 +833,7 @@ return raw == null ? null : dco_decode_box_autoadd_u_16(raw); }
 
 @protected SessionUpdate dco_decode_session_update(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 final arr = raw as List<dynamic>;
-                if (arr.length != 11) throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
+                if (arr.length != 12) throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
                 return SessionUpdate(kind: dco_decode_update_kind(arr[0]),
 label: dco_decode_opt_String(arr[1]),
 connected: dco_decode_bool(arr[2]),
@@ -811,7 +844,8 @@ y: dco_decode_u_16(arr[6]),
 width: dco_decode_u_16(arr[7]),
 height: dco_decode_u_16(arr[8]),
 rgba: dco_decode_list_prim_u_8_strict(arr[9]),
-error: dco_decode_opt_box_autoadd_error_info(arr[10]),); }
+error: dco_decode_opt_box_autoadd_error_info(arr[10]),
+text: dco_decode_opt_String(arr[11]),); }
 
 @protected int dco_decode_u_16(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw as int; }
@@ -859,6 +893,10 @@ return (sse_decode_error_info(deserializer)); }
 
 @protected int sse_decode_box_autoadd_u_16(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 return (sse_decode_u_16(deserializer)); }
+
+@protected ClipboardMode sse_decode_clipboard_mode(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+var inner = sse_decode_i_32(deserializer);
+        return ClipboardMode.values[inner]; }
 
 @protected ErrorInfo sse_decode_error_info(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 var var_id = sse_decode_String(deserializer);
@@ -953,7 +991,8 @@ var var_width = sse_decode_u_16(deserializer);
 var var_height = sse_decode_u_16(deserializer);
 var var_rgba = sse_decode_list_prim_u_8_strict(deserializer);
 var var_error = sse_decode_opt_box_autoadd_error_info(deserializer);
-return SessionUpdate(kind: var_kind, label: var_label, connected: var_connected, fingerprint: var_fingerprint, pinned: var_pinned, x: var_x, y: var_y, width: var_width, height: var_height, rgba: var_rgba, error: var_error); }
+var var_text = sse_decode_opt_String(deserializer);
+return SessionUpdate(kind: var_kind, label: var_label, connected: var_connected, fingerprint: var_fingerprint, pinned: var_pinned, x: var_x, y: var_y, width: var_width, height: var_height, rgba: var_rgba, error: var_error, text: var_text); }
 
 @protected int sse_decode_u_16(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 return deserializer.buffer.getUint16(); }
@@ -1004,6 +1043,9 @@ sse_encode_error_info(self, serializer); }
 
 @protected void sse_encode_box_autoadd_u_16(int self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_u_16(self, serializer); }
+
+@protected void sse_encode_clipboard_mode(ClipboardMode self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_i_32(self.index, serializer); }
 
 @protected void sse_encode_error_info(ErrorInfo self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_String(self.id, serializer);
@@ -1083,6 +1125,7 @@ sse_encode_u_16(self.width, serializer);
 sse_encode_u_16(self.height, serializer);
 sse_encode_list_prim_u_8_strict(self.rgba, serializer);
 sse_encode_opt_box_autoadd_error_info(self.error, serializer);
+sse_encode_opt_String(self.text, serializer);
  }
 
 @protected void sse_encode_u_16(int self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
@@ -1144,17 +1187,23 @@ sse_encode_i_32(self.index, serializer); }
  void  mouseMove({required int x , required int y })=>RustLib.instance.api.crateApiSessionRdpSessionMouseMove(that: this, x: x, y: y);
 
 
+/// Offers this device's clipboard text to the remote computer. It is sent
+/// only if clipboard sharing to the remote is allowed for this connection,
+/// and only when the remote pastes.
+ void  offerClipboardText({required String text })=>RustLib.instance.api.crateApiSessionRdpSessionOfferClipboardText(that: this, text: text);
+
+
 /// Connects on a worker thread; updates arrive on `sink` (a Dart stream).
 /// The password is used for this connection only and never stored here.
 /// `pins_path` is the certificate pin file in the app's private data folder.
 /// Can be called once per handle.
- Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath })=>RustLib.instance.api.crateApiSessionRdpSessionStart(that: this, host: host, port: port, username: username, password: password, width: width, height: height, pinsPath: pinsPath);
+ Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection })=>RustLib.instance.api.crateApiSessionRdpSessionStart(that: this, host: host, port: port, username: username, password: password, width: width, height: height, pinsPath: pinsPath, clipboardDirection: clipboardDirection);
 
 
 /// Like [`RdpSession::start`], but reads the saved password from the OS
 /// vault inside Rust, so it never passes through the UI (Windows, Linux).
 /// The caller must have confirmed the user's identity first (S5).
- Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath })=>RustLib.instance.api.crateApiSessionRdpSessionStartWithSavedPassword(that: this, connectionId: connectionId, host: host, port: port, username: username, width: width, height: height, pinsPath: pinsPath);
+ Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection })=>RustLib.instance.api.crateApiSessionRdpSessionStartWithSavedPassword(that: this, connectionId: connectionId, host: host, port: port, username: username, width: width, height: height, pinsPath: pinsPath, clipboardDirection: clipboardDirection);
 
 
 /// Types text (on-screen keyboards, IMEs, pasted text is NOT sent this way).

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:secure_rdp_viewer/src/rust/api/session.dart' show ClipboardMode;
 import 'package:secure_rdp_viewer/state/profiles.dart';
 import 'package:secure_rdp_viewer/state/settings.dart';
 
@@ -53,6 +54,15 @@ void main() {
       expect(p.clipboardEnabled, isFalse);
       expect(p.savePassword, isFalse);
     });
+  });
+
+  test('clipboard mode defaults to off and can be set per direction', () {
+    const p = ConnectionProfile(id: 'x', name: 'n', host: 'h', port: 1, username: 'u');
+    expect(p.clipboardMode, ClipboardMode.off);
+    expect(p.clipboardEnabled, isFalse);
+    final one = p.copyWith(clipboardMode: ClipboardMode.fromRemoteOnly);
+    expect(one.clipboardEnabled, isTrue);
+    expect(one.copyWith(name: 'm').clipboardMode, ClipboardMode.fromRemoteOnly);
   });
 
   test('connection ids are random, unique and vault-safe', () {

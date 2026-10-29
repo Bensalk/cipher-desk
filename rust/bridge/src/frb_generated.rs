@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 7256367;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -283280114;
 
 // Section: executor
 
@@ -389,6 +389,58 @@ fn wire__crate__api__session__RdpSession_mouse_move_impl(
         },
     )
 }
+fn wire__crate__api__session__RdpSession_offer_clipboard_text_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "RdpSession_offer_clipboard_text",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RdpSession>,
+            >>::sse_decode(&mut deserializer);
+            let api_text = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let mut api_that_guard = None;
+                let decode_indices_ =
+                    flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                        flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                            &api_that, 0, false,
+                        ),
+                    ]);
+                for i in decode_indices_ {
+                    match i {
+                        0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                        _ => unreachable!(),
+                    }
+                }
+                let api_that_guard = api_that_guard.unwrap();
+                let output_ok = Ok::<_, ()>({
+                    crate::api::session::RdpSession::offer_clipboard_text(
+                        &*api_that_guard,
+                        api_text,
+                    );
+                })?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
 fn wire__crate__api__session__RdpSession_start_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -421,6 +473,8 @@ fn wire__crate__api__session__RdpSession_start_impl(
             let api_width = <u16>::sse_decode(&mut deserializer);
             let api_height = <u16>::sse_decode(&mut deserializer);
             let api_pins_path = <String>::sse_decode(&mut deserializer);
+            let api_clipboard_direction =
+                <crate::api::session::ClipboardMode>::sse_decode(&mut deserializer);
             let api_sink = <StreamSink<
                 crate::api::session::SessionUpdate,
                 flutter_rust_bridge::for_generated::SseCodec,
@@ -452,6 +506,7 @@ fn wire__crate__api__session__RdpSession_start_impl(
                             api_width,
                             api_height,
                             api_pins_path,
+                            api_clipboard_direction,
                             api_sink,
                         );
                     })?;
@@ -493,6 +548,8 @@ fn wire__crate__api__session__RdpSession_start_with_saved_password_impl(
             let api_width = <u16>::sse_decode(&mut deserializer);
             let api_height = <u16>::sse_decode(&mut deserializer);
             let api_pins_path = <String>::sse_decode(&mut deserializer);
+            let api_clipboard_direction =
+                <crate::api::session::ClipboardMode>::sse_decode(&mut deserializer);
             let api_sink = <StreamSink<
                 crate::api::session::SessionUpdate,
                 flutter_rust_bridge::for_generated::SseCodec,
@@ -524,6 +581,7 @@ fn wire__crate__api__session__RdpSession_start_with_saved_password_impl(
                             api_width,
                             api_height,
                             api_pins_path,
+                            api_clipboard_direction,
                             api_sink,
                         );
                     })?;
@@ -1017,6 +1075,20 @@ impl SseDecode for bool {
     }
 }
 
+impl SseDecode for crate::api::session::ClipboardMode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::session::ClipboardMode::Off,
+            1 => crate::api::session::ClipboardMode::Both,
+            2 => crate::api::session::ClipboardMode::ToRemoteOnly,
+            3 => crate::api::session::ClipboardMode::FromRemoteOnly,
+            _ => unreachable!("Invalid variant for ClipboardMode: {}", inner),
+        };
+    }
+}
+
 impl SseDecode for crate::api::errors::ErrorInfo {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1172,6 +1244,7 @@ impl SseDecode for crate::api::session::SessionUpdate {
         let mut var_height = <u16>::sse_decode(deserializer);
         let mut var_rgba = <Vec<u8>>::sse_decode(deserializer);
         let mut var_error = <Option<crate::api::errors::ErrorInfo>>::sse_decode(deserializer);
+        let mut var_text = <Option<String>>::sse_decode(deserializer);
         return crate::api::session::SessionUpdate {
             kind: var_kind,
             label: var_label,
@@ -1184,6 +1257,7 @@ impl SseDecode for crate::api::session::SessionUpdate {
             height: var_height,
             rgba: var_rgba,
             error: var_error,
+            text: var_text,
         };
     }
 }
@@ -1218,6 +1292,8 @@ impl SseDecode for crate::api::session::UpdateKind {
             3 => crate::api::session::UpdateKind::Resized,
             4 => crate::api::session::UpdateKind::Frame,
             5 => crate::api::session::UpdateKind::Ended,
+            6 => crate::api::session::UpdateKind::RemoteClipboard,
+            7 => crate::api::session::UpdateKind::RemoteClipboardTooLarge,
             _ => unreachable!("Invalid variant for UpdateKind: {}", inner),
         };
     }
@@ -1254,8 +1330,8 @@ fn pde_ffi_dispatcher_primary_impl(
 ) {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        8 => wire__crate__api__session__RdpSession_start_impl(port, ptr, rust_vec_len, data_len),
-        9 => wire__crate__api__session__RdpSession_start_with_saved_password_impl(
+        9 => wire__crate__api__session__RdpSession_start_impl(port, ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__session__RdpSession_start_with_saved_password_impl(
             port,
             ptr,
             rust_vec_len,
@@ -1284,18 +1360,23 @@ fn pde_ffi_dispatcher_sync_impl(
         5 => wire__crate__api__session__RdpSession_key_impl(ptr, rust_vec_len, data_len),
         6 => wire__crate__api__session__RdpSession_mouse_button_impl(ptr, rust_vec_len, data_len),
         7 => wire__crate__api__session__RdpSession_mouse_move_impl(ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__session__RdpSession_type_text_impl(ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__session__RdpSession_wheel_impl(ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__errors__all_connection_errors_impl(ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__form__check_connection_form_impl(ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__info__core_summary_impl(ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__form__default_port_impl(ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__pins__forget_certificate_impl(ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__info__hello_from_rust_impl(ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__info__security_defaults_summary_impl(ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__vault__vault_check_password_impl(ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__vault__vault_delete_password_impl(ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__vault__vault_save_password_impl(ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__session__RdpSession_offer_clipboard_text_impl(
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        11 => wire__crate__api__session__RdpSession_type_text_impl(ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__session__RdpSession_wheel_impl(ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__errors__all_connection_errors_impl(ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__form__check_connection_form_impl(ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__info__core_summary_impl(ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__form__default_port_impl(ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__pins__forget_certificate_impl(ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__info__hello_from_rust_impl(ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__info__security_defaults_summary_impl(ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__vault__vault_check_password_impl(ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__vault__vault_delete_password_impl(ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__vault__vault_save_password_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1317,6 +1398,29 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<RdpSession>> for RdpSession {
     }
 }
 
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::session::ClipboardMode {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Off => 0.into_dart(),
+            Self::Both => 1.into_dart(),
+            Self::ToRemoteOnly => 2.into_dart(),
+            Self::FromRemoteOnly => 3.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::session::ClipboardMode
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::session::ClipboardMode>
+    for crate::api::session::ClipboardMode
+{
+    fn into_into_dart(self) -> crate::api::session::ClipboardMode {
+        self
+    }
+}
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::errors::ErrorInfo {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
@@ -1397,6 +1501,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::session::SessionUpdate {
             self.height.into_into_dart().into_dart(),
             self.rgba.into_into_dart().into_dart(),
             self.error.into_into_dart().into_dart(),
+            self.text.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -1422,6 +1527,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::session::UpdateKind {
             Self::Resized => 3.into_dart(),
             Self::Frame => 4.into_dart(),
             Self::Ended => 5.into_dart(),
+            Self::RemoteClipboard => 6.into_dart(),
+            Self::RemoteClipboardTooLarge => 7.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -1507,6 +1614,24 @@ impl SseEncode for bool {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         serializer.cursor.write_u8(self as _).unwrap();
+    }
+}
+
+impl SseEncode for crate::api::session::ClipboardMode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::session::ClipboardMode::Off => 0,
+                crate::api::session::ClipboardMode::Both => 1,
+                crate::api::session::ClipboardMode::ToRemoteOnly => 2,
+                crate::api::session::ClipboardMode::FromRemoteOnly => 3,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
     }
 }
 
@@ -1637,6 +1762,7 @@ impl SseEncode for crate::api::session::SessionUpdate {
         <u16>::sse_encode(self.height, serializer);
         <Vec<u8>>::sse_encode(self.rgba, serializer);
         <Option<crate::api::errors::ErrorInfo>>::sse_encode(self.error, serializer);
+        <Option<String>>::sse_encode(self.text, serializer);
     }
 }
 
@@ -1670,6 +1796,8 @@ impl SseEncode for crate::api::session::UpdateKind {
                 crate::api::session::UpdateKind::Resized => 3,
                 crate::api::session::UpdateKind::Frame => 4,
                 crate::api::session::UpdateKind::Ended => 5,
+                crate::api::session::UpdateKind::RemoteClipboard => 6,
+                crate::api::session::UpdateKind::RemoteClipboardTooLarge => 7,
                 _ => {
                     unimplemented!("");
                 }

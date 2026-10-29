@@ -35,8 +35,10 @@ Only the latest release receives security fixes until version 1.0.
 - **Logging is capped at `info` in release builds** and the authentication
   library's (`sspi`) logs are always disabled, because at debug level it
   records credential buffers.
-- Drive, printer, USB and audio redirection are **off by default**.
-  Clipboard sharing is **opt-in**.
+- Drive, printer, USB and audio redirection are **off**.
+  Clipboard sharing is **opt-in per connection**, plain text only, up to 1 MB,
+  in both or one direction. When it is off, the clipboard channel is not offered
+  to the host at all. On Android, text from the host is marked sensitive.
 - Outside access is intended **only through a VPN** (e.g. WireGuard or
   Tailscale). Never expose RDP port 3389 to the internet.
 

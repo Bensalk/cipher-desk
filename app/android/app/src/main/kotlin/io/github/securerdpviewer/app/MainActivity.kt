@@ -1,6 +1,12 @@
 package io.github.securerdpviewer.app
 
+import android.content.ClipData
+import android.content.ClipDescription
+import android.content.ClipboardManager
+import android.content.Context
+import android.os.Build
 import android.os.Bundle
+import android.os.PersistableBundle
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -36,6 +42,25 @@ class MainActivity : FlutterFragmentActivity() {
                 }
                 else -> result.notImplemented()
             }
+        }
+
+        // Text copied on the remote computer, marked sensitive (S6).
+        MethodChannel(messenger, "rdpv/clipboard").setMethodCallHandler { call, result ->
+            if (call.method != "setSensitiveText") return@setMethodCallHandler result.notImplemented()
+            val text = call.arguments as? String
+                ?: return@setMethodCallHandler result.error("bad_args", "Expected text", null)
+            val clip = ClipData.newPlainText("Remote computer", text)
+            val extras = PersistableBundle()
+            val key = if (Build.VERSION.SDK_INT >= 33) {
+                ClipDescription.EXTRA_IS_SENSITIVE
+            } else {
+                "android.content.extra.IS_SENSITIVE"
+            }
+            extras.putBoolean(key, true)
+            clip.description.extras = extras
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(clip)
+            result.success(null)
         }
 
         // Saved passwords in the Android Keystore (S4, S5).

@@ -2,6 +2,8 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
+import '../src/rust/api/session.dart' show ClipboardMode;
+
 /// A saved connection. Deliberately has **no password field**: passwords are
 /// only ever stored in the operating system's vault (Stage 5).
 @immutable
@@ -13,7 +15,7 @@ class ConnectionProfile {
     required this.port,
     required this.username,
     this.savePassword = false,
-    this.clipboardEnabled = false,
+    this.clipboardMode = ClipboardMode.off,
     this.lastUsed,
   });
 
@@ -27,7 +29,9 @@ class ConnectionProfile {
   final bool savePassword;
 
   /// Clipboard sharing for this profile (off by default, S3/S6).
-  final bool clipboardEnabled;
+  final ClipboardMode clipboardMode;
+
+  bool get clipboardEnabled => clipboardMode != ClipboardMode.off;
   final DateTime? lastUsed;
 
   /// "host:port", bracketing IPv6 addresses.
@@ -42,7 +46,7 @@ class ConnectionProfile {
     int? port,
     String? username,
     bool? savePassword,
-    bool? clipboardEnabled,
+    ClipboardMode? clipboardMode,
     DateTime? lastUsed,
   }) {
     return ConnectionProfile(
@@ -52,7 +56,7 @@ class ConnectionProfile {
       port: port ?? this.port,
       username: username ?? this.username,
       savePassword: savePassword ?? this.savePassword,
-      clipboardEnabled: clipboardEnabled ?? this.clipboardEnabled,
+      clipboardMode: clipboardMode ?? this.clipboardMode,
       lastUsed: lastUsed ?? this.lastUsed,
     );
   }

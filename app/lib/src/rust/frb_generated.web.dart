@@ -51,6 +51,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_web.dart';
 
 @protected int dco_decode_box_autoadd_u_16(dynamic raw);
 
+@protected ClipboardMode dco_decode_clipboard_mode(dynamic raw);
+
 @protected ErrorInfo dco_decode_error_info(dynamic raw);
 
 @protected FieldProblem dco_decode_field_problem(dynamic raw);
@@ -107,6 +109,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_web.dart';
 
 @protected int sse_decode_box_autoadd_u_16(SseDeserializer deserializer);
 
+@protected ClipboardMode sse_decode_clipboard_mode(SseDeserializer deserializer);
+
 @protected ErrorInfo sse_decode_error_info(SseDeserializer deserializer);
 
 @protected FieldProblem sse_decode_field_problem(SseDeserializer deserializer);
@@ -162,6 +166,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_web.dart';
 @protected void sse_encode_box_autoadd_error_info(ErrorInfo self, SseSerializer serializer);
 
 @protected void sse_encode_box_autoadd_u_16(int self, SseSerializer serializer);
+
+@protected void sse_encode_clipboard_mode(ClipboardMode self, SseSerializer serializer);
 
 @protected void sse_encode_error_info(ErrorInfo self, SseSerializer serializer);
 

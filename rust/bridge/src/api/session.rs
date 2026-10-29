@@ -7,9 +7,10 @@
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::time::Duration;
 
+use rdpv_core::clipboard::ClipboardPolicy;
 use rdpv_core::input::{parse_endpoint, parse_username};
 use rdpv_core::pins::PinStore;
-use rdpv_core::policy::SecurityDefaults;
+use rdpv_core::policy::{ClipboardDirection, SecurityDefaults};
 use rdpv_core::secret::SecretString;
 use rdpv_core::session::{
     connect, ConnectFailure, ConnectParams, InputEvent, PointerButton, Region, Session,
@@ -37,6 +38,10 @@ pub enum UpdateKind {
     Frame,
     /// The session ended. `error` is `None` when the user disconnected.
     Ended,
+    /// Text copied on the remote computer (`text`), for this device's clipboard.
+    RemoteClipboard,
+    /// Text copied on the remote computer was larger than allowed and was dropped.
+    RemoteClipboardTooLarge,
 }
 
 /// Something the UI should show. Only the fields named for its `kind` are set.
@@ -53,6 +58,7 @@ pub struct SessionUpdate {
     pub height: u16,
     pub rgba: Vec<u8>,
     pub error: Option<ErrorInfo>,
+    pub text: Option<String>,
 }
 
 impl SessionUpdate {
@@ -69,6 +75,14 @@ impl SessionUpdate {
             height: 0,
             rgba: Vec::new(),
             error: None,
+            text: None,
+        }
+    }
+
+    fn remote_clipboard(text: String) -> Self {
+        Self {
+            text: Some(text),
+            ..Self::new(UpdateKind::RemoteClipboard)
         }
     }
 
@@ -124,6 +138,7 @@ impl SessionUpdate {
 
 enum Command {
     Input(Vec<InputEvent>),
+    OfferClipboard(String),
     ApproveCertificate(bool),
     Disconnect,
 }
@@ -160,6 +175,7 @@ impl RdpSession {
         width: u16,
         height: u16,
         pins_path: String,
+        clipboard_direction: ClipboardMode,
         sink: StreamSink<SessionUpdate>,
     ) {
         let target = Target {
@@ -169,6 +185,7 @@ impl RdpSession {
             width,
             height,
             pins_path,
+            clipboard: clipboard_direction,
         };
         self.spawn(target, Some(SecretString::new(password)), None, sink);
     }
@@ -186,6 +203,7 @@ impl RdpSession {
         width: u16,
         height: u16,
         pins_path: String,
+        clipboard_direction: ClipboardMode,
         sink: StreamSink<SessionUpdate>,
     ) {
         let target = Target {
@@ -195,6 +213,7 @@ impl RdpSession {
             width,
             height,
             pins_path,
+            clipboard: clipboard_direction,
         };
         self.spawn(target, None, Some(connection_id), sink);
     }
@@ -315,6 +334,14 @@ impl RdpSession {
         ]);
     }
 
+    /// Offers this device's clipboard text to the remote computer. It is sent
+    /// only if clipboard sharing to the remote is allowed for this connection,
+    /// and only when the remote pastes.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn offer_clipboard_text(&self, text: String) {
+        let _ = self.tx.send(Command::OfferClipboard(text));
+    }
+
     /// Answers the certificate prompt.
     #[flutter_rust_bridge::frb(sync)]
     pub fn approve_certificate(&self, approve: bool) {
@@ -334,6 +361,30 @@ impl RdpSession {
     }
 }
 
+/// Clipboard sharing for one connection (S6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClipboardMode {
+    Off,
+    /// Both directions.
+    Both,
+    /// Only from this device to the remote computer.
+    ToRemoteOnly,
+    /// Only from the remote computer to this device.
+    FromRemoteOnly,
+}
+
+impl ClipboardMode {
+    fn policy(self) -> ClipboardPolicy {
+        let d = match self {
+            Self::Off => ClipboardDirection::Off,
+            Self::Both => ClipboardDirection::Both,
+            Self::ToRemoteOnly => ClipboardDirection::LocalToHost,
+            Self::FromRemoteOnly => ClipboardDirection::HostToLocal,
+        };
+        ClipboardPolicy::from_direction(d, SecurityDefaults::secure().clipboard_max_bytes)
+    }
+}
+
 /// Where to connect (everything except the password).
 struct Target {
     host: String,
@@ -342,6 +393,7 @@ struct Target {
     width: u16,
     height: u16,
     pins_path: String,
+    clipboard: ClipboardMode,
 }
 
 fn run(
@@ -357,6 +409,7 @@ fn run(
         width,
         height,
         pins_path,
+        clipboard,
     } = target;
     let (port, width, height) = (*port, *width, *height);
     let send = |u: SessionUpdate| {
@@ -390,6 +443,7 @@ fn run(
             desktop_height: height,
             pinned_fingerprint: pin.clone(),
             connect_timeout: policy.connect_timeout,
+            clipboard: clipboard.policy(),
         };
         match connect(params) {
             Ok(s) => break s,
@@ -427,7 +481,8 @@ fn wait_for_approval(rx: &Receiver<Command>) -> Option<bool> {
         match rx.recv() {
             Ok(Command::ApproveCertificate(a)) => return Some(a),
             Ok(Command::Disconnect) | Err(_) => return None,
-            Ok(Command::Input(_)) => {}
+            // Input and clipboard offers before the session exists are dropped.
+            Ok(Command::Input(_) | Command::OfferClipboard(_)) => {}
         }
     }
 }
@@ -451,6 +506,13 @@ fn drive(
                 Ok(Command::Input(events)) => {
                     last_input = std::time::Instant::now();
                     if let Err(e) = s.send_input(events) {
+                        let _ = sink.add(SessionUpdate::ended(Some(e)));
+                        return;
+                    }
+                }
+                Ok(Command::OfferClipboard(text)) => {
+                    // Copying on this device is not user input to the session.
+                    if let Err(e) = s.offer_local_clipboard(text) {
                         let _ = sink.add(SessionUpdate::ended(Some(e)));
                         return;
                     }
@@ -488,6 +550,12 @@ fn drive(
                         bottom: height.saturating_sub(1),
                     };
                     dirty = Some(full);
+                }
+                SessionEvent::RemoteClipboardText(text) => {
+                    send(SessionUpdate::remote_clipboard(text));
+                }
+                SessionEvent::RemoteClipboardTooLarge => {
+                    send(SessionUpdate::new(UpdateKind::RemoteClipboardTooLarge));
                 }
                 SessionEvent::Ended(err) => {
                     let _ = sink.add(SessionUpdate::ended(err));

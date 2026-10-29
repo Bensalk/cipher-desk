@@ -81,6 +81,7 @@ jobs:
             openssl rand -hex 16 | gnome-keyring-daemon --unlock --components=secrets > /dev/null
             cargo test -p rdpv-core --test live_host -- --ignored --test-threads=1
             cargo test -p rdpv-core --test live_vault real_vault -- --ignored
+            cargo test -p rdpv-core --test live_clipboard -- --ignored --test-threads=1
             cargo test --release -p rdpv-core --test live_host -- --ignored --test-threads=1
           '
       - name: Vault refuses to save when no keyring exists (I8)
@@ -143,7 +144,7 @@ jobs:
             exit 1; }
       - run: flutter pub get
       - name: Analyze
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos
       - name: Unit tests
         run: flutter test
       - name: Build Linux

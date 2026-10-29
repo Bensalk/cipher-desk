@@ -4,11 +4,13 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../platform/remote_clipboard.dart';
 import '../session/scancodes.dart';
 import '../src/rust/api/errors.dart';
 import '../src/rust/api/session.dart';
@@ -39,7 +41,7 @@ class SessionScreen extends StatefulWidget {
   State<SessionScreen> createState() => _SessionScreenState();
 }
 
-class _SessionScreenState extends State<SessionScreen> {
+class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserver {
   final RdpSession _session = RdpSession.create();
   StreamSubscription<SessionUpdate>? _sub;
   final FocusNode _focus = FocusNode(debugLabel: 'remote-desktop');
@@ -57,10 +59,45 @@ class _SessionScreenState extends State<SessionScreen> {
   bool _decoding = false;
   bool _dirty = false;
 
+  // Clipboard (S6).
+  Timer? _clipTimer;
+  String? _lastLocalClip;
+  bool get _sendsClipboard =>
+      widget.profile.clipboardMode == ClipboardMode.both ||
+      widget.profile.clipboardMode == ClipboardMode.toRemoteOnly;
+  static bool get _isAndroid => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _start();
+  }
+
+  /// Desktop: check this device's clipboard every second while connected.
+  /// Android: only when the app comes back to the foreground or on request,
+  /// because Android shows a notice every time an app reads the clipboard.
+  void _startClipboardSync() {
+    if (!_sendsClipboard) return;
+    _offerLocalClipboard();
+    if (!_isAndroid) {
+      _clipTimer = Timer.periodic(const Duration(seconds: 1), (_) => _offerLocalClipboard());
+    }
+  }
+
+  Future<void> _offerLocalClipboard() async {
+    if (_ended || !_sendsClipboard) return;
+    final text = await RemoteClipboard.readText();
+    if (text == null || text == _lastLocalClip || _ended) return;
+    _lastLocalClip = text;
+    _session.offerClipboardText(text: text);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _state == RdpConnectionState.connected) {
+      _offerLocalClipboard();
+    }
   }
 
   Future<void> _start() async {
@@ -81,6 +118,7 @@ class _SessionScreenState extends State<SessionScreen> {
             width: w,
             height: h,
             pinsPath: pinsPath,
+            clipboardDirection: widget.profile.clipboardMode,
           )
         : _session.start(
             host: widget.profile.host,
@@ -90,6 +128,7 @@ class _SessionScreenState extends State<SessionScreen> {
             width: w,
             height: h,
             pinsPath: pinsPath,
+            clipboardDirection: widget.profile.clipboardMode,
           );
     _sub = stream.listen(_onUpdate, onError: (_) => _onEnded(null));
   }
@@ -105,7 +144,10 @@ class _SessionScreenState extends State<SessionScreen> {
                   ? RdpConnectionState.checkIdentity
                   : RdpConnectionState.connecting);
         });
-        if (u.connected) _focus.requestFocus();
+        if (u.connected) {
+          _focus.requestFocus();
+          _startClipboardSync();
+        }
       case UpdateKind.certificateApproval:
         _askApproval(u.fingerprint ?? '');
       case UpdateKind.certificateChanged:
@@ -120,6 +162,16 @@ class _SessionScreenState extends State<SessionScreen> {
         _applyFrame(u);
       case UpdateKind.ended:
         _onEnded(u.error);
+      case UpdateKind.remoteClipboard:
+        final text = u.text;
+        if (text != null && text.isNotEmpty) {
+          _lastLocalClip = text; // don't send it straight back
+          RemoteClipboard.setText(text);
+        }
+      case UpdateKind.remoteClipboardTooLarge:
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Text copied on the remote computer was larger than 1 MB and was not copied.'),
+        ));
     }
   }
 
@@ -160,6 +212,7 @@ class _SessionScreenState extends State<SessionScreen> {
   }
 
   void _onEnded(ErrorInfo? error) {
+    _clipTimer?.cancel();
     if (_ended) return;
     setState(() {
       _ended = true;
@@ -208,6 +261,8 @@ class _SessionScreenState extends State<SessionScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _clipTimer?.cancel();
     if (!_ended) _session.disconnect();
     _sub?.cancel();
     _image?.dispose();
@@ -382,6 +437,12 @@ class _SessionScreenState extends State<SessionScreen> {
               icon: const Icon(Icons.keyboard_outlined),
               onPressed: _typeText,
             ),
+            if (_isAndroid && _sendsClipboard)
+              IconButton(
+                tooltip: 'Send clipboard to the remote computer',
+                icon: const Icon(Icons.content_paste_go_outlined),
+                onPressed: _offerLocalClipboard,
+              ),
           ],
         ),
       ),
@@ -395,6 +456,18 @@ class _SessionScreenState extends State<SessionScreen> {
       appBar: AppBar(
         title: Text(widget.profile.displayName),
         actions: [
+          if (widget.profile.clipboardEnabled && _state == RdpConnectionState.connected)
+            Tooltip(
+              message: switch (widget.profile.clipboardMode) {
+                ClipboardMode.toRemoteOnly => 'Clipboard sharing on: this device → remote only',
+                ClipboardMode.fromRemoteOnly => 'Clipboard sharing on: remote → this device only',
+                _ => 'Clipboard sharing on (both directions)',
+              },
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Icon(Icons.content_paste_outlined, key: Key('clipboard-indicator')),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: StatusChip(state: _state),

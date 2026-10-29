@@ -17,6 +17,8 @@ use std::io::{self, Write as _};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs as _};
 
 use ironrdp_blocking::Framed;
+use ironrdp_cliprdr::pdu::{ClipboardFormat, ClipboardFormatId, OwnedFormatDataResponse};
+use ironrdp_cliprdr::CliprdrClient;
 use ironrdp_connector::connection_activation::{
     ConnectionActivationFactory, ConnectionActivationState,
 };
@@ -34,6 +36,7 @@ use ironrdp_session::{
     ActiveStage, ActiveStageBuilder, ActiveStageOutput, GracefulDisconnectReason,
 };
 
+use crate::clipboard::{decode_unicode_text, ClipAction, ClipQueue, ClipboardPolicy, QueueBackend};
 use crate::input::{Endpoint, Username};
 use crate::secret::SecretString;
 use crate::status::ConnectionError;
@@ -63,6 +66,9 @@ pub struct ConnectParams {
     pub pinned_fingerprint: Option<String>,
     /// Timeout for connecting and for each read/write during setup.
     pub connect_timeout: Duration,
+    /// Text clipboard sharing (off by default). When off, the clipboard
+    /// channel is not even offered to the host.
+    pub clipboard: ClipboardPolicy,
 }
 
 /// Why [`connect`] did not produce a session.
@@ -106,6 +112,34 @@ pub enum SessionEvent {
     Resized { width: u16, height: u16 },
     /// The session ended. `None` means the user asked to disconnect.
     Ended(Option<ConnectionError>),
+    /// Text copied on the host, allowed by the policy, for the local clipboard.
+    RemoteClipboardText(String),
+    /// Text copied on the host was larger than the policy allows and was dropped.
+    RemoteClipboardTooLarge,
+}
+
+/// Result of offering this device's clipboard text to the host.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClipboardOffer {
+    /// The host was told new text is available; it is sent when the host pastes.
+    Offered,
+    /// Sharing from this device to the host is off for this session.
+    Disabled,
+    /// Larger than the policy allows; not offered.
+    TooLarge,
+    /// Same text as last time (or text that just came from the host); nothing to do.
+    Unchanged,
+}
+
+/// Clipboard state for one session.
+struct ClipState {
+    policy: ClipboardPolicy,
+    queue: ClipQueue,
+    /// Text this device currently offers to the host.
+    local_text: Option<String>,
+    /// Last text received from the host, to avoid echoing it straight back.
+    last_remote: Option<String>,
+    ready: bool,
 }
 
 /// An open RDP session.
@@ -116,6 +150,7 @@ pub struct Session {
     activation_factory: ConnectionActivationFactory,
     input: Database,
     ended: bool,
+    clip: Option<ClipState>,
 }
 
 impl core::fmt::Debug for Session {
@@ -138,6 +173,7 @@ pub fn connect(params: ConnectParams) -> Result<Session, ConnectFailure> {
         desktop_height,
         pinned_fingerprint,
         connect_timeout,
+        clipboard,
     } = params;
 
     let addr = resolve(&endpoint).map_err(ConnectFailure::Failed)?;
@@ -153,6 +189,21 @@ pub fn connect(params: ConnectParams) -> Result<Session, ConnectFailure> {
     // The connector holds its own copy of the password until CredSSP is done.
     drop(password);
     let mut connector = ClientConnector::new(config, client_addr);
+    let clip = if clipboard.is_enabled() {
+        let queue = ClipQueue::default();
+        connector = connector.with_static_channel(CliprdrClient::new(Box::new(QueueBackend::new(
+            std::sync::Arc::clone(&queue),
+        ))));
+        Some(ClipState {
+            policy: clipboard,
+            queue,
+            local_text: None,
+            last_remote: None,
+            ready: false,
+        })
+    } else {
+        None
+    };
 
     let mut framed = Framed::new(tcp);
     let should_upgrade = ironrdp_blocking::connect_begin(&mut framed, &mut connector)
@@ -205,6 +256,7 @@ pub fn connect(params: ConnectParams) -> Result<Session, ConnectFailure> {
         activation_factory,
         input: Database::new(),
         ended: false,
+        clip,
     })
 }
 
@@ -287,7 +339,138 @@ impl Session {
                 break;
             }
         }
+        if !self.ended {
+            if let Err(err) = self.service_clipboard(&mut events) {
+                self.end(&mut events, Some(err));
+            }
+        }
         events
+    }
+
+    /// Offers this device's clipboard text to the host (if the policy allows).
+    /// The text itself is only sent when the host pastes.
+    pub fn offer_local_clipboard(
+        &mut self,
+        text: String,
+    ) -> Result<ClipboardOffer, ConnectionError> {
+        let Some(clip) = self.clip.as_mut() else {
+            return Ok(ClipboardOffer::Disabled);
+        };
+        if !clip.policy.local_to_host {
+            return Ok(ClipboardOffer::Disabled);
+        }
+        if text.is_empty() || !clip.policy.fits(&text) {
+            return Ok(ClipboardOffer::TooLarge);
+        }
+        if clip.local_text.as_deref() == Some(text.as_str())
+            || clip.last_remote.as_deref() == Some(text.as_str())
+        {
+            return Ok(ClipboardOffer::Unchanged);
+        }
+        clip.local_text = Some(text);
+        if clip.ready {
+            self.advertise_local()?;
+        }
+        Ok(ClipboardOffer::Offered)
+    }
+
+    /// Tells the host which formats this device offers (plain text or nothing).
+    fn advertise_local(&mut self) -> Result<(), ConnectionError> {
+        let offer_text = self
+            .clip
+            .as_ref()
+            .is_some_and(|c| c.policy.local_to_host && c.local_text.is_some());
+        let formats = if offer_text {
+            vec![ClipboardFormat::new(ClipboardFormatId::CF_UNICODETEXT)]
+        } else {
+            Vec::new()
+        };
+        let msgs = self
+            .stage
+            .get_svc_processor_mut::<CliprdrClient>()
+            .ok_or(ConnectionError::Unexpected)?
+            .initiate_copy(&formats)
+            .map_err(|_| ConnectionError::Unexpected)?;
+        self.send_svc(msgs)
+    }
+
+    fn send_svc(
+        &mut self,
+        msgs: ironrdp_cliprdr::CliprdrSvcMessages<ironrdp_cliprdr::Client>,
+    ) -> Result<(), ConnectionError> {
+        let frame = self
+            .stage
+            .process_svc_processor_messages(msgs)
+            .map_err(|_| ConnectionError::Unexpected)?;
+        if !frame.is_empty() {
+            self.write(&frame)?;
+        }
+        Ok(())
+    }
+
+    /// Acts on what the clipboard channel reported, applying the policy.
+    fn service_clipboard(&mut self, events: &mut Vec<SessionEvent>) -> Result<(), ConnectionError> {
+        let actions: Vec<ClipAction> = match self.clip.as_ref() {
+            Some(c) => c
+                .queue
+                .lock()
+                .map(|mut q| std::mem::take(&mut *q))
+                .unwrap_or_default(),
+            None => return Ok(()),
+        };
+        for action in actions {
+            let Some(clip) = self.clip.as_mut() else {
+                return Ok(());
+            };
+            let policy = clip.policy;
+            match action {
+                ClipAction::AdvertiseLocal => {
+                    clip.ready = true;
+                    self.advertise_local()?;
+                }
+                ClipAction::RemoteChanged { has_text } => {
+                    if has_text && policy.host_to_local {
+                        let msgs = self
+                            .stage
+                            .get_svc_processor_mut::<CliprdrClient>()
+                            .ok_or(ConnectionError::Unexpected)?
+                            .initiate_paste(ClipboardFormatId::CF_UNICODETEXT)
+                            .map_err(|_| ConnectionError::Unexpected)?;
+                        self.send_svc(msgs)?;
+                    }
+                }
+                ClipAction::DataRequested(format) => {
+                    let text = clip.local_text.clone().filter(|_| policy.local_to_host);
+                    let response = match text {
+                        Some(t) if format == ClipboardFormatId::CF_UNICODETEXT => {
+                            OwnedFormatDataResponse::new_unicode_string(&t)
+                        }
+                        _ => OwnedFormatDataResponse::new_error(),
+                    };
+                    let msgs = self
+                        .stage
+                        .get_svc_processor_mut::<CliprdrClient>()
+                        .ok_or(ConnectionError::Unexpected)?
+                        .submit_format_data(response)
+                        .map_err(|_| ConnectionError::Unexpected)?;
+                    self.send_svc(msgs)?;
+                }
+                ClipAction::DataReceived(Some(bytes)) if policy.host_to_local => {
+                    if bytes.len() > policy.max_bytes + 2 {
+                        events.push(SessionEvent::RemoteClipboardTooLarge);
+                        continue;
+                    }
+                    if let Some(text) = decode_unicode_text(&bytes) {
+                        if !text.is_empty() {
+                            clip.last_remote = Some(text.clone());
+                            events.push(SessionEvent::RemoteClipboardText(text));
+                        }
+                    }
+                }
+                ClipAction::DataReceived(_) => {}
+            }
+        }
+        Ok(())
     }
 
     fn handle_outputs(
@@ -736,7 +919,15 @@ fn classify_text(text: &str) -> ConnectionError {
         "c0000070", // STATUS_INVALID_WORKSTATION
         "c000015b", // STATUS_LOGON_TYPE_NOT_GRANTED
     ];
-    if t.contains("c000006d") || t.contains("logon_failure") || t.contains("logon failure") {
+    // Wrong username/password: STATUS_LOGON_FAILURE (Windows), SEC_E_LOGON_DENIED and the
+    // variant some servers send with a Win32 facility (e.g. IronRDP-based hosts).
+    if t.contains("c000006d")
+        || t.contains("8009030c")
+        || t.contains("c007030c")
+        || t.contains("logon_failure")
+        || t.contains("logon failure")
+        || t.contains("logon_denied")
+    {
         ConnectionError::WrongCredentials
     } else if ACCOUNT.iter().any(|c| t.contains(c)) {
         ConnectionError::AccountProblem
@@ -776,6 +967,15 @@ mod tests {
         // Text seen in the Stage 1 spike for a wrong password.
         let wrong = "[CredSSP] CredSSP: InvalidToken: CredSSP server returned an error status; status is STATUS_LOGON_FAILURE [0xc000006d]";
         assert_eq!(classify_text(wrong), ConnectionError::WrongCredentials);
+        // Text seen from an IronRDP-based host for a wrong password.
+        assert_eq!(
+            classify_text("[CredSSP] CredSSP, caused by: InvalidToken: CredSSP server returned an error status; status is NSTATUS code 0xc007030c"),
+            ConnectionError::WrongCredentials
+        );
+        assert_eq!(
+            classify_text("SEC_E_LOGON_DENIED (0x8009030C)"),
+            ConnectionError::WrongCredentials
+        );
         assert_eq!(
             classify_text("status is STATUS_ACCOUNT_LOCKED_OUT [0xC0000234]"),
             ConnectionError::AccountProblem

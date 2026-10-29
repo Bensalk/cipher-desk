@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../platform/password_vault.dart';
 import '../src/rust/api/form.dart';
+import '../src/rust/api/session.dart' show ClipboardMode;
 import '../state/profiles.dart';
 
 /// Create or edit a connection (Stage 3). Returns the saved profile, or null.
@@ -33,7 +34,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
 
   bool _obscure = true;
   late bool _savePassword;
-  late bool _clipboard;
+  late ClipboardMode _clipboard;
   Map<String, String> _problems = const {};
   bool _submitted = false;
 
@@ -46,7 +47,8 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
     _port = TextEditingController(text: p == null ? '' : '${p.port}');
     _username = TextEditingController(text: p?.username ?? '');
     _savePassword = p?.savePassword ?? false;
-    _clipboard = p?.clipboardEnabled ?? widget.clipboardDefault;
+    _clipboard = p?.clipboardMode ??
+        (widget.clipboardDefault ? ClipboardMode.both : ClipboardMode.off);
   }
 
   @override
@@ -117,7 +119,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
       port: r.port ?? defaultPort(),
       username: _username.text.trim(),
       savePassword: savePassword,
-      clipboardEnabled: _clipboard,
+      clipboardMode: _clipboard,
       lastUsed: widget.existing?.lastUsed,
     );
     widget.store.upsert(profile);
@@ -246,16 +248,30 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                     'is usually unlocked when you log in.',
                   ),
                 ),
-                SwitchListTile(
+                const SizedBox(height: 8),
+                DropdownButtonFormField<ClipboardMode>(
                   key: const Key('field-clipboard'),
-                  contentPadding: EdgeInsets.zero,
-                  value: _clipboard,
-                  onChanged: (v) => setState(() => _clipboard = v),
-                  title: const Text('Share clipboard'),
-                  subtitle: const Text(
-                    'Copy and paste text between this device and the remote computer. '
-                    'Anything you copy can be read by the remote computer.',
+                  initialValue: _clipboard,
+                  decoration: const InputDecoration(
+                    labelText: 'Share clipboard (text only)',
+                    helperText: 'Anything you copy while connected can be read by the remote '
+                        'computer, and the remote computer can put text on this device.',
+                    helperMaxLines: 3,
                   ),
+                  items: const [
+                    DropdownMenuItem(value: ClipboardMode.off, child: Text('Off')),
+                    DropdownMenuItem(value: ClipboardMode.both, child: Text('Both directions')),
+                    DropdownMenuItem(
+                      value: ClipboardMode.toRemoteOnly,
+                      child: Text('Only from this device to the remote computer'),
+                    ),
+                    DropdownMenuItem(
+                      value: ClipboardMode.fromRemoteOnly,
+                      child: Text('Only from the remote computer to this device'),
+                    ),
+                  ],
+                  onChanged: (v) => setState(() => _clipboard = v ?? ClipboardMode.off),
+                ),
                 ),
                 const SizedBox(height: 16),
                 FilledButton.icon(

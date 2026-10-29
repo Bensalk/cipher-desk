@@ -367,3 +367,67 @@ bridge's reconnect-after-approval loop, vault id validation order, Kotlin vault 
 (time-bound key, retry after prompt, invalidation reset), CI job steps and environment,
 dependency and secret checks.
 
+---
+
+## Stage 6 — Bidirectional Clipboard ✅ Engine verified live; Flutter/Android parts awaiting first CI run (29 Oct 2026)
+
+### Objective
+Two-way plain-text clipboard during authorised sessions only, with a per-connection
+switch, one-direction options, a size limit, a visible indicator, and no other formats.
+
+### Completed
+- **Rust `clipboard`:** policy (direction + 1 MB limit, counted as UTF-16 bytes, the
+  format sent over RDP) and a queue backend for IronRDP's clipboard channel. Only
+  CF_UNICODETEXT is ever offered or requested; file transfer and other formats are never
+  enabled. When clipboard sharing is off, the clipboard channel is **not even offered** to
+  the host.
+- **Session:** host → device text arrives as an event only if allowed and within the limit
+  (too-large text is dropped with a notice); device → host text is offered, and only sent
+  when the host pastes; text that just came from the host is not echoed back; everything
+  stops when the session ends.
+- **Bridge / Flutter:** per-connection mode (Off · Both · Only to remote · Only from remote,
+  off by default); clipboard indicator in the session bar showing the direction; desktop
+  checks the local clipboard every second while connected; Android only when the app
+  returns to the foreground or via a "Send clipboard" button (Android shows a notice on
+  every clipboard read); text from the host is marked **sensitive** on Android (hidden
+  from clipboard previews on Android 13+).
+- **Test-only host `tools/rdp-test-host`:** NLA plus a scriptable clipboard (offers a known
+  text, records what it receives), built on the published `ironrdp-server` crate. Kept out
+  of the app's workspace and never shipped. Its password comes from an environment variable.
+  Started by `scripts/start-test-hosts.sh`; CI runs the clipboard tests against it.
+- **Found and fixed during the stage:** wrong-password detection only knew Windows' status
+  code; this host sends `0xC007030C` (a "logon denied" variant) and the app said "Something
+  went wrong". Now classified correctly, with tests for both codes.
+
+### Test results (Ubuntu 24.04, Rust 1.97.0)
+
+| Check | Result |
+|-------|--------|
+| fmt, clippy (`-D warnings`), policy, cargo-deny, actionlint | ✅ PASS |
+| Unit tests (debug / release) | ✅ PASS — 67/67 each |
+| C1 host → device text (with accents) | ✅ |
+| C2 device → host text (accents and emoji); same text not re-sent | ✅ |
+| C3 clipboard off: nothing arrives from the host, nothing reaches the host | ✅ |
+| C4 one direction only, both ways round | ✅ |
+| C5 size limit: oversized host text dropped with a notice; oversized local text not offered | ✅ |
+| C6 clipboard text never in logs (plain or UTF-16 hex) at the most detailed allowed level | ✅ |
+| Host's own record: exactly the two allowed texts received, none of the "must not arrive" texts | ✅ |
+| Whole live suite as CI runs it (host 10/10, clipboard 6/6, vault) | ✅ PASS |
+| Clipboard against a **Windows** host | ⛔ **NOT RUN** — no Windows host here |
+| Flutter clipboard sync, indicator, Android sensitive clipboard, Dart test | ⛔ **NOT RUN** — needs Flutter / Android (CI) |
+
+### Known issues (end-of-stage review)
+- **KI-20:** Changing a connection's clipboard mode takes effect on the next connection
+  (when off, the channel is not offered at all, so it cannot be switched on mid-session).
+- **KI-21:** On Android, text copied on the phone is sent only when the app returns to the
+  foreground or the "Send clipboard" button is used, to avoid Android's clipboard-read
+  notice on every check.
+- **KI-22:** On desktop, the local clipboard is checked once a second while connected;
+  the content is only advertised, and sent only when the remote computer pastes.
+- **KI-23:** The CI analysis step no longer fails on informational hints (warnings and
+  errors still fail), because unused-import hints could not be checked without Flutter.
+
+### Next step
+Stage 7 — connection and profile management (saved to disk), pin management, Android
+trackpad mode and pinch-zoom, settings for S5/S13.
+

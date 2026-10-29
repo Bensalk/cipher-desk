@@ -59,6 +59,7 @@ fn params(
         desktop_height: h,
         pinned_fingerprint: pin,
         connect_timeout: Duration::from_secs(5),
+        clipboard: rdpv_core::clipboard::ClipboardPolicy::off(),
     })
 }
 

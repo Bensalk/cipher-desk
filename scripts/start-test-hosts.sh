@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Starts local RDP test hosts for the live integration tests (rust/core/tests/live_host.rs):
+# Starts local RDP test hosts for the live integration tests (rust/core/tests/live_*.rs):
 #   - FreeRDP shadow server on port 3389 with NLA required (positive tests),
-#   - xrdp on port 3390, which does not support NLA (must be refused).
+#   - xrdp on port 3390, which does not support NLA (must be refused),
+#   - the test-only clipboard host (tools/rdp-test-host) on port 3391, NLA + clipboard.
 # A random password is generated for every run; it is never written to the repository.
 #
 # Usage:   source scripts/start-test-hosts.sh   (bash, Linux; needs: Xvfb xterm freerdp3-shadow-x11
@@ -42,8 +43,23 @@ if command -v xrdp >/dev/null 2>&1; then
   NONLA_PORT=3390
 fi
 
+# Clipboard host (NLA + scriptable clipboard), built from tools/rdp-test-host.
+CLIP_PASSWORD=$(openssl rand -base64 24 | tr -d '/+=' | cut -c1-24)
+if [ -n "${GITHUB_ACTIONS:-}" ]; then
+  echo "::add-mask::$CLIP_PASSWORD"
+fi
+CLIP_TEXT="host-clipboard-$(openssl rand -hex 6)-ünïcødé"
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+(cd "$ROOT/tools/rdp-test-host" && cargo build -q)
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$WORK/clip-key.pem" -out "$WORK/clip-cert.pem" \
+  -days 2 -subj "/CN=rdpv-clipboard-test-host" >/dev/null 2>&1
+(RDPV_HOST_BIND=127.0.0.1:3391 RDPV_HOST_USER=rdpvclip RDPV_HOST_PASSWORD="$CLIP_PASSWORD" \
+  RDPV_HOST_CERT="$WORK/clip-cert.pem" RDPV_HOST_KEY="$WORK/clip-key.pem" \
+  RDPV_HOST_CLIP_TEXT="$CLIP_TEXT" RDPV_HOST_CLIP_OUT="$WORK/clip-received.txt" \
+  setsid "$ROOT/tools/rdp-test-host/target/debug/rdp-test-host" >"$WORK/clip-host.log" 2>&1 &)
+
 # Wait for the ports.
-for port in 3389 ${NONLA_PORT}; do
+for port in 3389 3391 ${NONLA_PORT}; do
   i=0
   until (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; do
     i=$((i + 1))
@@ -59,10 +75,19 @@ if [ -n "${GITHUB_ENV:-}" ]; then
     echo "RDPV_TEST_USER=$USER_NAME"
     echo "RDPV_TEST_PASSWORD=$PASSWORD"
     if [ -n "$NONLA_PORT" ]; then echo "RDPV_TEST_NONLA_PORT=$NONLA_PORT"; fi
+    echo "RDPV_CLIP_HOST=127.0.0.1"
+    echo "RDPV_CLIP_PORT=3391"
+    echo "RDPV_CLIP_USER=rdpvclip"
+    echo "RDPV_CLIP_PASSWORD=$CLIP_PASSWORD"
+    echo "RDPV_CLIP_HOST_TEXT=$CLIP_TEXT"
+    echo "RDPV_CLIP_OUT=$WORK/clip-received.txt"
   } >>"$GITHUB_ENV"
 else
   export RDPV_TEST_HOST=127.0.0.1 RDPV_TEST_PORT=3389 RDPV_TEST_USER="$USER_NAME"
   export RDPV_TEST_PASSWORD="$PASSWORD"
   if [ -n "$NONLA_PORT" ]; then export RDPV_TEST_NONLA_PORT="$NONLA_PORT"; fi
+  export RDPV_CLIP_HOST=127.0.0.1 RDPV_CLIP_PORT=3391 RDPV_CLIP_USER=rdpvclip
+  export RDPV_CLIP_PASSWORD="$CLIP_PASSWORD" RDPV_CLIP_HOST_TEXT="$CLIP_TEXT"
+  export RDPV_CLIP_OUT="$WORK/clip-received.txt"
 fi
-echo "Test hosts ready (NLA on 3389${NONLA_PORT:+, no-NLA on $NONLA_PORT})."
+echo "Test hosts ready (NLA on 3389, clipboard on 3391${NONLA_PORT:+, no-NLA on $NONLA_PORT})."

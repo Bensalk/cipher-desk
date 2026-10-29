@@ -8,9 +8,9 @@ import 'errors.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 
-            // These functions are ignored because they are not marked as `pub`: `approval`, `changed`, `drive`, `ended`, `frame`, `new`, `resized`, `run`, `send`, `spawn`, `status`, `union`, `wait_for_approval`
+            // These functions are ignored because they are not marked as `pub`: `approval`, `changed`, `drive`, `ended`, `frame`, `new`, `policy`, `remote_clipboard`, `resized`, `run`, `send`, `spawn`, `status`, `union`, `wait_for_approval`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Command`, `Target`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `eq`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`
 
 
             
@@ -46,17 +46,23 @@ static RdpSession  create()=>RustLib.instance.api.crateApiSessionRdpSessionCreat
  void  mouseMove({required int x , required int y });
 
 
+/// Offers this device's clipboard text to the remote computer. It is sent
+/// only if clipboard sharing to the remote is allowed for this connection,
+/// and only when the remote pastes.
+ void  offerClipboardText({required String text });
+
+
 /// Connects on a worker thread; updates arrive on `sink` (a Dart stream).
 /// The password is used for this connection only and never stored here.
 /// `pins_path` is the certificate pin file in the app's private data folder.
 /// Can be called once per handle.
- Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath });
+ Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection });
 
 
 /// Like [`RdpSession::start`], but reads the saved password from the OS
 /// vault inside Rust, so it never passes through the UI (Windows, Linux).
 /// The caller must have confirmed the user's identity first (S5).
- Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath });
+ Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection });
 
 
 /// Types text (on-screen keyboards, IMEs, pasted text is NOT sent this way).
@@ -72,6 +78,19 @@ static RdpSession  create()=>RustLib.instance.api.crateApiSessionRdpSessionCreat
                 }
                 
 
+/// Clipboard sharing for one connection (S6).
+enum ClipboardMode {
+                    off,
+/// Both directions.
+both,
+/// Only from this device to the remote computer.
+toRemoteOnly,
+/// Only from the remote computer to this device.
+fromRemoteOnly,
+                    ;
+                    
+                }
+
 /// Something the UI should show. Only the fields named for its `kind` are set.
 class SessionUpdate  {
                 final UpdateKind kind;
@@ -85,15 +104,16 @@ final int width;
 final int height;
 final Uint8List rgba;
 final ErrorInfo? error;
+final String? text;
 
-                const SessionUpdate({required this.kind ,this.label ,required this.connected ,this.fingerprint ,this.pinned ,required this.x ,required this.y ,required this.width ,required this.height ,required this.rgba ,this.error ,});
+                const SessionUpdate({required this.kind ,this.label ,required this.connected ,this.fingerprint ,this.pinned ,required this.x ,required this.y ,required this.width ,required this.height ,required this.rgba ,this.error ,this.text ,});
 
 
 
 
 
         @override
-        int get hashCode => kind.hashCode^label.hashCode^connected.hashCode^fingerprint.hashCode^pinned.hashCode^x.hashCode^y.hashCode^width.hashCode^height.hashCode^rgba.hashCode^error.hashCode;
+        int get hashCode => kind.hashCode^label.hashCode^connected.hashCode^fingerprint.hashCode^pinned.hashCode^x.hashCode^y.hashCode^width.hashCode^height.hashCode^rgba.hashCode^error.hashCode^text.hashCode;
 
 
 
@@ -102,7 +122,7 @@ final ErrorInfo? error;
             identical(this, other) ||
             other is SessionUpdate &&
                 runtimeType == other.runtimeType
-                && kind == other.kind&& label == other.label&& connected == other.connected&& fingerprint == other.fingerprint&& pinned == other.pinned&& x == other.x&& y == other.y&& width == other.width&& height == other.height&& rgba == other.rgba&& error == other.error;
+                && kind == other.kind&& label == other.label&& connected == other.connected&& fingerprint == other.fingerprint&& pinned == other.pinned&& x == other.x&& y == other.y&& width == other.width&& height == other.height&& rgba == other.rgba&& error == other.error&& text == other.text;
 
             }
 
@@ -122,6 +142,10 @@ resized,
 frame,
 /// The session ended. `error` is `None` when the user disconnected.
 ended,
+/// Text copied on the remote computer (`text`), for this device's clipboard.
+remoteClipboard,
+/// Text copied on the remote computer was larger than allowed and was dropped.
+remoteClipboardTooLarge,
                     ;
                     
                 }

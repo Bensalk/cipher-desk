@@ -14,8 +14,12 @@
 //! Stage 5 (credentials) adds:
 //! - [`vault`]: saved passwords in the OS vault (Windows/Linux).
 //!
-//! Later stages add clipboard and saved profiles.
+//! Stage 6 (clipboard) adds:
+//! - [`clipboard`]: two-way plain-text clipboard under a direction/size policy.
+//!
+//! Later stages add saved profiles.
 
+pub mod clipboard;
 pub mod input;
 pub mod logging;
 pub mod pins;

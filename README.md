@@ -2,9 +2,9 @@
 
 A secure, open-source remote desktop (RDP) viewer for **Windows, Linux and Android**.
 
-> **Status: in development — Stages 1–5 done (plan, foundation, user interface,
-> connection engine, saved passwords).** Not ready for everyday use: clipboard and
-> saved profiles come in Stages 6–7.
+> **Status: in development — Stages 1–6 done (plan, foundation, user interface,
+> connection engine, saved passwords, clipboard).** Not ready for everyday use:
+> connections are not yet saved to disk (Stage 7).
 > See [`docs/PROGRESS.md`](docs/PROGRESS.md) for what is done and what is next.
 
 ## Goals
@@ -24,7 +24,8 @@ A secure, open-source remote desktop (RDP) viewer for **Windows, Linux and Andro
 | `rust/bridge` | flutter_rust_bridge API layer used by the Flutter UI |
 | `app/` | Flutter app (Windows, Linux, Android) |
 | `app/rust_builder` | Builds the Rust library for each platform (Cargokit, from flutter_rust_bridge) |
-| `scripts/` | Git hooks, security policy checks, release build helper |
+| `scripts/` | Git hooks, security policy checks, test hosts, release build helper |
+| `tools/rdp-test-host` | Test-only RDP host (NLA + scriptable clipboard) for live tests; never shipped |
 | `docs/` | Plan, progress record and design notes |
 
 ## Building
