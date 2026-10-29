@@ -89,8 +89,16 @@ void main() {
     ThemeMode theme = ThemeMode.light,
     List<ConnectionProfile> extra = const [],
   }) async {
-    await binding.setSurfaceSize(devices[device]!.$1);
-    addTearDown(() => binding.setSurfaceSize(null));
+    // The surface size sets where the app draws; the view's size and pixel ratio
+    // set what MediaQuery reports, so phones get the phone layout.
+    final (size, ratio) = devices[device]!;
+    await binding.setSurfaceSize(size);
+    t.view.devicePixelRatio = ratio;
+    t.view.physicalSize = size * ratio;
+    addTearDown(() async {
+      t.view.reset();
+      await binding.setSurfaceSize(null);
+    });
     final dir = await Directory.systemTemp.createTemp('cipher-desk-shots-');
     addTearDown(() => dir.delete(recursive: true));
 

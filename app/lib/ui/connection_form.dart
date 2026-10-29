@@ -279,6 +279,8 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                 DropdownButtonFormField<ClipboardMode>(
                   key: const Key('field-clipboard'),
                   initialValue: _clipboard,
+                  // Long choices must not overflow on narrow phones.
+                  isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Share clipboard (text only)',
                     helperText: 'Anything you copy while connected can be read by the remote '
@@ -290,11 +292,11 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                     DropdownMenuItem(value: ClipboardMode.both, child: Text('Both directions')),
                     DropdownMenuItem(
                       value: ClipboardMode.toRemoteOnly,
-                      child: Text('Only from this device to the remote computer'),
+                      child: Text('This device → remote only', overflow: TextOverflow.ellipsis),
                     ),
                     DropdownMenuItem(
                       value: ClipboardMode.fromRemoteOnly,
-                      child: Text('Only from the remote computer to this device'),
+                      child: Text('Remote → this device only', overflow: TextOverflow.ellipsis),
                     ),
                   ],
                   onChanged: (v) => setState(() => _clipboard = v ?? ClipboardMode.off),
