@@ -132,15 +132,22 @@ void main() {
       for (final p in [office, server, lab, ...extra]) {
         store.upsert(p);
       }
-      store.addHistory(office.id, 'connected', DateTime(2026, 10, 28, 9, 12));
-      store.addHistory(server.id, 'WrongCredentials', DateTime(2026, 10, 27, 20, 41));
-      store.addHistory(lab.id, 'HostNotFound', DateTime(2026, 10, 26, 14, 5));
+      // Oldest first, as they would happen.
       store.addHistory(office.id, 'connected', DateTime(2026, 10, 25, 8, 58));
+      store.addHistory(lab.id, 'HostNotFound', DateTime(2026, 10, 26, 14, 5));
+      store.addHistory(server.id, 'WrongCredentials', DateTime(2026, 10, 27, 20, 41));
+      store.addHistory(office.id, 'connected', DateTime(2026, 10, 28, 9, 12));
     }
     final settings = AppSettings()..themeMode = theme;
     await t.pumpWidget(RepaintBoundary(
       key: _boundary,
-      child: CipherDeskApp(store: store, settings: settings, paths: AppPaths(dir.path)),
+      // A new key each time, so no screen state carries over from the last start.
+      child: CipherDeskApp(
+        key: UniqueKey(),
+        store: store,
+        settings: settings,
+        paths: AppPaths(dir.path),
+      ),
     ));
     await t.pumpAndSettle();
     return (store, settings);
