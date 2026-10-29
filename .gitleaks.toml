@@ -8,7 +8,8 @@ useDefault = true
 [[rules]]
 id = "rdpv-password-literal"
 description = "Hard-coded password value"
-regex = '''(?i)(password|passwd|pwd|secret)\s*[:=]\s*["'][^"'\s]{4,}["']'''
+# Values starting with "$" are variable references (e.g. "$PASSWORD"), not secrets.
+regex = '''(?i)(password|passwd|pwd|secret)\s*[:=]\s*["'][^"'\s$][^"'\s]{3,}["']'''
 keywords = ["password", "passwd", "pwd", "secret"]
 
 # Catch passwords passed as command-line flags in scripts/docs, e.g. --password xxx or /p:xxx

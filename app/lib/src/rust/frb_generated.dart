@@ -6,6 +6,7 @@
 import 'api/errors.dart';
 import 'api/form.dart';
 import 'api/info.dart';
+import 'api/session.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'frb_generated.dart';
@@ -70,7 +71,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
                   String get codegenVersion => '2.13.0';
 
                   @override
-                  int get rustContentHash => -1693701230;
+                  int get rustContentHash => 571096346;
 
                   static const kDefaultExternalLibraryLoaderConfig = ExternalLibraryLoaderConfig(
                     stem: 'rust_lib_secure_rdp_viewer',
@@ -82,7 +83,27 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
                 
 
                 abstract class RustLibApi extends BaseApi {
-                  List<ErrorInfo> crateApiErrorsAllConnectionErrors();
+                  void crateApiSessionRdpSessionApproveCertificate({required RdpSession that , required bool approve });
+
+RdpSession crateApiSessionRdpSessionCreate();
+
+void crateApiSessionRdpSessionCtrlAltDel({required RdpSession that });
+
+void crateApiSessionRdpSessionDisconnect({required RdpSession that });
+
+void crateApiSessionRdpSessionKey({required RdpSession that , required int scancode , required bool extended , required bool down });
+
+void crateApiSessionRdpSessionMouseButton({required RdpSession that , required int x , required int y , required int button , required bool down });
+
+void crateApiSessionRdpSessionMouseMove({required RdpSession that , required int x , required int y });
+
+Stream<SessionUpdate> crateApiSessionRdpSessionStart({required RdpSession that , required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath });
+
+void crateApiSessionRdpSessionTypeText({required RdpSession that , required String text });
+
+void crateApiSessionRdpSessionWheel({required RdpSession that , required bool vertical , required int delta });
+
+List<ErrorInfo> crateApiErrorsAllConnectionErrors();
 
 FormCheckResult crateApiFormCheckConnectionForm({required String profileName , required String host , required String port , required String username , required String password , required bool hasSavedPassword });
 
@@ -93,6 +114,12 @@ int crateApiFormDefaultPort();
 String crateApiInfoHelloFromRust();
 
 List<String> crateApiInfoSecurityDefaultsSummary();
+
+RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_RdpSession;
+
+RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_RdpSession;
+
+CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_RdpSessionPtr;
 
 
                 }
@@ -106,11 +133,286 @@ List<String> crateApiInfoSecurityDefaultsSummary();
                     required super.portManager,
                   });
 
-                  @override List<ErrorInfo> crateApiErrorsAllConnectionErrors()  { return handler.executeSync(SyncTask(
+                  @override void crateApiSessionRdpSessionApproveCertificate({required RdpSession that , required bool approve })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
+sse_encode_bool(approve, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 1)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiSessionRdpSessionApproveCertificateConstMeta,
+            argValues: [that, approve],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiSessionRdpSessionApproveCertificateConstMeta => const TaskConstMeta(
+            debugName: "RdpSession_approve_certificate",
+            argNames: ["that", "approve"],
+        );
+        
+
+@override RdpSession crateApiSessionRdpSessionCreate()  { return handler.executeSync(SyncTask(
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 1)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 2)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiSessionRdpSessionCreateConstMeta,
+            argValues: [],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiSessionRdpSessionCreateConstMeta => const TaskConstMeta(
+            debugName: "RdpSession_create",
+            argNames: [],
+        );
+        
+
+@override void crateApiSessionRdpSessionCtrlAltDel({required RdpSession that })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiSessionRdpSessionCtrlAltDelConstMeta,
+            argValues: [that],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiSessionRdpSessionCtrlAltDelConstMeta => const TaskConstMeta(
+            debugName: "RdpSession_ctrl_alt_del",
+            argNames: ["that"],
+        );
+        
+
+@override void crateApiSessionRdpSessionDisconnect({required RdpSession that })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiSessionRdpSessionDisconnectConstMeta,
+            argValues: [that],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiSessionRdpSessionDisconnectConstMeta => const TaskConstMeta(
+            debugName: "RdpSession_disconnect",
+            argNames: ["that"],
+        );
+        
+
+@override void crateApiSessionRdpSessionKey({required RdpSession that , required int scancode , required bool extended , required bool down })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
+sse_encode_u_8(scancode, serializer);
+sse_encode_bool(extended, serializer);
+sse_encode_bool(down, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiSessionRdpSessionKeyConstMeta,
+            argValues: [that, scancode, extended, down],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiSessionRdpSessionKeyConstMeta => const TaskConstMeta(
+            debugName: "RdpSession_key",
+            argNames: ["that", "scancode", "extended", "down"],
+        );
+        
+
+@override void crateApiSessionRdpSessionMouseButton({required RdpSession that , required int x , required int y , required int button , required bool down })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
+sse_encode_u_16(x, serializer);
+sse_encode_u_16(y, serializer);
+sse_encode_u_8(button, serializer);
+sse_encode_bool(down, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiSessionRdpSessionMouseButtonConstMeta,
+            argValues: [that, x, y, button, down],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiSessionRdpSessionMouseButtonConstMeta => const TaskConstMeta(
+            debugName: "RdpSession_mouse_button",
+            argNames: ["that", "x", "y", "button", "down"],
+        );
+        
+
+@override void crateApiSessionRdpSessionMouseMove({required RdpSession that , required int x , required int y })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
+sse_encode_u_16(x, serializer);
+sse_encode_u_16(y, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiSessionRdpSessionMouseMoveConstMeta,
+            argValues: [that, x, y],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiSessionRdpSessionMouseMoveConstMeta => const TaskConstMeta(
+            debugName: "RdpSession_mouse_move",
+            argNames: ["that", "x", "y"],
+        );
+        
+
+@override Stream<SessionUpdate> crateApiSessionRdpSessionStart({required RdpSession that , required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath })  { 
+            final sink = RustStreamSink<SessionUpdate>();
+            unawaited(handler.executeNormal(NormalTask(
+            callFfi: (port_) {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
+sse_encode_String(host, serializer);
+sse_encode_u_16(port, serializer);
+sse_encode_String(username, serializer);
+sse_encode_String(password, serializer);
+sse_encode_u_16(width, serializer);
+sse_encode_u_16(height, serializer);
+sse_encode_String(pinsPath, serializer);
+sse_encode_StreamSink_session_update_Sse(sink, serializer);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8, port: port_);
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiSessionRdpSessionStartConstMeta,
+            argValues: [that, host, port, username, password, width, height, pinsPath, sink],
+            apiImpl: this,
+        )));
+            return sink.stream;
+             }
+
+
+        TaskConstMeta get kCrateApiSessionRdpSessionStartConstMeta => const TaskConstMeta(
+            debugName: "RdpSession_start",
+            argNames: ["that", "host", "port", "username", "password", "width", "height", "pinsPath", "sink"],
+        );
+        
+
+@override void crateApiSessionRdpSessionTypeText({required RdpSession that , required String text })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
+sse_encode_String(text, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiSessionRdpSessionTypeTextConstMeta,
+            argValues: [that, text],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiSessionRdpSessionTypeTextConstMeta => const TaskConstMeta(
+            debugName: "RdpSession_type_text",
+            argNames: ["that", "text"],
+        );
+        
+
+@override void crateApiSessionRdpSessionWheel({required RdpSession that , required bool vertical , required int delta })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
+sse_encode_bool(vertical, serializer);
+sse_encode_i_16(delta, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiSessionRdpSessionWheelConstMeta,
+            argValues: [that, vertical, delta],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiSessionRdpSessionWheelConstMeta => const TaskConstMeta(
+            debugName: "RdpSession_wheel",
+            argNames: ["that", "vertical", "delta"],
+        );
+        
+
+@override List<ErrorInfo> crateApiErrorsAllConnectionErrors()  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
             
             },
             codec: 
@@ -140,7 +442,7 @@ sse_encode_String(port, serializer);
 sse_encode_String(username, serializer);
 sse_encode_String(password, serializer);
 sse_encode_bool(hasSavedPassword, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 2)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
             
             },
             codec: 
@@ -165,7 +467,7 @@ sse_encode_bool(hasSavedPassword, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13)!;
             
             },
             codec: 
@@ -190,7 +492,7 @@ sse_encode_bool(hasSavedPassword, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
             
             },
             codec: 
@@ -215,7 +517,7 @@ sse_encode_bool(hasSavedPassword, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15)!;
             
             },
             codec: 
@@ -240,7 +542,7 @@ sse_encode_bool(hasSavedPassword, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
             
             },
             codec: 
@@ -261,13 +563,35 @@ sse_encode_bool(hasSavedPassword, serializer);
         );
         
 
+RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_RdpSession => wire.rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession;
+
+RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_RdpSession => wire.rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession;
 
 
-                  @protected String dco_decode_String(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+
+                  @protected AnyhowException dco_decode_AnyhowException(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return AnyhowException(raw as String); }
+
+@protected RdpSession dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return RdpSessionImpl.frbInternalDcoDecode(raw as List<dynamic>); }
+
+@protected RdpSession dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return RdpSessionImpl.frbInternalDcoDecode(raw as List<dynamic>); }
+
+@protected RdpSession dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return RdpSessionImpl.frbInternalDcoDecode(raw as List<dynamic>); }
+
+@protected RustStreamSink<SessionUpdate> dco_decode_StreamSink_session_update_Sse(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+throw UnimplementedError(); }
+
+@protected String dco_decode_String(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw as String; }
 
 @protected bool dco_decode_bool(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw as bool; }
+
+@protected ErrorInfo dco_decode_box_autoadd_error_info(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return dco_decode_error_info(raw); }
 
 @protected int dco_decode_box_autoadd_u_16(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw as int; }
@@ -295,6 +619,12 @@ endpoint: dco_decode_opt_String(arr[2]),
 host: dco_decode_opt_String(arr[3]),
 port: dco_decode_opt_box_autoadd_u_16(arr[4]),); }
 
+@protected int dco_decode_i_16(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return raw as int; }
+
+@protected int dco_decode_i_32(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return raw as int; }
+
 @protected List<String> dco_decode_list_String(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return (raw as List<dynamic>).map(dco_decode_String).toList(); }
 
@@ -310,8 +640,26 @@ return raw as Uint8List; }
 @protected String? dco_decode_opt_String(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw == null ? null : dco_decode_String(raw); }
 
+@protected ErrorInfo? dco_decode_opt_box_autoadd_error_info(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return raw == null ? null : dco_decode_box_autoadd_error_info(raw); }
+
 @protected int? dco_decode_opt_box_autoadd_u_16(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw == null ? null : dco_decode_box_autoadd_u_16(raw); }
+
+@protected SessionUpdate dco_decode_session_update(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+final arr = raw as List<dynamic>;
+                if (arr.length != 11) throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
+                return SessionUpdate(kind: dco_decode_update_kind(arr[0]),
+label: dco_decode_opt_String(arr[1]),
+connected: dco_decode_bool(arr[2]),
+fingerprint: dco_decode_opt_String(arr[3]),
+pinned: dco_decode_opt_String(arr[4]),
+x: dco_decode_u_16(arr[5]),
+y: dco_decode_u_16(arr[6]),
+width: dco_decode_u_16(arr[7]),
+height: dco_decode_u_16(arr[8]),
+rgba: dco_decode_list_prim_u_8_strict(arr[9]),
+error: dco_decode_opt_box_autoadd_error_info(arr[10]),); }
 
 @protected int dco_decode_u_16(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw as int; }
@@ -322,12 +670,37 @@ return raw as int; }
 @protected void dco_decode_unit(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return; }
 
+@protected UpdateKind dco_decode_update_kind(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return UpdateKind.values[raw as int]; }
+
+@protected BigInt dco_decode_usize(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return dcoDecodeU64(raw); }
+
+@protected AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+var inner = sse_decode_String(deserializer);
+        return AnyhowException(inner); }
+
+@protected RdpSession sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+return RdpSessionImpl.frbInternalSseDecode(sse_decode_usize(deserializer), sse_decode_i_32(deserializer)); }
+
+@protected RdpSession sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+return RdpSessionImpl.frbInternalSseDecode(sse_decode_usize(deserializer), sse_decode_i_32(deserializer)); }
+
+@protected RdpSession sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+return RdpSessionImpl.frbInternalSseDecode(sse_decode_usize(deserializer), sse_decode_i_32(deserializer)); }
+
+@protected RustStreamSink<SessionUpdate> sse_decode_StreamSink_session_update_Sse(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+throw UnimplementedError('Unreachable ()'); }
+
 @protected String sse_decode_String(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 var inner = sse_decode_list_prim_u_8_strict(deserializer);
         return utf8.decoder.convert(inner); }
 
 @protected bool sse_decode_bool(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 return deserializer.buffer.getUint8() != 0; }
+
+@protected ErrorInfo sse_decode_box_autoadd_error_info(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+return (sse_decode_error_info(deserializer)); }
 
 @protected int sse_decode_box_autoadd_u_16(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 return (sse_decode_u_16(deserializer)); }
@@ -351,6 +724,12 @@ var var_endpoint = sse_decode_opt_String(deserializer);
 var var_host = sse_decode_opt_String(deserializer);
 var var_port = sse_decode_opt_box_autoadd_u_16(deserializer);
 return FormCheckResult(valid: var_valid, problems: var_problems, endpoint: var_endpoint, host: var_host, port: var_port); }
+
+@protected int sse_decode_i_16(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+return deserializer.buffer.getInt16(); }
+
+@protected int sse_decode_i_32(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+return deserializer.buffer.getInt32(); }
 
 @protected List<String> sse_decode_list_String(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -389,6 +768,15 @@ var len_ = sse_decode_i_32(deserializer);
             }
              }
 
+@protected ErrorInfo? sse_decode_opt_box_autoadd_error_info(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+
+            if (sse_decode_bool(deserializer)) {
+                return (sse_decode_box_autoadd_error_info(deserializer));
+            } else {
+                return null;
+            }
+             }
+
 @protected int? sse_decode_opt_box_autoadd_u_16(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 
             if (sse_decode_bool(deserializer)) {
@@ -397,6 +785,20 @@ var len_ = sse_decode_i_32(deserializer);
                 return null;
             }
              }
+
+@protected SessionUpdate sse_decode_session_update(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+var var_kind = sse_decode_update_kind(deserializer);
+var var_label = sse_decode_opt_String(deserializer);
+var var_connected = sse_decode_bool(deserializer);
+var var_fingerprint = sse_decode_opt_String(deserializer);
+var var_pinned = sse_decode_opt_String(deserializer);
+var var_x = sse_decode_u_16(deserializer);
+var var_y = sse_decode_u_16(deserializer);
+var var_width = sse_decode_u_16(deserializer);
+var var_height = sse_decode_u_16(deserializer);
+var var_rgba = sse_decode_list_prim_u_8_strict(deserializer);
+var var_error = sse_decode_opt_box_autoadd_error_info(deserializer);
+return SessionUpdate(kind: var_kind, label: var_label, connected: var_connected, fingerprint: var_fingerprint, pinned: var_pinned, x: var_x, y: var_y, width: var_width, height: var_height, rgba: var_rgba, error: var_error); }
 
 @protected int sse_decode_u_16(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 return deserializer.buffer.getUint16(); }
@@ -407,14 +809,39 @@ return deserializer.buffer.getUint8(); }
 @protected void sse_decode_unit(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
  }
 
-@protected int sse_decode_i_32(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
-return deserializer.buffer.getInt32(); }
+@protected UpdateKind sse_decode_update_kind(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+var inner = sse_decode_i_32(deserializer);
+        return UpdateKind.values[inner]; }
+
+@protected BigInt sse_decode_usize(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+return deserializer.buffer.getBigUint64(); }
+
+@protected void sse_encode_AnyhowException(AnyhowException self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_String(self.message, serializer); }
+
+@protected void sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(RdpSession self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_usize((self as RdpSessionImpl).frbInternalSseEncode(move: true), serializer); }
+
+@protected void sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(RdpSession self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_usize((self as RdpSessionImpl).frbInternalSseEncode(move: false), serializer); }
+
+@protected void sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(RdpSession self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_usize((self as RdpSessionImpl).frbInternalSseEncode(move: null), serializer); }
+
+@protected void sse_encode_StreamSink_session_update_Sse(RustStreamSink<SessionUpdate> self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_String(self.setupAndSerialize(codec: SseCodec(
+            decodeSuccessData: sse_decode_session_update,
+            decodeErrorData: sse_decode_AnyhowException,
+        )), serializer); }
 
 @protected void sse_encode_String(String self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_list_prim_u_8_strict(utf8.encoder.convert(self), serializer); }
 
 @protected void sse_encode_bool(bool self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 serializer.buffer.putUint8(self ? 1 : 0); }
+
+@protected void sse_encode_box_autoadd_error_info(ErrorInfo self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_error_info(self, serializer); }
 
 @protected void sse_encode_box_autoadd_u_16(int self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_u_16(self, serializer); }
@@ -438,6 +865,12 @@ sse_encode_opt_String(self.endpoint, serializer);
 sse_encode_opt_String(self.host, serializer);
 sse_encode_opt_box_autoadd_u_16(self.port, serializer);
  }
+
+@protected void sse_encode_i_16(int self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+serializer.buffer.putInt16(self); }
+
+@protected void sse_encode_i_32(int self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+serializer.buffer.putInt32(self); }
 
 @protected void sse_encode_list_String(List<String> self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_i_32(self.length, serializer);
@@ -463,6 +896,14 @@ sse_encode_i_32(self.length, serializer);
                 }
                  }
 
+@protected void sse_encode_opt_box_autoadd_error_info(ErrorInfo? self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+
+                sse_encode_bool(self != null, serializer);
+                if (self != null) {
+                    sse_encode_box_autoadd_error_info(self, serializer);
+                }
+                 }
+
 @protected void sse_encode_opt_box_autoadd_u_16(int? self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 
                 sse_encode_bool(self != null, serializer);
@@ -470,6 +911,20 @@ sse_encode_i_32(self.length, serializer);
                     sse_encode_box_autoadd_u_16(self, serializer);
                 }
                  }
+
+@protected void sse_encode_session_update(SessionUpdate self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_update_kind(self.kind, serializer);
+sse_encode_opt_String(self.label, serializer);
+sse_encode_bool(self.connected, serializer);
+sse_encode_opt_String(self.fingerprint, serializer);
+sse_encode_opt_String(self.pinned, serializer);
+sse_encode_u_16(self.x, serializer);
+sse_encode_u_16(self.y, serializer);
+sse_encode_u_16(self.width, serializer);
+sse_encode_u_16(self.height, serializer);
+sse_encode_list_prim_u_8_strict(self.rgba, serializer);
+sse_encode_opt_box_autoadd_error_info(self.error, serializer);
+ }
 
 @protected void sse_encode_u_16(int self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 serializer.buffer.putUint16(self); }
@@ -480,7 +935,66 @@ serializer.buffer.putUint8(self); }
 @protected void sse_encode_unit(void self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
  }
 
-@protected void sse_encode_i_32(int self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
-serializer.buffer.putInt32(self); }
+@protected void sse_encode_update_kind(UpdateKind self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_i_32(self.index, serializer); }
+
+@protected void sse_encode_usize(BigInt self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+serializer.buffer.putBigUint64(self); }
                 }
                 
+
+            @sealed class RdpSessionImpl extends RustOpaque implements RdpSession {
+                // Not to be used by end users
+                RdpSessionImpl.frbInternalDcoDecode(List<dynamic> wire):
+                    super.frbInternalDcoDecode(wire, _kStaticData);
+
+                // Not to be used by end users
+                RdpSessionImpl.frbInternalSseDecode(BigInt ptr, int externalSizeOnNative):
+                    super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
+
+                static final _kStaticData = RustArcStaticData(
+                    rustArcIncrementStrongCount: RustLib.instance.api.rust_arc_increment_strong_count_RdpSession,
+                    rustArcDecrementStrongCount: RustLib.instance.api.rust_arc_decrement_strong_count_RdpSession,
+                    rustArcDecrementStrongCountPtr: RustLib.instance.api.rust_arc_decrement_strong_count_RdpSessionPtr,
+                );
+
+                /// Answers the certificate prompt.
+ void  approveCertificate({required bool approve })=>RustLib.instance.api.crateApiSessionRdpSessionApproveCertificate(that: this, approve: approve);
+
+
+/// Sends Ctrl+Alt+Del to the remote computer.
+ void  ctrlAltDel()=>RustLib.instance.api.crateApiSessionRdpSessionCtrlAltDel(that: this, );
+
+
+/// Disconnects politely.
+ void  disconnect()=>RustLib.instance.api.crateApiSessionRdpSessionDisconnect(that: this, );
+
+
+/// Presses or releases a key by PC scancode (set 1).
+ void  key({required int scancode , required bool extended , required bool down })=>RustLib.instance.api.crateApiSessionRdpSessionKey(that: this, scancode: scancode, extended: extended, down: down);
+
+
+/// Presses or releases a mouse button: 0 = left, 1 = right, 2 = middle.
+ void  mouseButton({required int x , required int y , required int button , required bool down })=>RustLib.instance.api.crateApiSessionRdpSessionMouseButton(that: this, x: x, y: y, button: button, down: down);
+
+
+/// Moves the remote mouse pointer (remote-desktop coordinates).
+ void  mouseMove({required int x , required int y })=>RustLib.instance.api.crateApiSessionRdpSessionMouseMove(that: this, x: x, y: y);
+
+
+/// Connects on a worker thread; updates arrive on `sink` (a Dart stream).
+/// The password is used for this connection only and never stored here.
+/// `pins_path` is the certificate pin file in the app's private data folder.
+/// Can be called once per handle.
+ Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath })=>RustLib.instance.api.crateApiSessionRdpSessionStart(that: this, host: host, port: port, username: username, password: password, width: width, height: height, pinsPath: pinsPath);
+
+
+/// Types text (on-screen keyboards, IMEs, pasted text is NOT sent this way).
+ void  typeText({required String text })=>RustLib.instance.api.crateApiSessionRdpSessionTypeText(that: this, text: text);
+
+
+/// Scrolls; one notch is 120, positive scrolls up.
+ void  wheel({required bool vertical , required int delta })=>RustLib.instance.api.crateApiSessionRdpSessionWheel(that: this, vertical: vertical, delta: delta);
+
+
+            }

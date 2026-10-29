@@ -6,12 +6,19 @@
 //! - [`policy`]: secure defaults the rest of the app must start from,
 //! - [`version`]: build and engine information shown in the UI.
 //!
-//! Later stages add the connection engine, certificate pinning, clipboard,
-//! profiles and vault access.
+//! Stage 4 (connection engine) adds:
+//! - [`pins`]: certificate pin store (trust on first use),
+//! - [`tls`]: TLS configuration that only accepts the pinned certificate,
+//! - [`session`]: connect, display updates, input and disconnect.
+//!
+//! Later stages add clipboard, profiles and vault access.
 
 pub mod input;
 pub mod logging;
+pub mod pins;
 pub mod policy;
 pub mod secret;
+pub mod session;
 pub mod status;
+pub mod tls;
 pub mod version;

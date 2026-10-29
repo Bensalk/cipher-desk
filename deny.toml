@@ -28,6 +28,8 @@ allow = [
   "ISC",
   "Zlib",
   "Unicode-3.0",
+  # Public-domain dedication (OSI approved); used by portpicker via ironrdp-connector.
+  "Unlicense",
 ]
 confidence-threshold = 0.9
 

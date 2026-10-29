@@ -7,7 +7,7 @@ pub const APP_NAME: &str = "Secure RDP Viewer";
 pub const CORE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// The RDP engine this build uses.
-pub const ENGINE: &str = "IronRDP 0.17";
+pub const ENGINE: &str = "IronRDP (connector 0.12, session 0.13)";
 
 /// Short one-line description, e.g. "Secure RDP Viewer 0.1.0 (IronRDP 0.17, release)".
 pub fn summary() -> String {
@@ -22,7 +22,7 @@ pub fn summary() -> String {
 /// Confirms the IronRDP engine is linked by touching one of its public types.
 /// Returns the protocol flag value IronRDP uses for NLA (CredSSP, "HYBRID").
 pub fn engine_nla_protocol_bits() -> u32 {
-    ironrdp::pdu::nego::SecurityProtocol::HYBRID.bits()
+    ironrdp_pdu::nego::SecurityProtocol::HYBRID.bits()
 }
 
 #[cfg(test)]

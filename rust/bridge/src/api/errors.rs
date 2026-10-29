@@ -3,6 +3,7 @@
 use rdpv_core::status::ConnectionError;
 
 /// Text for one kind of connection error.
+#[derive(Debug, Clone)]
 pub struct ErrorInfo {
     /// Stable identifier, e.g. "WrongCredentials".
     pub id: String,
@@ -12,7 +13,8 @@ pub struct ErrorInfo {
     pub security_warning: bool,
 }
 
-fn info(e: ConnectionError) -> ErrorInfo {
+/// Converts an error to its UI text (used by the session stream).
+pub(crate) fn error_info(e: ConnectionError) -> ErrorInfo {
     ErrorInfo {
         id: format!("{e:?}"),
         title: e.title().to_owned(),
@@ -24,7 +26,11 @@ fn info(e: ConnectionError) -> ErrorInfo {
 /// Every error the app can show, for the help screen and for looking up by id.
 #[flutter_rust_bridge::frb(sync)]
 pub fn all_connection_errors() -> Vec<ErrorInfo> {
-    ConnectionError::ALL.iter().copied().map(info).collect()
+    ConnectionError::ALL
+        .iter()
+        .copied()
+        .map(error_info)
+        .collect()
 }
 
 #[cfg(test)]

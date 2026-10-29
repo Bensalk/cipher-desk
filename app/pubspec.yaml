@@ -12,6 +12,7 @@ dependencies:
   rust_lib_secure_rdp_viewer:
     path: rust_builder
   flutter_rust_bridge: 2.13.0
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:

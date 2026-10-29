@@ -10,7 +10,22 @@ rust-version = "1.85"
 publish = false
 
 [workspace.dependencies]
-ironrdp = { version = "0.17", default-features = false }
+# IronRDP sub-crates are used directly at their latest matching releases: the `ironrdp`
+# umbrella crate (0.17) still pins older sub-crates (connector 0.10, session 0.11).
+ironrdp-connector = "0.12"
+ironrdp-session = "0.13"
+ironrdp-graphics = "0.11"
+ironrdp-pdu = "0.11"
+ironrdp-core = "0.3"
+ironrdp-blocking = "0.12"
+ironrdp-input = "0.9"
+sspi = { version = "0.23", features = ["network_client"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+x509-cert = { version = "0.2", default-features = false, features = ["std"] }
+sha2 = "0.10"
+bytes = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 tracing = { version = "0.1", features = ["release_max_level_info"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt", "std"] }
 zeroize = { version = "1", features = ["zeroize_derive"] }

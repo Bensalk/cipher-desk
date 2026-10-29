@@ -14,6 +14,7 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 [dependencies]
 rdpv-core = { path = "../core" }
 flutter_rust_bridge = "=2.13.0"
+tracing.workspace = true
 
 # Same rules as the workspace, except `unsafe_code` is "deny" instead of "forbid"
 # so the generated FFI module alone can opt out (see src/lib.rs).

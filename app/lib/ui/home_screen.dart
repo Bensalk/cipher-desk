@@ -5,6 +5,7 @@ import '../state/profiles.dart';
 import '../state/settings.dart';
 import 'connection_form.dart';
 import 'error_banner.dart';
+import 'session_screen.dart';
 import 'settings_screen.dart';
 import 'status_chip.dart';
 
@@ -24,7 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _tab = 0;
   String _query = '';
   ErrorInfo? _notice;
-  RdpConnectionState _state = RdpConnectionState.disconnected;
+  final RdpConnectionState _state = RdpConnectionState.disconnected;
 
   Future<void> _openForm([ConnectionProfile? existing]) async {
     await Navigator.of(context).push<ConnectionProfile>(
@@ -38,19 +39,20 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _connect(ConnectionProfile p) {
+  Future<void> _connect(ConnectionProfile p) async {
+    // Saved passwords arrive with the OS vault in Stage 5; until then, always ask.
+    final password = await showDialog<String>(
+      context: context,
+      builder: (_) => _PasswordDialog(profile: p),
+    );
+    if (password == null || !mounted) return;
     widget.store.markUsed(p.id, DateTime.now());
-    // The connection engine arrives in Stage 4. Until then, explain clearly.
-    setState(() {
-      _state = RdpConnectionState.disconnected;
-      _notice = const ErrorInfo(
-        id: 'NotYetAvailable',
-        title: 'Connecting is not available yet',
-        advice: 'This development build has the interface only. '
-            'The secure connection engine is added in the next stage.',
-        securityWarning: false,
-      );
-    });
+    setState(() => _notice = null);
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SessionScreen(profile: p, password: password),
+      ),
+    );
   }
 
   Future<void> _confirmDelete(ConnectionProfile p) async {
@@ -256,3 +258,74 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
+
+/// Asks for the password for one connection. The text is cleared when the
+/// dialog closes; it is never stored by the app (saving arrives in Stage 5).
+class _PasswordDialog extends StatefulWidget {
+  const _PasswordDialog({required this.profile});
+
+  final ConnectionProfile profile;
+
+  @override
+  State<_PasswordDialog> createState() => _PasswordDialogState();
+}
+
+class _PasswordDialogState extends State<_PasswordDialog> {
+  final _controller = TextEditingController();
+  bool _obscure = true;
+
+  @override
+  void dispose() {
+    _controller.clear();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_controller.text.isEmpty) return;
+    Navigator.pop(context, _controller.text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Connect to ${widget.profile.displayName}'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Username: ${widget.profile.username}'),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('connect-password'),
+            controller: _controller,
+            autofocus: true,
+            obscureText: _obscure,
+            autocorrect: false,
+            enableSuggestions: false,
+            enableIMEPersonalizedLearning: false,
+            keyboardType: TextInputType.visiblePassword,
+            decoration: InputDecoration(
+              labelText: 'Password',
+              suffixIcon: IconButton(
+                tooltip: _obscure ? 'Show password' : 'Hide password',
+                icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+                onPressed: () => setState(() => _obscure = !_obscure),
+              ),
+            ),
+            onSubmitted: (_) => _submit(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        FilledButton(
+          key: const Key('button-connect'),
+          onPressed: _submit,
+          child: const Text('Connect'),
+        ),
+      ],
+    );
+  }
+}
+

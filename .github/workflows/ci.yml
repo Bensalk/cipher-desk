@@ -47,6 +47,30 @@ jobs:
         shell: bash
         run: sh scripts/check-policy.sh
 
+  live-host:
+    name: Live RDP host tests (NLA, pinning, errors, input, logs)
+    needs: rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      - name: Install test hosts
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            xvfb xterm freerdp3-shadow-x11 winpr3-utils xrdp xorgxrdp openssl
+      - name: Start test hosts (random password per run)
+        run: sh scripts/start-test-hosts.sh
+      - name: Live tests (debug)
+        run: cargo test -p rdpv-core --test live_host -- --ignored --test-threads=1
+      - name: Live tests (release)
+        run: cargo test --release -p rdpv-core --test live_host -- --ignored --test-threads=1
+
   flutter:
     name: Flutter app (${{ matrix.target }})
     needs: rust

@@ -227,6 +227,8 @@ pub fn parse_port(input: &str) -> Result<u16, FieldError> {
 pub struct Username {
     pub user: String,
     pub domain: Option<String>,
+    /// True when typed as user@domain (UPN) rather than DOMAIN\\user.
+    pub upn: bool,
 }
 
 const USERNAME_FORBIDDEN: &[char] = &[
@@ -245,12 +247,12 @@ pub fn parse_username(input: &str) -> Result<Username, FieldError> {
     if t.chars().count() > MAX_USERNAME_CHARS {
         return Err(FieldError::TooLong);
     }
-    let (user, domain) = if let Some((d, u)) = t.split_once('\\') {
-        (u, Some(d))
+    let (user, domain, upn) = if let Some((d, u)) = t.split_once('\\') {
+        (u, Some(d), false)
     } else if let Some((u, d)) = t.rsplit_once('@') {
-        (u, Some(d))
+        (u, Some(d), true)
     } else {
-        (t, None)
+        (t, None, false)
     };
     let user_ok = !user.is_empty()
         && !user.contains('\\')
@@ -265,6 +267,7 @@ pub fn parse_username(input: &str) -> Result<Username, FieldError> {
     Ok(Username {
         user: user.to_owned(),
         domain: domain.map(str::to_owned),
+        upn,
     })
 }
 

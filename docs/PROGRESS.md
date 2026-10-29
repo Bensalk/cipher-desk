@@ -193,3 +193,85 @@ tracked files or commit metadata; 0 `unsafe` in hand-written code.
 Still unverified (needs the GitHub repository): compiling and running the Flutter,
 Kotlin and Windows parts.
 
+---
+
+## Stage 4 — Connection Engine ✅ Engine verified against live hosts; Flutter session screen awaiting first CI run (29 Oct 2026)
+
+### Objective
+Secure connection (TLS + NLA) with certificate pinning, timeouts, remote screen,
+keyboard/mouse/touch input, server reactivation and graceful disconnect.
+
+### Completed
+- **Dependencies:** IronRDP sub-crates used directly at their latest matching releases
+  (connector 0.12, session 0.13, graphics 0.11, pdu 0.11, blocking 0.12, input 0.9).
+  The `ironrdp` 0.17 umbrella crate pinned older sub-crates; this also resolves KI-3.
+- **`pins`:** trust-on-first-use certificate pins (SHA-256), per host:port, saved
+  atomically with owner-only permissions; a damaged or tampered file is an error, never a
+  silent reset.
+- **`tls`:** rustls with an explicit crypto provider, TLS 1.2/1.3 only, accepts only the
+  pinned certificate and still verifies handshake signatures. No "accept any" mode exists.
+- **`session`:** TCP (10 s timeout) → pinned TLS → NLA (CredSSP) → capability exchange;
+  screen updates; keyboard (scancodes and Unicode), mouse and wheel input; server
+  Deactivation-Reactivation (SF-4); graceful disconnect that releases held keys; idle
+  disconnect (S7); errors mapped to the fixed user messages. A fixed client name is sent,
+  so the device's own name is not revealed to the host.
+- **Bridge:** `RdpSession.create()` + `start(...)` stream (status, certificate prompt,
+  certificate changed, resize, frame, ended) and input/approval/disconnect methods.
+- **Flutter:** password prompt (saved passwords arrive in Stage 5), certificate approval
+  dialog showing the fingerprint, certificate-changed warning with both fingerprints,
+  remote screen, mouse/keyboard (physical keys → PC scancodes), touch (tap, long-press for
+  right-click, drag), special-keys bar (Esc, Tab, Win, Ctrl+Alt+Del, arrows, F1–F12) and
+  "Type text" for on-screen keyboards. Pins stored in the app's private data folder.
+- **CI:** new `live-host` job starts a FreeRDP shadow server (NLA) and xrdp (no NLA) with a
+  random password per run (`scripts/start-test-hosts.sh`) and runs the live tests in debug
+  and release.
+
+### Test results (Ubuntu 24.04, Rust 1.97.0)
+
+| Check | Result |
+|-------|--------|
+| `cargo fmt --check`, `cargo clippy --all-targets -D warnings` | ✅ PASS |
+| Unit tests (debug) | ✅ PASS — 56/56 |
+| Live tests vs local hosts — debug, 3 consecutive runs | ✅ PASS — 9/9 each |
+| Live tests — release | ✅ PASS — 9/9 |
+| T1 unknown certificate never trusted automatically | ✅ |
+| T2/T3 approved certificate connects; screen received (non-blank) | ✅ |
+| T4 changed certificate blocked before credentials are sent | ✅ |
+| T5 wrong password → "Wrong username or password" | ✅ |
+| T6 closed port → "refused"; unroutable address → no hang | ✅ |
+| T7 password never in logs (plain or UTF-16 hex) at the most detailed allowed level; control run proves the check detects the sspi leak when unfiltered | ✅ |
+| T8 host without NLA (xrdp) refused → "Secure connection not supported" | ✅ |
+| T9 mouse, wheel, keyboard and Unicode input; graceful disconnect | ✅ |
+| T10 requested size differs from the host's → session continues (SF-4) | ✅ |
+| NLA against a **Windows** host | ⛔ **NOT RUN** — no Windows host available here |
+| Flutter session screen, input mapping, Dart tests (`scancodes_test.dart`) | ⛔ **NOT RUN** — needs Flutter (CI) |
+| Android/Windows builds with the engine | ⛔ **NOT RUN** — needs CI |
+
+### Problems found and fixed during the stage
+- `poll` kept reading while the screen changed continuously and never returned (hang found
+  by the live tests). Fixed with a 50 ms processing budget per poll; 3 clean full runs since.
+- xrdp's refusal of NLA was reported as "Something went wrong"; now "Secure connection not
+  supported" (test uses the exact server text).
+- Username format (`DOMAIN\user` vs `user@domain`) was lost after validation; now kept so
+  each is sent correctly.
+- flutter_rust_bridge turned `start_session` into a plain stream and dropped the handle;
+  split into `create()` + `start()`.
+- The secret-scan rule flagged `"$PASSWORD"` (a variable reference); it now ignores
+  variables and still catches real literals (tested both ways).
+
+### Known issues
+- **KI-8:** Windows-host and Kerberos (domain) sign-in are untested.
+- **KI-9:** Hosts that do not accept fast-path input (rare, e.g. some VirtualBox VRDP
+  versions) are not supported yet; input uses fast-path only.
+- **KI-10:** Server redirection (RD Connection Broker) is not followed; reported as an
+  error.
+- **KI-11:** Changed certificates cannot be re-trusted from the app yet; that needs the
+  pin management screen (Stage 7). Until then a reinstalled host requires removing the
+  pin file.
+- **KI-12:** Screen updates are copied in full rectangles over the bridge; fine on a LAN,
+  to be optimised if slow on phones (Stage 8).
+
+### Next step
+Stage 5 — secure credential management (OS vaults, biometric/PIN unlock, delete).
+CI still needs the private GitHub repository.
+
