@@ -119,7 +119,7 @@ messages; layouts for desktop and phone.
 - **Rust `status`:** connection state machine (connecting, check identity,
   connected, reconnecting, disconnecting, failed). Wrong password, account problems
   and certificate changes **never auto-retry** (SA-8); network drops reconnect up to
-  the policy limit. Catalogue of 15 plain-language errors with advice; security
+  the policy limit. Catalogue of 16 plain-language errors with advice (16th, "Connection cancelled", added in the review); security
   warnings flagged.
 - **Bridge:** `check_connection_form`, `default_port`, `all_connection_errors`.
   Bindings regenerated with flutter_rust_bridge 2.13.0.
@@ -144,7 +144,7 @@ messages; layouts for desktop and phone.
 |-------|--------|
 | `cargo fmt --check` | ✅ PASS |
 | `cargo clippy --all-targets -D warnings` | ✅ PASS |
-| `cargo test` (debug / release) | ✅ PASS — 38/38 each (8 input, 10 status, 5 bridge, plus Stage 2 tests) |
+| `cargo test` (debug / release) | ✅ PASS — 40/40 each after the review (8 input, 12 status, 5 bridge, 15 Stage 2) |
 | Policy, cargo-deny, gitleaks pre-commit | ✅ PASS |
 | `unsafe` in hand-written code | ✅ 0 |
 | Dart unit tests (`test/profile_store_test.dart`, 6 tests) | ⛔ **NOT RUN** — no Flutter SDK here; runs in CI |
@@ -160,3 +160,36 @@ messages; layouts for desktop and phone.
 ### Next step
 Create the private GitHub repository so CI can verify Stages 2–3, then Stage 4
 (connection engine).
+
+---
+
+## Review of Stages 1–3 (29 Oct 2026)
+
+A full review of the plan, documents, Rust, Dart, Kotlin, CI and repository before
+starting Stage 4. Corrections made:
+
+| # | Area | Problem found | Fix |
+|---|------|---------------|-----|
+| R1 | Repository | A deliverable zip (`secure-rdp-viewer-stage3.zip`) had been committed into the repository | Removed from the (unpushed) Stage 3 commit, so it is not in the history; `*.zip`, `*.bundle`, `*.tar.gz`, `*.7z` added to `.gitignore` |
+| R2 | Plan | No stage covered keyboard, mouse and touch input | Added to Stage 4 (with Android touch/trackpad modes and special-keys bar, F8–F10) |
+| R3 | Plan | Stack table said flutter_rust_bridge 2.12 and "IronRDP 0.17 commit f01f9b5" | Now 2.13.0 (pinned), and the prototype commit is separated from the published crates the app uses |
+| R4 | Plan | "Approval needed" section still asked for Stage 1 approval | Replaced with the approval record and the two items still open |
+| R5 | Docs | Suggestions file still said "awaiting approval" and could be mistaken for the plan | Marked approved, with a note that the Stage 1 report takes precedence |
+| R6 | Docs | README status still said Stage 2 | Updated |
+| R7 | Rust | An error arriving while disconnecting was an invalid status change | Now finishes the disconnect; test added |
+| R8 | Rust | Rejecting an unknown certificate showed the "compare the fingerprint" message | New error "Connection cancelled — nothing was sent"; test added |
+| R9 | Rust | A bad port was not reported while the host field was also invalid | Both are now reported together; tests updated |
+| R10 | Dart | "Save password" text promised fingerprint/face/PIN, which is wrong for Linux | Text now covers device password too |
+| R11 | Dart | Status chip had no "Disconnecting" state although the core has one | Added |
+| R12 | Tests | Integration tests tapped form fields without scrolling them into view, and looked for an entry in a lazily built list | Tests now scroll before tapping and scroll the error list; also check the new port message |
+| R13 | Security tooling | The command-line password rule also matched `cargo -p <crate>` | Rule now matches `--password` and `/p:` only; verified to catch both and ignore `cargo -p` |
+
+Checked and found correct: generated bindings in sync with the Rust API (regenerated,
+no differences); Dart code matches the generated signatures; Kotlin channel matches
+the Dart channel name and method; Android manifest/Gradle security settings; CI
+workflows (actionlint); dependency, licence and secret checks; no personal data in
+tracked files or commit metadata; 0 `unsafe` in hand-written code.
+
+Still unverified (needs the GitHub repository): compiling and running the Flutter,
+Kotlin and Windows parts.
+

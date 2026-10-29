@@ -2,7 +2,8 @@
 
 A secure, open-source remote desktop (RDP) viewer for **Windows, Linux and Android**.
 
-> **Status: in development — Stage 2 (project foundation).** Not ready for use yet.
+> **Status: in development — Stages 1–3 done (plan, foundation, user interface);
+> Stage 4 (connection engine) next.** Not ready for use yet: the app cannot connect yet.
 > See [`docs/PROGRESS.md`](docs/PROGRESS.md) for what is done and what is next.
 
 ## Goals
@@ -18,7 +19,7 @@ A secure, open-source remote desktop (RDP) viewer for **Windows, Linux and Andro
 
 | Path | Contents |
 |------|----------|
-| `rust/core` | Shared Rust core: security policy, logging policy, secrets handling (connection engine from Stage 4) |
+| `rust/core` | Shared Rust core: security policy, logging policy, secrets handling, form validation, connection status and error messages (connection engine from Stage 4) |
 | `rust/bridge` | flutter_rust_bridge API layer used by the Flutter UI |
 | `app/` | Flutter app (Windows, Linux, Android) |
 | `app/rust_builder` | Builds the Rust library for each platform (Cargokit, from flutter_rust_bridge) |

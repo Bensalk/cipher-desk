@@ -11,6 +11,18 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async => RustLib.init());
 
+  /// Scrolls a widget into view, then taps it (forms are taller than small screens).
+  Future<void> tapVisible(WidgetTester tester, Finder f) async {
+    await tester.ensureVisible(f);
+    await tester.pumpAndSettle();
+    await tester.tap(f);
+  }
+
+  Future<void> typeVisible(WidgetTester tester, Finder f, String text) async {
+    await tester.ensureVisible(f);
+    await tester.enterText(f, text);
+  }
+
   Future<ProfileStore> start(WidgetTester tester) async {
     final store = ProfileStore();
     await tester.pumpWidget(SecureRdpViewerApp(store: store, settings: AppSettings()));
@@ -30,11 +42,12 @@ void main() {
     await start(tester);
     await tester.tap(find.byKey(const Key('button-new')));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('field-host')), 'rdp://example.com');
-    await tester.enterText(find.byKey(const Key('field-port')), '70000');
-    await tester.tap(find.byKey(const Key('button-save')));
+    await typeVisible(tester, find.byKey(const Key('field-host')), 'rdp://example.com');
+    await typeVisible(tester, find.byKey(const Key('field-port')), '70000');
+    await tapVisible(tester, find.byKey(const Key('button-save')));
     await tester.pumpAndSettle();
     expect(find.textContaining('without rdp://'), findsOneWidget);
+    expect(find.textContaining('Port must be a number'), findsOneWidget);
     expect(find.text('This field is required.'), findsNWidgets(2)); // username, password
   });
 
@@ -44,7 +57,7 @@ void main() {
     await tester.pumpAndSettle();
     final field = find.byKey(const Key('field-password'));
     expect(tester.widget<TextField>(field).obscureText, isTrue);
-    await tester.tap(find.byTooltip('Show password'));
+    await tapVisible(tester, find.byTooltip('Show password'));
     await tester.pump();
     expect(tester.widget<TextField>(field).obscureText, isFalse);
   });
@@ -53,12 +66,12 @@ void main() {
     final store = await start(tester);
     await tester.tap(find.byKey(const Key('button-new')));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('field-name')), 'Office');
-    await tester.enterText(find.byKey(const Key('field-host')), '192.0.2.10');
-    await tester.enterText(find.byKey(const Key('field-username')), 'alice');
-    await tester.enterText(find.byKey(const Key('field-password')), ['t', 'e', 's', 't', '9'].join());
-    await tester.tap(find.byKey(const Key('field-save-password')));
-    await tester.tap(find.byKey(const Key('button-save')));
+    await typeVisible(tester, find.byKey(const Key('field-name')), 'Office');
+    await typeVisible(tester, find.byKey(const Key('field-host')), '192.0.2.10');
+    await typeVisible(tester, find.byKey(const Key('field-username')), 'alice');
+    await typeVisible(tester, find.byKey(const Key('field-password')), ['t', 'e', 's', 't', '9'].join());
+    await tapVisible(tester, find.byKey(const Key('field-save-password')));
+    await tapVisible(tester, find.byKey(const Key('button-save')));
     await tester.pumpAndSettle();
 
     final p = store.profiles.single;
@@ -77,6 +90,8 @@ void main() {
     await tester.scrollUntilVisible(find.text('What error messages mean'), 200);
     await tester.tap(find.text('What error messages mean'));
     await tester.pumpAndSettle();
-    expect(find.text('Warning: computer identity changed'), findsOneWidget);
+    final warning = find.text('Warning: computer identity changed');
+    await tester.scrollUntilVisible(warning, 200, scrollable: find.byType(Scrollable).last);
+    expect(warning, findsOneWidget);
   });
 }

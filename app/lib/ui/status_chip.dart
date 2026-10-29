@@ -7,6 +7,7 @@ enum RdpConnectionState {
   checkIdentity('Check computer identity', Icons.verified_user_outlined),
   connected('Connected', Icons.link),
   reconnecting('Reconnecting…', Icons.sync_problem),
+  disconnecting('Disconnecting…', Icons.link_off),
   failed('Connection failed', Icons.error_outline);
 
   const RdpConnectionState(this.label, this.icon);

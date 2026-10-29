@@ -11,12 +11,13 @@ description = "Hard-coded password value"
 regex = '''(?i)(password|passwd|pwd|secret)\s*[:=]\s*["'][^"'\s]{4,}["']'''
 keywords = ["password", "passwd", "pwd", "secret"]
 
-# Catch passwords passed as command-line flags in scripts/docs, e.g. -p 'xxx'
+# Catch passwords passed as command-line flags in scripts/docs, e.g. --password xxx or /p:xxx
+# (a plain "-p" is not matched: it is also cargo's package flag).
 [[rules]]
 id = "rdpv-password-cli-flag"
 description = "Password passed on a command line"
-regex = '''(?i)(\s-p|--password)[ =]["']?[^\s"'$<{][^\s"']{3,}'''
-keywords = ["-p", "--password"]
+regex = '''(?i)(--password[ =]|\s/p:)["']?[^\s"'$<{][^\s"']{3,}'''
+keywords = ["--password", "/p:"]
 
 # Catch email addresses that are not reserved placeholders or GitHub noreply.
 [[rules]]

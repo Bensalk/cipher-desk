@@ -22,6 +22,8 @@ pub enum ConnectionError {
     ConnectionLost,
     /// First connection to this host: the user must approve the certificate.
     CertificateUnknown,
+    /// The user chose not to trust the host's certificate. Nothing was sent.
+    CertificateRejected,
     /// The host's certificate differs from the pinned one. Possible interception.
     CertificateChanged,
     /// The host does not support NLA or TLS 1.2+.
@@ -42,7 +44,7 @@ pub enum ConnectionError {
 
 impl ConnectionError {
     /// Every variant, for tests and the UI's help screen.
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 16] = [
         Self::WrongCredentials,
         Self::AccountProblem,
         Self::HostRefused,
@@ -50,6 +52,7 @@ impl ConnectionError {
         Self::HostNotFound,
         Self::ConnectionLost,
         Self::CertificateUnknown,
+        Self::CertificateRejected,
         Self::CertificateChanged,
         Self::SecurityNotSupported,
         Self::RemoteDesktopUnavailable,
@@ -70,6 +73,7 @@ impl ConnectionError {
             Self::HostNotFound => "Computer not found",
             Self::ConnectionLost => "Connection lost",
             Self::CertificateUnknown => "New computer — check its identity",
+            Self::CertificateRejected => "Connection cancelled",
             Self::CertificateChanged => "Warning: computer identity changed",
             Self::SecurityNotSupported => "Secure connection not supported",
             Self::RemoteDesktopUnavailable => "Remote Desktop isn't available",
@@ -91,6 +95,7 @@ impl ConnectionError {
             Self::HostNotFound => "Check the computer name or use its IP address.",
             Self::ConnectionLost => "The network dropped. The app will try to reconnect a few times.",
             Self::CertificateUnknown => "Compare the fingerprint shown with the one on the remote computer before trusting it. Only continue if they match.",
+            Self::CertificateRejected => "You chose not to trust this computer's certificate, so the connection was stopped before your password was sent.",
             Self::CertificateChanged => "Its security certificate is different from last time. This can happen after reinstalling Windows, but it can also mean someone is intercepting the connection. The connection was blocked and no password was sent.",
             Self::SecurityNotSupported => "The computer must allow Network Level Authentication (NLA) and TLS 1.2 or later. Older, less secure methods are not used.",
             Self::RemoteDesktopUnavailable => "Remote Desktop needs Windows Pro, Enterprise or Education, with Remote Desktop turned on in Settings.",
@@ -181,7 +186,7 @@ impl Status {
             }
             (S::AwaitingCertificateApproval, E::CertificateApproved) => S::Connecting,
             (S::AwaitingCertificateApproval, E::CertificateRejected) => {
-                S::Failed(ConnectionError::CertificateUnknown)
+                S::Failed(ConnectionError::CertificateRejected)
             }
             (S::Connecting | S::Reconnecting { .. }, E::SessionReady) => S::Connected,
             (S::Connected, E::Error(err)) if err.auto_reconnect_allowed() && max_reconnects > 0 => {
@@ -209,6 +214,8 @@ impl Status {
                 E::DisconnectRequested,
             ) => S::Disconnecting,
             (S::Disconnecting | S::Connected, E::Closed) => S::Disconnected,
+            // An error while already disconnecting just finishes the disconnect.
+            (S::Disconnecting, E::Error(_)) => S::Disconnected,
             (from, event) => return Err(InvalidTransition { from, event }),
         };
         Ok(to)
@@ -251,7 +258,7 @@ mod tests {
         ]);
         assert_eq!(
             rejected,
-            Ok(Status::Failed(ConnectionError::CertificateUnknown))
+            Ok(Status::Failed(ConnectionError::CertificateRejected))
         );
         let approved = run(&[
             Event::ConnectRequested,
@@ -370,5 +377,21 @@ mod tests {
         for s in all {
             assert!(!s.label().is_empty());
         }
+    }
+
+    #[test]
+    fn error_while_disconnecting_finishes_the_disconnect() {
+        let s = run(&[
+            Event::ConnectRequested,
+            Event::SessionReady,
+            Event::DisconnectRequested,
+            Event::Error(ConnectionError::ConnectionLost),
+        ]);
+        assert_eq!(s, Ok(Status::Disconnected));
+    }
+
+    #[test]
+    fn rejected_certificate_never_retries() {
+        assert!(!ConnectionError::CertificateRejected.auto_reconnect_allowed());
     }
 }

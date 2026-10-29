@@ -315,7 +315,15 @@ pub fn check_form(
     }
     match parse_endpoint(host, port) {
         Ok(ep) => check.endpoint = Some(ep),
-        Err(e) => check.errors.push(e),
+        Err(e) => {
+            check.errors.push(e);
+            // Also report a bad port field now, so the user can fix both at once.
+            if e.0 == Field::Host && !port.trim().is_empty() {
+                if let Err(pe) = parse_port(port) {
+                    check.errors.push((Field::Port, pe));
+                }
+            }
+        }
     }
     if let Err(e) = parse_username(username) {
         check.errors.push((Field::Username, e));
@@ -445,7 +453,10 @@ mod tests {
     fn whole_form_collects_all_errors() {
         let c = check_form("", "", "70000", "", "", false);
         let fields: Vec<Field> = c.errors.iter().map(|(f, _)| *f).collect();
-        assert_eq!(fields, vec![Field::Host, Field::Username, Field::Password]);
+        assert_eq!(
+            fields,
+            vec![Field::Host, Field::Port, Field::Username, Field::Password]
+        );
         assert!(!c.is_valid());
 
         let sample = ["p", "w", "-", "1", "2", "3"].concat();

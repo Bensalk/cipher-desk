@@ -1,6 +1,10 @@
 # Secure Open-Source Remote Desktop Viewer — Suggestions for Review
 
-**Status:** Awaiting approval (Stage 1, pre-plan)
+> **Note:** this is the suggestion list as reviewed before planning. Where it differs from
+> [`stage1-report.md`](stage1-report.md) (for example on the decisions in its section 7), the
+> Stage 1 report is the approved plan.
+
+**Status:** Approved 29 Oct 2026 (all items, with the defaults recorded in the Stage 1 report)
 **Date:** 28 October 2026
 **Target platforms:** Windows, Linux and Android
 

@@ -39,11 +39,11 @@
 
 | Layer | Choice | Licence | Why |
 |-------|--------|---------|-----|
-| RDP engine | IronRDP 0.17 (Devolutions), commit `f01f9b5` (28 Oct 2026) | MIT OR Apache-2.0 | Memory-safe Rust; actively maintained (commit the day before this report); NLA/CredSSP, TLS, clipboard channel, RD Gateway crate (`ironrdp-mstsgu`) |
+| RDP engine | IronRDP (Devolutions). Prototype: git commit `f01f9b5` (28 Oct 2026). App: published crates.io releases (see `Cargo.lock`) | MIT OR Apache-2.0 | Memory-safe Rust; actively maintained (commit the day before this report); NLA/CredSSP, TLS, clipboard channel, RD Gateway crate (`ironrdp-mstsgu`) |
 | TLS | rustls (via `ironrdp-tls`) | Apache-2.0/MIT/ISC | Spike negotiated **TLS 1.3**; supports a custom certificate check for pinning |
 | Clipboard | `ironrdp-cliprdr` + `ironrdp-cliprdr-native` | MIT/Apache-2.0 | Native backends for **Windows** and **Linux (X11 and Wayland data-control)**. GNOME doesn't offer data-control, so there it falls back to X11/XWayland (to be tested in Stage 6). **No Android backend**, so Android needs a Kotlin bridge. |
 | Credential vault | `keyring` crate (Windows Credential Manager, Linux Secret Service); Android Keystore via Kotlin | MIT/Apache-2.0 | Save, read and delete verified on Linux (section 5) |
-| UI | Flutter + flutter_rust_bridge 2.12 | BSD-3 / MIT | One UI for all three platforms; the bridge officially supports Android, Windows and Linux |
+| UI | Flutter + flutter_rust_bridge 2.13.0 (pinned) | BSD-3 / MIT | One UI for all three platforms; the bridge officially supports Android, Windows and Linux |
 | Android-only parts | Kotlin | — | Keystore, clipboard bridge, foreground service, `FLAG_SECURE` |
 | Packaging | WiX (MSI), AppImage, Flatpak, Gradle (APK/AAB) | various OSS | — |
 | CI & security | GitHub Actions (Windows + Ubuntu), CodeQL, Dependabot, OSV-Scanner, gitleaks, Syft, cargo-audit, cargo-deny | OSS | — |
@@ -186,7 +186,7 @@ Each stage follows your workflow: plan → build → test → fix → record →
 |-------|-----------|-------------------------|
 | **2 Foundation** | Repo, Cargo workspace, Flutter app, bridge, CI on Windows + Ubuntu + Android build | "Hello from Rust" runs on all 3 platforms; CI green; CodeQL/OSV/gitleaks/cargo-deny wired in; licence and `SECURITY.md` present; SA-9 in place (`.gitignore`, gitleaks pre-commit hook, noreply commit email, repo private). **Includes the Windows-host, Android-build and Flutter checks the spike couldn't run.** |
 | **3 UI** | Main window, connect form, profiles list, status, errors, settings, themes; Android touch layout | Masked password, Save Password checkbox, layouts usable on phone + desktop; UI tests pass |
-| **4 Connection engine** | IronRDP session, TOFU pinning, timeouts, reactivation, graceful disconnect | Spike tests T1–T7 automated; NLA against a **Windows** host passes; no dangerous certificate policy (SA-6) |
+| **4 Connection engine** | IronRDP session, TOFU pinning, timeouts, reactivation, graceful disconnect; remote screen display; **keyboard, mouse and touch input** (touch/trackpad modes and special-keys bar on Android, F8–F10) | Spike tests T1–T7 automated; NLA against a **Windows** host passes; no dangerous certificate policy (SA-6) |
 | **5 Credentials** | Vaults on all 3 OSes, biometric gate, delete | Save/read/delete on each OS; no plaintext copies; deleted password can't be retrieved; no-keyring path refuses to save |
 | **6 Clipboard** | Two-way text, toggle, one-direction, size cap, Android bridge | C1–C3 on Windows, Linux X11, Linux Wayland, Android; stops at session end |
 | **7 Profiles** | Save/edit/delete/reconnect, history, import/export, unattended checklist, Wake-on-LAN | Corrupt-file and interrupted-write tests pass; exports contain no secrets |
@@ -221,13 +221,16 @@ Each stage follows your workflow: plan → build → test → fix → record →
 
 ---
 
-## 11. Approval Needed
+## 11. Approval
 
-Reply **"approve Stage 1"** to start Stage 2, or list changes to any decision in section 2.
+Stage 1 was **approved on 29 October 2026** with the defaults in section 2,
+plus the additions requested afterwards: installation packages, portable versions,
+source-code privacy rules (SA-9) and portable-mode rules (SA-10).
 
-Also tell me:
-1. The **GitHub repository name** to use under your account. Should it be private until the first release?
-2. Whether you want me to **draft the private report to Devolutions** about SF-2.
+Still open:
+1. **GitHub repository:** to be created by the owner as a **private** repository
+   (suggested name `secure-rdp-viewer`); it stays private until the SA-9 checks pass.
+2. **Private report to Devolutions about SF-2:** to be drafted for the owner's approval.
 
 ---
 
@@ -235,7 +238,7 @@ Also tell me:
 
 - [IronRDP repository (GitHub)](https://github.com/Devolutions/IronRDP)
 - [IronRDP documentation](https://www.mintlify.com/Devolutions/IronRDP/introduction)
-- [flutter_rust_bridge 2.12.0 (docs.rs)](https://docs.rs/crate/flutter_rust_bridge/latest)
+- [flutter_rust_bridge (docs.rs)](https://docs.rs/crate/flutter_rust_bridge/latest)
 - [Android — Secure clipboard handling](https://developer.android.com/privacy-and-security/risks/secure-clipboard-handling)
 - [MITRE ATT&CK T1414 — Clipboard Data](https://attack.mitre.org/techniques/T1414)
 - [Windows 11 Home cannot host Remote Desktop (iTechGuides)](https://www.itechguides.com/?p=353808)

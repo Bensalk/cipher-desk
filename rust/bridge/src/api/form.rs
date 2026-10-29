@@ -104,7 +104,7 @@ mod tests {
         );
         assert!(!r.valid);
         let fields: Vec<&str> = r.problems.iter().map(|p| p.field.as_str()).collect();
-        assert_eq!(fields, vec!["host", "username", "password"]);
+        assert_eq!(fields, vec!["host", "port", "username", "password"]);
         assert!(r.endpoint.is_none());
     }
 }

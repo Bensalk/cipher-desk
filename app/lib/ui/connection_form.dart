@@ -209,8 +209,8 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                   onChanged: (v) => setState(() => _savePassword = v ?? false),
                   title: const Text('Save password'),
                   subtitle: const Text(
-                    "Stored only in this device's secure password storage. "
-                    'You will confirm with fingerprint, face or PIN before it is used.',
+                    "Stored only in this device's secure password storage, never in the app's files. "
+                    "You'll unlock it (fingerprint, face, PIN or your device password) before it's used.",
                   ),
                 ),
                 SwitchListTile(
