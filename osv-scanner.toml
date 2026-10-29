@@ -1,6 +1,32 @@
-# OSV-Scanner exceptions. Each entry must match a reviewed exception in deny.toml
-# and docs/PROGRESS.md.
+# OSV-Scanner exceptions, each reviewed and explained (see docs/PROGRESS.md).
+# OSV also reports GitHub advisories and "unmaintained" notices that cargo-deny
+# does not fail on; entries with ignoreUntil must be reviewed again by that date.
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2023-0071"
 reason = "rsa Marvin timing attack affects private-key operations; this client performs RSA public-key operations only (via IronRDP sspi/picky). See docs/PROGRESS.md KI-2."
+
+[[IgnoredVulns]]
+id = "GHSA-qwgh-2vcv-g2f7"
+ignoreUntil = 2027-01-31
+reason = "block-buffer < 0.12.1: a caught panic followed by reuse of the same hasher can corrupt its position. Reached via sha2 0.10 and IronRDP (hmac, md-5), which only support digest 0.10. Not triggerable here: our code never catches panics, the hash functions used do not panic, and a hasher is never reused after an error. Re-review 2027-01-31 or when IronRDP moves to digest 0.11."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2023-0089"
+ignoreUntil = 2027-01-31
+reason = "atomic-polyfill is unmaintained (no vulnerability). Pulled in by sspi -> winscard (smart-card emulation, never used by this app); sspi 0.23.1 is the latest release. Re-review 2027-01-31."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0370"
+ignoreUntil = 2027-01-31
+reason = "zvariant is unmaintained because it was merged into zbus 6 (no vulnerability). Pulled in by the Linux keyring store (zbus-secret-service-keyring-store 1.0.1, latest), which still uses zbus 5. Re-review 2027-01-31."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0371"
+ignoreUntil = 2027-01-31
+reason = "zbus_names is unmaintained (merged into zbus 6); same path and review as RUSTSEC-2026-0370."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0372"
+ignoreUntil = 2027-01-31
+reason = "zvariant_derive is unmaintained (merged into zbus 6); same path and review as RUSTSEC-2026-0370."
