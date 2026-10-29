@@ -10,3 +10,12 @@ gitleaks git --staged --no-banner --redact --config .gitleaks.toml || {
   exit 1
 }
 sh scripts/check-policy.sh
+# Dart syntax (only when the checker is installed: cd tools/dart-syntax && npm ci).
+# Catches bracket mistakes on machines without Flutter; CI still runs flutter analyze.
+if [ -d tools/dart-syntax/node_modules ] && command -v node >/dev/null 2>&1; then
+  files=$(git diff --cached --name-only --diff-filter=ACM -- 'app/*.dart' | grep -v '/src/rust/' || true)
+  if [ -n "$files" ]; then
+    # shellcheck disable=SC2086
+    node tools/dart-syntax/check.js $files
+  fi
+fi

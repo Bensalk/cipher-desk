@@ -8,6 +8,7 @@ import 'api/form.dart';
 import 'api/info.dart';
 import 'api/pins.dart';
 import 'api/session.dart';
+import 'api/store.dart';
 import 'api/vault.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -73,7 +74,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
                   String get codegenVersion => '2.13.0';
 
                   @override
-                  int get rustContentHash => -283280114;
+                  int get rustContentHash => -107971321;
 
                   static const kDefaultExternalLibraryLoaderConfig = ExternalLibraryLoaderConfig(
                     stem: 'rust_lib_secure_rdp_viewer',
@@ -101,9 +102,9 @@ void crateApiSessionRdpSessionMouseMove({required RdpSession that , required int
 
 void crateApiSessionRdpSessionOfferClipboardText({required RdpSession that , required String text });
 
-Stream<SessionUpdate> crateApiSessionRdpSessionStart({required RdpSession that , required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection });
+Stream<SessionUpdate> crateApiSessionRdpSessionStart({required RdpSession that , required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required int idleMinutes });
 
-Stream<SessionUpdate> crateApiSessionRdpSessionStartWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection });
+Stream<SessionUpdate> crateApiSessionRdpSessionStartWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required int idleMinutes });
 
 void crateApiSessionRdpSessionTypeText({required RdpSession that , required String text });
 
@@ -113,21 +114,45 @@ List<ErrorInfo> crateApiErrorsAllConnectionErrors();
 
 FormCheckResult crateApiFormCheckConnectionForm({required String profileName , required String host , required String port , required String username , required String password , required bool hasSavedPassword });
 
+Future<bool> crateApiStoreCheckReachable({required String host , required int port , required int timeoutMs });
+
+String crateApiStoreConnectionsExport({required List<ConnectionData> connections });
+
+ImportResult crateApiStoreConnectionsImport({required String text });
+
+LoadResult crateApiStoreConnectionsLoad({required String path });
+
+bool crateApiStoreConnectionsSave({required String path , required List<ConnectionData> connections , required List<HistoryData> history });
+
 String crateApiInfoCoreSummary();
 
 int crateApiFormDefaultPort();
 
 bool crateApiPinsForgetCertificate({required String pinsPath , required String host , required int port });
 
+bool crateApiStoreForgetTrustedComputer({required String pinsPath , required String endpoint });
+
 String crateApiInfoHelloFromRust();
 
+Uint32List crateApiStoreIdleMinuteChoices();
+
+bool crateApiStoreIsValidMac({required String text });
+
 List<String> crateApiInfoSecurityDefaultsSummary();
+
+SettingsData crateApiStoreSettingsLoad({required String path });
+
+bool crateApiStoreSettingsSave({required String path , required SettingsData data });
+
+List<TrustedComputer> crateApiStoreTrustedComputers({required String pinsPath });
 
 VaultResult crateApiVaultVaultCheckPassword({required String connectionId });
 
 VaultResult crateApiVaultVaultDeletePassword({required String connectionId });
 
 VaultResult crateApiVaultVaultSavePassword({required String connectionId , required String password });
+
+WakeResult crateApiStoreWakeOnLan({required String mac });
 
 RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_RdpSession;
 
@@ -358,7 +383,7 @@ sse_encode_String(text, serializer);
         );
         
 
-@override Stream<SessionUpdate> crateApiSessionRdpSessionStart({required RdpSession that , required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection })  { 
+@override Stream<SessionUpdate> crateApiSessionRdpSessionStart({required RdpSession that , required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required int idleMinutes })  { 
             final sink = RustStreamSink<SessionUpdate>();
             unawaited(handler.executeNormal(NormalTask(
             callFfi: (port_) {
@@ -372,6 +397,7 @@ sse_encode_u_16(width, serializer);
 sse_encode_u_16(height, serializer);
 sse_encode_String(pinsPath, serializer);
 sse_encode_clipboard_mode(clipboardDirection, serializer);
+sse_encode_u_32(idleMinutes, serializer);
 sse_encode_StreamSink_session_update_Sse(sink, serializer);
             pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9, port: port_);
             
@@ -383,7 +409,7 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
         )
         ,
             constMeta: kCrateApiSessionRdpSessionStartConstMeta,
-            argValues: [that, host, port, username, password, width, height, pinsPath, clipboardDirection, sink],
+            argValues: [that, host, port, username, password, width, height, pinsPath, clipboardDirection, idleMinutes, sink],
             apiImpl: this,
         )));
             return sink.stream;
@@ -392,11 +418,11 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
 
         TaskConstMeta get kCrateApiSessionRdpSessionStartConstMeta => const TaskConstMeta(
             debugName: "RdpSession_start",
-            argNames: ["that", "host", "port", "username", "password", "width", "height", "pinsPath", "clipboardDirection", "sink"],
+            argNames: ["that", "host", "port", "username", "password", "width", "height", "pinsPath", "clipboardDirection", "idleMinutes", "sink"],
         );
         
 
-@override Stream<SessionUpdate> crateApiSessionRdpSessionStartWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection })  { 
+@override Stream<SessionUpdate> crateApiSessionRdpSessionStartWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required int idleMinutes })  { 
             final sink = RustStreamSink<SessionUpdate>();
             unawaited(handler.executeNormal(NormalTask(
             callFfi: (port_) {
@@ -410,6 +436,7 @@ sse_encode_u_16(width, serializer);
 sse_encode_u_16(height, serializer);
 sse_encode_String(pinsPath, serializer);
 sse_encode_clipboard_mode(clipboardDirection, serializer);
+sse_encode_u_32(idleMinutes, serializer);
 sse_encode_StreamSink_session_update_Sse(sink, serializer);
             pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10, port: port_);
             
@@ -421,7 +448,7 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
         )
         ,
             constMeta: kCrateApiSessionRdpSessionStartWithSavedPasswordConstMeta,
-            argValues: [that, connectionId, host, port, username, width, height, pinsPath, clipboardDirection, sink],
+            argValues: [that, connectionId, host, port, username, width, height, pinsPath, clipboardDirection, idleMinutes, sink],
             apiImpl: this,
         )));
             return sink.stream;
@@ -430,7 +457,7 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
 
         TaskConstMeta get kCrateApiSessionRdpSessionStartWithSavedPasswordConstMeta => const TaskConstMeta(
             debugName: "RdpSession_start_with_saved_password",
-            argNames: ["that", "connectionId", "host", "port", "username", "width", "height", "pinsPath", "clipboardDirection", "sink"],
+            argNames: ["that", "connectionId", "host", "port", "username", "width", "height", "pinsPath", "clipboardDirection", "idleMinutes", "sink"],
         );
         
 
@@ -542,11 +569,140 @@ sse_encode_bool(hasSavedPassword, serializer);
         );
         
 
+@override Future<bool> crateApiStoreCheckReachable({required String host , required int port , required int timeoutMs })  { return handler.executeNormal(NormalTask(
+            callFfi: (port_) {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(host, serializer);
+sse_encode_u_16(port, serializer);
+sse_encode_u_32(timeoutMs, serializer);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15, port: port_);
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiStoreCheckReachableConstMeta,
+            argValues: [host, port, timeoutMs],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiStoreCheckReachableConstMeta => const TaskConstMeta(
+            debugName: "check_reachable",
+            argNames: ["host", "port", "timeoutMs"],
+        );
+        
+
+@override String crateApiStoreConnectionsExport({required List<ConnectionData> connections })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_list_connection_data(connections, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiStoreConnectionsExportConstMeta,
+            argValues: [connections],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiStoreConnectionsExportConstMeta => const TaskConstMeta(
+            debugName: "connections_export",
+            argNames: ["connections"],
+        );
+        
+
+@override ImportResult crateApiStoreConnectionsImport({required String text })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(text, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_import_result,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiStoreConnectionsImportConstMeta,
+            argValues: [text],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiStoreConnectionsImportConstMeta => const TaskConstMeta(
+            debugName: "connections_import",
+            argNames: ["text"],
+        );
+        
+
+@override LoadResult crateApiStoreConnectionsLoad({required String path })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(path, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_load_result,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiStoreConnectionsLoadConstMeta,
+            argValues: [path],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiStoreConnectionsLoadConstMeta => const TaskConstMeta(
+            debugName: "connections_load",
+            argNames: ["path"],
+        );
+        
+
+@override bool crateApiStoreConnectionsSave({required String path , required List<ConnectionData> connections , required List<HistoryData> history })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(path, serializer);
+sse_encode_list_connection_data(connections, serializer);
+sse_encode_list_history_data(history, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiStoreConnectionsSaveConstMeta,
+            argValues: [path, connections, history],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiStoreConnectionsSaveConstMeta => const TaskConstMeta(
+            debugName: "connections_save",
+            argNames: ["path", "connections", "history"],
+        );
+        
+
 @override String crateApiInfoCoreSummary()  { return handler.executeSync(SyncTask(
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20)!;
             
             },
             codec: 
@@ -571,7 +727,7 @@ sse_encode_bool(hasSavedPassword, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
             
             },
             codec: 
@@ -598,7 +754,7 @@ sse_encode_bool(hasSavedPassword, serializer);
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(pinsPath, serializer);
 sse_encode_String(host, serializer);
 sse_encode_u_16(port, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 22)!;
             
             },
             codec: 
@@ -619,11 +775,37 @@ sse_encode_u_16(port, serializer);
         );
         
 
+@override bool crateApiStoreForgetTrustedComputer({required String pinsPath , required String endpoint })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(pinsPath, serializer);
+sse_encode_String(endpoint, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiStoreForgetTrustedComputerConstMeta,
+            argValues: [pinsPath, endpoint],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiStoreForgetTrustedComputerConstMeta => const TaskConstMeta(
+            debugName: "forget_trusted_computer",
+            argNames: ["pinsPath", "endpoint"],
+        );
+        
+
 @override String crateApiInfoHelloFromRust()  { return handler.executeSync(SyncTask(
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 24)!;
             
             },
             codec: 
@@ -644,11 +826,61 @@ sse_encode_u_16(port, serializer);
         );
         
 
+@override Uint32List crateApiStoreIdleMinuteChoices()  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_list_prim_u_32_strict,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiStoreIdleMinuteChoicesConstMeta,
+            argValues: [],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiStoreIdleMinuteChoicesConstMeta => const TaskConstMeta(
+            debugName: "idle_minute_choices",
+            argNames: [],
+        );
+        
+
+@override bool crateApiStoreIsValidMac({required String text })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(text, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiStoreIsValidMacConstMeta,
+            argValues: [text],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiStoreIsValidMacConstMeta => const TaskConstMeta(
+            debugName: "is_valid_mac",
+            argNames: ["text"],
+        );
+        
+
 @override List<String> crateApiInfoSecurityDefaultsSummary()  { return handler.executeSync(SyncTask(
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27)!;
             
             },
             codec: 
@@ -669,11 +901,87 @@ sse_encode_u_16(port, serializer);
         );
         
 
+@override SettingsData crateApiStoreSettingsLoad({required String path })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(path, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_settings_data,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiStoreSettingsLoadConstMeta,
+            argValues: [path],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiStoreSettingsLoadConstMeta => const TaskConstMeta(
+            debugName: "settings_load",
+            argNames: ["path"],
+        );
+        
+
+@override bool crateApiStoreSettingsSave({required String path , required SettingsData data })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(path, serializer);
+sse_encode_box_autoadd_settings_data(data, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiStoreSettingsSaveConstMeta,
+            argValues: [path, data],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiStoreSettingsSaveConstMeta => const TaskConstMeta(
+            debugName: "settings_save",
+            argNames: ["path", "data"],
+        );
+        
+
+@override List<TrustedComputer> crateApiStoreTrustedComputers({required String pinsPath })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(pinsPath, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_list_trusted_computer,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiStoreTrustedComputersConstMeta,
+            argValues: [pinsPath],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiStoreTrustedComputersConstMeta => const TaskConstMeta(
+            debugName: "trusted_computers",
+            argNames: ["pinsPath"],
+        );
+        
+
 @override VaultResult crateApiVaultVaultCheckPassword({required String connectionId })  { return handler.executeSync(SyncTask(
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(connectionId, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 31)!;
             
             },
             codec: 
@@ -698,7 +1006,7 @@ sse_encode_u_16(port, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(connectionId, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32)!;
             
             },
             codec: 
@@ -724,7 +1032,7 @@ sse_encode_u_16(port, serializer);
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(connectionId, serializer);
 sse_encode_String(password, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 22)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 33)!;
             
             },
             codec: 
@@ -742,6 +1050,31 @@ sse_encode_String(password, serializer);
         TaskConstMeta get kCrateApiVaultVaultSavePasswordConstMeta => const TaskConstMeta(
             debugName: "vault_save_password",
             argNames: ["connectionId", "password"],
+        );
+        
+
+@override WakeResult crateApiStoreWakeOnLan({required String mac })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(mac, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 34)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_wake_result,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiStoreWakeOnLanConstMeta,
+            argValues: [mac],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiStoreWakeOnLanConstMeta => const TaskConstMeta(
+            debugName: "wake_on_lan",
+            argNames: ["mac"],
         );
         
 
@@ -769,17 +1102,39 @@ throw UnimplementedError(); }
 @protected String dco_decode_String(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw as String; }
 
+@protected AppTheme dco_decode_app_theme(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return AppTheme.values[raw as int]; }
+
 @protected bool dco_decode_bool(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw as bool; }
 
 @protected ErrorInfo dco_decode_box_autoadd_error_info(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return dco_decode_error_info(raw); }
 
+@protected PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return dco_decode_i_64(raw); }
+
+@protected SettingsData dco_decode_box_autoadd_settings_data(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return dco_decode_settings_data(raw); }
+
 @protected int dco_decode_box_autoadd_u_16(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw as int; }
 
 @protected ClipboardMode dco_decode_clipboard_mode(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return ClipboardMode.values[raw as int]; }
+
+@protected ConnectionData dco_decode_connection_data(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+final arr = raw as List<dynamic>;
+                if (arr.length != 9) throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+                return ConnectionData(id: dco_decode_String(arr[0]),
+name: dco_decode_String(arr[1]),
+host: dco_decode_String(arr[2]),
+port: dco_decode_u_16(arr[3]),
+username: dco_decode_String(arr[4]),
+savePassword: dco_decode_bool(arr[5]),
+clipboard: dco_decode_clipboard_mode(arr[6]),
+lastUsed: dco_decode_opt_box_autoadd_i_64(arr[7]),
+wakeMac: dco_decode_opt_String(arr[8]),); }
 
 @protected ErrorInfo dco_decode_error_info(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 final arr = raw as List<dynamic>;
@@ -804,14 +1159,34 @@ endpoint: dco_decode_opt_String(arr[2]),
 host: dco_decode_opt_String(arr[3]),
 port: dco_decode_opt_box_autoadd_u_16(arr[4]),); }
 
+@protected HistoryData dco_decode_history_data(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+final arr = raw as List<dynamic>;
+                if (arr.length != 3) throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+                return HistoryData(connectionId: dco_decode_String(arr[0]),
+time: dco_decode_i_64(arr[1]),
+outcome: dco_decode_String(arr[2]),); }
+
 @protected int dco_decode_i_16(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw as int; }
 
 @protected int dco_decode_i_32(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw as int; }
 
+@protected PlatformInt64 dco_decode_i_64(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return dcoDecodeI64(raw); }
+
+@protected ImportResult dco_decode_import_result(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+final arr = raw as List<dynamic>;
+                if (arr.length != 3) throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+                return ImportResult(connections: dco_decode_list_connection_data(arr[0]),
+skipped: dco_decode_u_32(arr[1]),
+notAnExport: dco_decode_bool(arr[2]),); }
+
 @protected List<String> dco_decode_list_String(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return (raw as List<dynamic>).map(dco_decode_String).toList(); }
+
+@protected List<ConnectionData> dco_decode_list_connection_data(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return (raw as List<dynamic>).map(dco_decode_connection_data).toList(); }
 
 @protected List<ErrorInfo> dco_decode_list_error_info(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return (raw as List<dynamic>).map(dco_decode_error_info).toList(); }
@@ -819,14 +1194,36 @@ return (raw as List<dynamic>).map(dco_decode_error_info).toList(); }
 @protected List<FieldProblem> dco_decode_list_field_problem(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return (raw as List<dynamic>).map(dco_decode_field_problem).toList(); }
 
+@protected List<HistoryData> dco_decode_list_history_data(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return (raw as List<dynamic>).map(dco_decode_history_data).toList(); }
+
+@protected Uint32List dco_decode_list_prim_u_32_strict(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return raw as Uint32List; }
+
 @protected Uint8List dco_decode_list_prim_u_8_strict(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw as Uint8List; }
+
+@protected List<TrustedComputer> dco_decode_list_trusted_computer(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return (raw as List<dynamic>).map(dco_decode_trusted_computer).toList(); }
+
+@protected LoadResult dco_decode_load_result(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+final arr = raw as List<dynamic>;
+                if (arr.length != 6) throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+                return LoadResult(connections: dco_decode_list_connection_data(arr[0]),
+history: dco_decode_list_history_data(arr[1]),
+restoredFromBackup: dco_decode_bool(arr[2]),
+damagedAndReset: dco_decode_bool(arr[3]),
+skipped: dco_decode_u_32(arr[4]),
+readError: dco_decode_bool(arr[5]),); }
 
 @protected String? dco_decode_opt_String(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw == null ? null : dco_decode_String(raw); }
 
 @protected ErrorInfo? dco_decode_opt_box_autoadd_error_info(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw == null ? null : dco_decode_box_autoadd_error_info(raw); }
+
+@protected PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return raw == null ? null : dco_decode_box_autoadd_i_64(raw); }
 
 @protected int? dco_decode_opt_box_autoadd_u_16(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw == null ? null : dco_decode_box_autoadd_u_16(raw); }
@@ -847,7 +1244,25 @@ rgba: dco_decode_list_prim_u_8_strict(arr[9]),
 error: dco_decode_opt_box_autoadd_error_info(arr[10]),
 text: dco_decode_opt_String(arr[11]),); }
 
+@protected SettingsData dco_decode_settings_data(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+final arr = raw as List<dynamic>;
+                if (arr.length != 5) throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+                return SettingsData(theme: dco_decode_app_theme(arr[0]),
+blockScreenshots: dco_decode_bool(arr[1]),
+clipboardDefault: dco_decode_bool(arr[2]),
+confirmSavedPassword: dco_decode_bool(arr[3]),
+idleMinutes: dco_decode_u_32(arr[4]),); }
+
+@protected TrustedComputer dco_decode_trusted_computer(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+final arr = raw as List<dynamic>;
+                if (arr.length != 2) throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+                return TrustedComputer(endpoint: dco_decode_String(arr[0]),
+fingerprint: dco_decode_String(arr[1]),); }
+
 @protected int dco_decode_u_16(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return raw as int; }
+
+@protected int dco_decode_u_32(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw as int; }
 
 @protected int dco_decode_u_8(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -864,6 +1279,9 @@ return dcoDecodeU64(raw); }
 
 @protected VaultResult dco_decode_vault_result(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return VaultResult.values[raw as int]; }
+
+@protected WakeResult dco_decode_wake_result(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return WakeResult.values[raw as int]; }
 
 @protected AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 var inner = sse_decode_String(deserializer);
@@ -885,11 +1303,21 @@ throw UnimplementedError('Unreachable ()'); }
 var inner = sse_decode_list_prim_u_8_strict(deserializer);
         return utf8.decoder.convert(inner); }
 
+@protected AppTheme sse_decode_app_theme(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+var inner = sse_decode_i_32(deserializer);
+        return AppTheme.values[inner]; }
+
 @protected bool sse_decode_bool(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 return deserializer.buffer.getUint8() != 0; }
 
 @protected ErrorInfo sse_decode_box_autoadd_error_info(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 return (sse_decode_error_info(deserializer)); }
+
+@protected PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+return (sse_decode_i_64(deserializer)); }
+
+@protected SettingsData sse_decode_box_autoadd_settings_data(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+return (sse_decode_settings_data(deserializer)); }
 
 @protected int sse_decode_box_autoadd_u_16(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 return (sse_decode_u_16(deserializer)); }
@@ -897,6 +1325,18 @@ return (sse_decode_u_16(deserializer)); }
 @protected ClipboardMode sse_decode_clipboard_mode(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 var inner = sse_decode_i_32(deserializer);
         return ClipboardMode.values[inner]; }
+
+@protected ConnectionData sse_decode_connection_data(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+var var_id = sse_decode_String(deserializer);
+var var_name = sse_decode_String(deserializer);
+var var_host = sse_decode_String(deserializer);
+var var_port = sse_decode_u_16(deserializer);
+var var_username = sse_decode_String(deserializer);
+var var_savePassword = sse_decode_bool(deserializer);
+var var_clipboard = sse_decode_clipboard_mode(deserializer);
+var var_lastUsed = sse_decode_opt_box_autoadd_i_64(deserializer);
+var var_wakeMac = sse_decode_opt_String(deserializer);
+return ConnectionData(id: var_id, name: var_name, host: var_host, port: var_port, username: var_username, savePassword: var_savePassword, clipboard: var_clipboard, lastUsed: var_lastUsed, wakeMac: var_wakeMac); }
 
 @protected ErrorInfo sse_decode_error_info(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 var var_id = sse_decode_String(deserializer);
@@ -918,17 +1358,40 @@ var var_host = sse_decode_opt_String(deserializer);
 var var_port = sse_decode_opt_box_autoadd_u_16(deserializer);
 return FormCheckResult(valid: var_valid, problems: var_problems, endpoint: var_endpoint, host: var_host, port: var_port); }
 
+@protected HistoryData sse_decode_history_data(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+var var_connectionId = sse_decode_String(deserializer);
+var var_time = sse_decode_i_64(deserializer);
+var var_outcome = sse_decode_String(deserializer);
+return HistoryData(connectionId: var_connectionId, time: var_time, outcome: var_outcome); }
+
 @protected int sse_decode_i_16(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 return deserializer.buffer.getInt16(); }
 
 @protected int sse_decode_i_32(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 return deserializer.buffer.getInt32(); }
 
+@protected PlatformInt64 sse_decode_i_64(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+return deserializer.buffer.getPlatformInt64(); }
+
+@protected ImportResult sse_decode_import_result(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+var var_connections = sse_decode_list_connection_data(deserializer);
+var var_skipped = sse_decode_u_32(deserializer);
+var var_notAnExport = sse_decode_bool(deserializer);
+return ImportResult(connections: var_connections, skipped: var_skipped, notAnExport: var_notAnExport); }
+
 @protected List<String> sse_decode_list_String(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 
         var len_ = sse_decode_i_32(deserializer);
         var ans_ = <String>[];
         for (var idx_ = 0; idx_ < len_; ++idx_) { ans_.add(sse_decode_String(deserializer)); }
+        return ans_;
+         }
+
+@protected List<ConnectionData> sse_decode_list_connection_data(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+
+        var len_ = sse_decode_i_32(deserializer);
+        var ans_ = <ConnectionData>[];
+        for (var idx_ = 0; idx_ < len_; ++idx_) { ans_.add(sse_decode_connection_data(deserializer)); }
         return ans_;
          }
 
@@ -948,9 +1411,38 @@ return deserializer.buffer.getInt32(); }
         return ans_;
          }
 
+@protected List<HistoryData> sse_decode_list_history_data(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+
+        var len_ = sse_decode_i_32(deserializer);
+        var ans_ = <HistoryData>[];
+        for (var idx_ = 0; idx_ < len_; ++idx_) { ans_.add(sse_decode_history_data(deserializer)); }
+        return ans_;
+         }
+
+@protected Uint32List sse_decode_list_prim_u_32_strict(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+var len_ = sse_decode_i_32(deserializer);
+                return deserializer.buffer.getUint32List(len_); }
+
 @protected Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 var len_ = sse_decode_i_32(deserializer);
                 return deserializer.buffer.getUint8List(len_); }
+
+@protected List<TrustedComputer> sse_decode_list_trusted_computer(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+
+        var len_ = sse_decode_i_32(deserializer);
+        var ans_ = <TrustedComputer>[];
+        for (var idx_ = 0; idx_ < len_; ++idx_) { ans_.add(sse_decode_trusted_computer(deserializer)); }
+        return ans_;
+         }
+
+@protected LoadResult sse_decode_load_result(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+var var_connections = sse_decode_list_connection_data(deserializer);
+var var_history = sse_decode_list_history_data(deserializer);
+var var_restoredFromBackup = sse_decode_bool(deserializer);
+var var_damagedAndReset = sse_decode_bool(deserializer);
+var var_skipped = sse_decode_u_32(deserializer);
+var var_readError = sse_decode_bool(deserializer);
+return LoadResult(connections: var_connections, history: var_history, restoredFromBackup: var_restoredFromBackup, damagedAndReset: var_damagedAndReset, skipped: var_skipped, readError: var_readError); }
 
 @protected String? sse_decode_opt_String(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -965,6 +1457,15 @@ var len_ = sse_decode_i_32(deserializer);
 
             if (sse_decode_bool(deserializer)) {
                 return (sse_decode_box_autoadd_error_info(deserializer));
+            } else {
+                return null;
+            }
+             }
+
+@protected PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+
+            if (sse_decode_bool(deserializer)) {
+                return (sse_decode_box_autoadd_i_64(deserializer));
             } else {
                 return null;
             }
@@ -994,8 +1495,24 @@ var var_error = sse_decode_opt_box_autoadd_error_info(deserializer);
 var var_text = sse_decode_opt_String(deserializer);
 return SessionUpdate(kind: var_kind, label: var_label, connected: var_connected, fingerprint: var_fingerprint, pinned: var_pinned, x: var_x, y: var_y, width: var_width, height: var_height, rgba: var_rgba, error: var_error, text: var_text); }
 
+@protected SettingsData sse_decode_settings_data(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+var var_theme = sse_decode_app_theme(deserializer);
+var var_blockScreenshots = sse_decode_bool(deserializer);
+var var_clipboardDefault = sse_decode_bool(deserializer);
+var var_confirmSavedPassword = sse_decode_bool(deserializer);
+var var_idleMinutes = sse_decode_u_32(deserializer);
+return SettingsData(theme: var_theme, blockScreenshots: var_blockScreenshots, clipboardDefault: var_clipboardDefault, confirmSavedPassword: var_confirmSavedPassword, idleMinutes: var_idleMinutes); }
+
+@protected TrustedComputer sse_decode_trusted_computer(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+var var_endpoint = sse_decode_String(deserializer);
+var var_fingerprint = sse_decode_String(deserializer);
+return TrustedComputer(endpoint: var_endpoint, fingerprint: var_fingerprint); }
+
 @protected int sse_decode_u_16(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 return deserializer.buffer.getUint16(); }
+
+@protected int sse_decode_u_32(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+return deserializer.buffer.getUint32(); }
 
 @protected int sse_decode_u_8(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 return deserializer.buffer.getUint8(); }
@@ -1013,6 +1530,10 @@ return deserializer.buffer.getBigUint64(); }
 @protected VaultResult sse_decode_vault_result(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 var inner = sse_decode_i_32(deserializer);
         return VaultResult.values[inner]; }
+
+@protected WakeResult sse_decode_wake_result(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+var inner = sse_decode_i_32(deserializer);
+        return WakeResult.values[inner]; }
 
 @protected void sse_encode_AnyhowException(AnyhowException self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_String(self.message, serializer); }
@@ -1035,17 +1556,38 @@ sse_encode_String(self.setupAndSerialize(codec: SseCodec(
 @protected void sse_encode_String(String self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_list_prim_u_8_strict(utf8.encoder.convert(self), serializer); }
 
+@protected void sse_encode_app_theme(AppTheme self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_i_32(self.index, serializer); }
+
 @protected void sse_encode_bool(bool self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 serializer.buffer.putUint8(self ? 1 : 0); }
 
 @protected void sse_encode_box_autoadd_error_info(ErrorInfo self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_error_info(self, serializer); }
 
+@protected void sse_encode_box_autoadd_i_64(PlatformInt64 self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_i_64(self, serializer); }
+
+@protected void sse_encode_box_autoadd_settings_data(SettingsData self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_settings_data(self, serializer); }
+
 @protected void sse_encode_box_autoadd_u_16(int self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_u_16(self, serializer); }
 
 @protected void sse_encode_clipboard_mode(ClipboardMode self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_i_32(self.index, serializer); }
+
+@protected void sse_encode_connection_data(ConnectionData self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_String(self.id, serializer);
+sse_encode_String(self.name, serializer);
+sse_encode_String(self.host, serializer);
+sse_encode_u_16(self.port, serializer);
+sse_encode_String(self.username, serializer);
+sse_encode_bool(self.savePassword, serializer);
+sse_encode_clipboard_mode(self.clipboard, serializer);
+sse_encode_opt_box_autoadd_i_64(self.lastUsed, serializer);
+sse_encode_opt_String(self.wakeMac, serializer);
+ }
 
 @protected void sse_encode_error_info(ErrorInfo self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_String(self.id, serializer);
@@ -1067,15 +1609,34 @@ sse_encode_opt_String(self.host, serializer);
 sse_encode_opt_box_autoadd_u_16(self.port, serializer);
  }
 
+@protected void sse_encode_history_data(HistoryData self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_String(self.connectionId, serializer);
+sse_encode_i_64(self.time, serializer);
+sse_encode_String(self.outcome, serializer);
+ }
+
 @protected void sse_encode_i_16(int self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 serializer.buffer.putInt16(self); }
 
 @protected void sse_encode_i_32(int self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 serializer.buffer.putInt32(self); }
 
+@protected void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+serializer.buffer.putPlatformInt64(self); }
+
+@protected void sse_encode_import_result(ImportResult self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_list_connection_data(self.connections, serializer);
+sse_encode_u_32(self.skipped, serializer);
+sse_encode_bool(self.notAnExport, serializer);
+ }
+
 @protected void sse_encode_list_String(List<String> self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_i_32(self.length, serializer);
         for (final item in self) { sse_encode_String(item, serializer); } }
+
+@protected void sse_encode_list_connection_data(List<ConnectionData> self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_i_32(self.length, serializer);
+        for (final item in self) { sse_encode_connection_data(item, serializer); } }
 
 @protected void sse_encode_list_error_info(List<ErrorInfo> self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_i_32(self.length, serializer);
@@ -1085,9 +1646,30 @@ sse_encode_i_32(self.length, serializer);
 sse_encode_i_32(self.length, serializer);
         for (final item in self) { sse_encode_field_problem(item, serializer); } }
 
+@protected void sse_encode_list_history_data(List<HistoryData> self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_i_32(self.length, serializer);
+        for (final item in self) { sse_encode_history_data(item, serializer); } }
+
+@protected void sse_encode_list_prim_u_32_strict(Uint32List self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_i_32(self.length, serializer);
+                    serializer.buffer.putUint32List(self); }
+
 @protected void sse_encode_list_prim_u_8_strict(Uint8List self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_i_32(self.length, serializer);
                     serializer.buffer.putUint8List(self); }
+
+@protected void sse_encode_list_trusted_computer(List<TrustedComputer> self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_i_32(self.length, serializer);
+        for (final item in self) { sse_encode_trusted_computer(item, serializer); } }
+
+@protected void sse_encode_load_result(LoadResult self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_list_connection_data(self.connections, serializer);
+sse_encode_list_history_data(self.history, serializer);
+sse_encode_bool(self.restoredFromBackup, serializer);
+sse_encode_bool(self.damagedAndReset, serializer);
+sse_encode_u_32(self.skipped, serializer);
+sse_encode_bool(self.readError, serializer);
+ }
 
 @protected void sse_encode_opt_String(String? self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -1102,6 +1684,14 @@ sse_encode_i_32(self.length, serializer);
                 sse_encode_bool(self != null, serializer);
                 if (self != null) {
                     sse_encode_box_autoadd_error_info(self, serializer);
+                }
+                 }
+
+@protected void sse_encode_opt_box_autoadd_i_64(PlatformInt64? self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+
+                sse_encode_bool(self != null, serializer);
+                if (self != null) {
+                    sse_encode_box_autoadd_i_64(self, serializer);
                 }
                  }
 
@@ -1128,8 +1718,24 @@ sse_encode_opt_box_autoadd_error_info(self.error, serializer);
 sse_encode_opt_String(self.text, serializer);
  }
 
+@protected void sse_encode_settings_data(SettingsData self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_app_theme(self.theme, serializer);
+sse_encode_bool(self.blockScreenshots, serializer);
+sse_encode_bool(self.clipboardDefault, serializer);
+sse_encode_bool(self.confirmSavedPassword, serializer);
+sse_encode_u_32(self.idleMinutes, serializer);
+ }
+
+@protected void sse_encode_trusted_computer(TrustedComputer self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_String(self.endpoint, serializer);
+sse_encode_String(self.fingerprint, serializer);
+ }
+
 @protected void sse_encode_u_16(int self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 serializer.buffer.putUint16(self); }
+
+@protected void sse_encode_u_32(int self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+serializer.buffer.putUint32(self); }
 
 @protected void sse_encode_u_8(int self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 serializer.buffer.putUint8(self); }
@@ -1144,6 +1750,9 @@ sse_encode_i_32(self.index, serializer); }
 serializer.buffer.putBigUint64(self); }
 
 @protected void sse_encode_vault_result(VaultResult self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_i_32(self.index, serializer); }
+
+@protected void sse_encode_wake_result(WakeResult self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_i_32(self.index, serializer); }
                 }
                 
@@ -1197,13 +1806,13 @@ sse_encode_i_32(self.index, serializer); }
 /// The password is used for this connection only and never stored here.
 /// `pins_path` is the certificate pin file in the app's private data folder.
 /// Can be called once per handle.
- Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection })=>RustLib.instance.api.crateApiSessionRdpSessionStart(that: this, host: host, port: port, username: username, password: password, width: width, height: height, pinsPath: pinsPath, clipboardDirection: clipboardDirection);
+ Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required int idleMinutes })=>RustLib.instance.api.crateApiSessionRdpSessionStart(that: this, host: host, port: port, username: username, password: password, width: width, height: height, pinsPath: pinsPath, clipboardDirection: clipboardDirection, idleMinutes: idleMinutes);
 
 
 /// Like [`RdpSession::start`], but reads the saved password from the OS
 /// vault inside Rust, so it never passes through the UI (Windows, Linux).
 /// The caller must have confirmed the user's identity first (S5).
- Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection })=>RustLib.instance.api.crateApiSessionRdpSessionStartWithSavedPassword(that: this, connectionId: connectionId, host: host, port: port, username: username, width: width, height: height, pinsPath: pinsPath, clipboardDirection: clipboardDirection);
+ Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required int idleMinutes })=>RustLib.instance.api.crateApiSessionRdpSessionStartWithSavedPassword(that: this, connectionId: connectionId, host: host, port: port, username: username, width: width, height: height, pinsPath: pinsPath, clipboardDirection: clipboardDirection, idleMinutes: idleMinutes);
 
 
 /// Types text (on-screen keyboards, IMEs, pasted text is NOT sent this way).

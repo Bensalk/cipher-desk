@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:secure_rdp_viewer/main.dart';
 import 'package:secure_rdp_viewer/src/rust/frb_generated.dart';
+import 'package:secure_rdp_viewer/state/persistence.dart';
 import 'package:secure_rdp_viewer/state/profiles.dart';
 import 'package:secure_rdp_viewer/state/settings.dart';
 
@@ -94,6 +97,7 @@ void main() {
     await start(tester);
     await tester.tap(find.text('Settings').last);
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.textContaining('NLA required: true'), 200);
     expect(find.textContaining('NLA required: true'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('What error messages mean'), 200);
     await tester.tap(find.text('What error messages mean'));
@@ -101,5 +105,58 @@ void main() {
     final warning = find.text('Warning: computer identity changed');
     await tester.scrollUntilVisible(warning, 200, scrollable: find.byType(Scrollable).last);
     expect(warning, findsOneWidget);
+  });
+
+  testWidgets('a bad Wake-on-LAN address is reported', (tester) async {
+    await start(tester);
+    await tester.tap(find.byKey(const Key('button-new')));
+    await tester.pumpAndSettle();
+    await typeVisible(tester, find.byKey(const Key('field-mac')), 'not-a-mac');
+    await tapVisible(tester, find.byKey(const Key('button-save')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Enter a MAC address'), findsOneWidget);
+  });
+
+  test('connections and settings survive a restart, without passwords', () async {
+    final dir = await Directory.systemTemp.createTemp('rdpv-it-');
+    addTearDown(() => dir.delete(recursive: true));
+    final paths = AppPaths(dir.path);
+
+    final store = ProfileStore();
+    expect(ProfilePersistence(paths, store).start(), isNull);
+    final p = ConnectionProfile(
+      id: store.newId(),
+      name: 'Office',
+      host: '192.0.2.10',
+      port: 3389,
+      username: 'alice',
+      wakeMac: '00:11:22:33:44:55',
+    );
+    store.upsert(p);
+    store.addHistory(p.id, 'WrongCredentials', DateTime(2026, 10, 29, 9));
+    final settings = AppSettings();
+    SettingsPersistence(paths, settings).start();
+    settings.idleMinutes = 60;
+
+    final store2 = ProfileStore();
+    expect(ProfilePersistence(paths, store2).start(), isNull);
+    expect(store2.profiles.single.name, 'Office');
+    expect(store2.profiles.single.wakeMac, '00:11:22:33:44:55');
+    expect(store2.history.single.outcome, 'WrongCredentials');
+    final settings2 = AppSettings();
+    SettingsPersistence(paths, settings2).start();
+    expect(settings2.idleMinutes, 60);
+
+    final text = await File(paths.connections).readAsString();
+    expect(text, isNot(contains('"password"')));
+  });
+
+  test('a damaged connections file gives a start-up notice', () async {
+    final dir = await Directory.systemTemp.createTemp('rdpv-it-');
+    addTearDown(() => dir.delete(recursive: true));
+    final paths = AppPaths(dir.path);
+    await File(paths.connections).writeAsString('{ not json');
+    final notice = ProfilePersistence(paths, ProfileStore()).start();
+    expect(notice, isNotNull);
   });
 }

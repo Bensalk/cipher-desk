@@ -8,8 +8,7 @@
 //! atomically and, on Unix, readable only by the owner.
 
 use std::collections::BTreeMap;
-use std::io::Write as _;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
@@ -145,6 +144,14 @@ impl PinStore {
         Ok(())
     }
 
+    /// All pins as (endpoint, fingerprint), sorted by endpoint.
+    pub fn entries(&self) -> Vec<(String, String)> {
+        self.pins
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
+    }
+
     pub fn len(&self) -> usize {
         self.pins.len()
     }
@@ -162,31 +169,9 @@ impl PinStore {
             pins: self.pins.clone(),
         };
         let json = serde_json::to_vec_pretty(&file).map_err(|_| PinStoreError::Format)?;
-        write_atomically(path, &json)?;
+        crate::fsutil::write_atomically(path, &json)?;
         Ok(())
     }
-}
-
-/// Writes to a temporary file in the same folder, flushes it to disk, then
-/// renames it over the target, so a crash never leaves a half-written file.
-fn write_atomically(path: &Path, data: &[u8]) -> std::io::Result<()> {
-    let dir = path.parent().unwrap_or_else(|| Path::new("."));
-    std::fs::create_dir_all(dir)?;
-    let tmp = path.with_extension("tmp");
-    {
-        let mut opts = std::fs::OpenOptions::new();
-        opts.write(true).create(true).truncate(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt as _;
-            opts.mode(0o600);
-        }
-        let mut f = opts.open(&tmp)?;
-        f.write_all(data)?;
-        f.sync_all()?;
-    }
-    std::fs::rename(&tmp, path)?;
-    Ok(())
 }
 
 #[cfg(test)]

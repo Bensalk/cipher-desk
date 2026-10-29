@@ -87,8 +87,12 @@ class PasswordVault {
   ///   set up, returns false so the password is typed instead (fail safe).
   /// - Linux: the keyring itself asks for its password when it is locked.
   /// - Android: handled by the Keystore prompt in [loadOnAndroid].
-  static Future<bool> confirmUser(String reason) async {
-    if (!_isWindows) return true;
+  ///
+  /// [required] comes from the "Confirm before using a saved password" setting.
+  /// It only affects Windows: on Android the Keystore key itself demands the
+  /// confirmation, and on Linux the keyring decides.
+  static Future<bool> confirmUser(String reason, {bool required = true}) async {
+    if (!_isWindows || !required) return true;
     final auth = LocalAuthentication();
     try {
       if (!await auth.isDeviceSupported()) return false;

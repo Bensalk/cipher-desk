@@ -17,16 +17,23 @@
 //! Stage 6 (clipboard) adds:
 //! - [`clipboard`]: two-way plain-text clipboard under a direction/size policy.
 //!
-//! Later stages add saved profiles.
+//! Stage 7 (connections) adds:
+//! - [`profiles`], [`settings`]: saved connections, history and settings (no secrets),
+//! - [`fsutil`]: atomic, private writes with backups,
+//! - [`wol`]: Wake-on-LAN and a reachability check.
 
 pub mod clipboard;
+pub mod fsutil;
 pub mod input;
 pub mod logging;
 pub mod pins;
 pub mod policy;
+pub mod profiles;
 pub mod secret;
 pub mod session;
+pub mod settings;
 pub mod status;
 pub mod tls;
 pub mod vault;
 pub mod version;
+pub mod wol;

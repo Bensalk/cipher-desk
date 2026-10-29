@@ -176,6 +176,7 @@ impl RdpSession {
         height: u16,
         pins_path: String,
         clipboard_direction: ClipboardMode,
+        idle_minutes: u32,
         sink: StreamSink<SessionUpdate>,
     ) {
         let target = Target {
@@ -186,6 +187,7 @@ impl RdpSession {
             height,
             pins_path,
             clipboard: clipboard_direction,
+            idle_minutes,
         };
         self.spawn(target, Some(SecretString::new(password)), None, sink);
     }
@@ -204,6 +206,7 @@ impl RdpSession {
         height: u16,
         pins_path: String,
         clipboard_direction: ClipboardMode,
+        idle_minutes: u32,
         sink: StreamSink<SessionUpdate>,
     ) {
         let target = Target {
@@ -214,6 +217,7 @@ impl RdpSession {
             height,
             pins_path,
             clipboard: clipboard_direction,
+            idle_minutes,
         };
         self.spawn(target, None, Some(connection_id), sink);
     }
@@ -394,6 +398,8 @@ struct Target {
     height: u16,
     pins_path: String,
     clipboard: ClipboardMode,
+    /// Disconnect after this many minutes without input; 0 = never (S7).
+    idle_minutes: u32,
 }
 
 fn run(
@@ -410,6 +416,7 @@ fn run(
         height,
         pins_path,
         clipboard,
+        idle_minutes,
     } = target;
     let (port, width, height) = (*port, *width, *height);
     let send = |u: SessionUpdate| {
@@ -472,7 +479,8 @@ fn run(
         }
     };
     drop(password);
-    drive(session, sink, rx, policy.idle_disconnect);
+    let idle = (*idle_minutes > 0).then(|| Duration::from_secs(u64::from(*idle_minutes) * 60));
+    drive(session, sink, rx, idle);
 }
 
 /// Waits for the user's answer. `None` means disconnect was requested.
@@ -491,7 +499,7 @@ fn drive(
     mut s: Session,
     sink: &StreamSink<SessionUpdate>,
     rx: &Receiver<Command>,
-    idle_limit: Duration,
+    idle_limit: Option<Duration>,
 ) {
     let send = |u: SessionUpdate| sink.add(u).is_ok();
     let (w, h) = s.size();
@@ -528,7 +536,7 @@ fn drive(
         }
 
         // S7: idle disconnect.
-        if last_input.elapsed() >= idle_limit {
+        if idle_limit.is_some_and(|limit| last_input.elapsed() >= limit) {
             s.disconnect();
             let _ = sink.add(SessionUpdate::ended(Some(ConnectionError::IdleTimeout)));
             return;

@@ -448,3 +448,100 @@ trackpad mode and pinch-zoom, settings for S5/S13.
 After the fixes: unit tests 67/67; live connection suite 10/10 (in a keyring session);
 live clipboard suite 6/6.
 
+
+---
+
+## Stage 7 — Connection and Profile Management ✅ Rust verified; Flutter screens awaiting first CI run (29 Oct 2026)
+
+### Objective
+Save connections, history and settings to disk (never passwords), manage trusted
+computers, export/import, Wake-on-LAN and a readiness check, the S5/S13 settings, and
+touch improvements (trackpad mode, pinch-zoom).
+
+### Completed
+- **Rust `fsutil`:** atomic writes (temp file + rename), a backup of the previous version,
+  a 4 MB read limit, and setting a damaged file aside (`.damaged-<time>`) instead of
+  deleting it.
+- **Rust `profiles`:** connections (id, name, address, port, username, saved-password flag,
+  clipboard mode, last used, Wake-on-LAN MAC) and history (last 100 outcomes, no secrets).
+  Loading falls back to the backup, then starts empty with a notice; invalid entries are
+  skipped and counted. Limits: 500 connections, 100 history entries.
+- **Export / import:** export holds names, addresses, ports and usernames only — no
+  passwords, ids, saved-password flags or history. Import validates every entry, gives new
+  ids, and turns clipboard sharing **off** for everything imported. Windows/Linux use a
+  file dialog; Android shows the text to copy and accepts pasted text.
+- **Rust `settings`:** theme, block screenshots, clipboard default, confirm saved password,
+  idle disconnect (5, 15, 30, 60, 120 minutes or never; default 30).
+- **Rust `wol`:** MAC parsing (`:`, `-`, `.` or none), magic packet, sending, and a
+  reachability check that only opens and closes a TCP connection.
+- **Flutter:**
+  - Connections, history and settings load at start-up and save on every change; a notice
+    appears if the file was damaged or restored, or if saving fails.
+  - Connection form: optional Wake-on-LAN MAC address (checked by the Rust core).
+  - Connection menu: **Wake up** and **Check readiness** (computer answers on its port,
+    certificate trusted, username set, password saved).
+  - Settings: idle disconnect, **Windows Hello confirmation toggle with a warning before
+    turning it off (KI-18 done)**, trusted computers (view fingerprints, forget), history,
+    export, import.
+  - Session: history outcome recorded; **re-trust after a certificate change** with a strong
+    warning, which forgets the old fingerprint and reconnects so the new one must be checked
+    (KI-11 done); **trackpad mode** (finger moves a visible pointer, tap clicks at the pointer,
+    long press right-clicks) and **pinch-zoom** up to 4× in both modes, with "show the whole
+    screen".
+  - Deleting a connection keeps the trusted certificate if another connection uses the same
+    computer and port (KI-17 done).
+- **New tool `tools/dart-syntax`:** syntax-only check of Dart files (tree-sitter grammar,
+  versions pinned in a lock file) for machines without Flutter. Runs in the pre-commit hook
+  when installed. It does not check types or imports; `flutter analyze` in CI still does.
+
+### Test results (Ubuntu 24.04, Rust 1.97.0)
+
+| Check | Result |
+|-------|--------|
+| fmt, clippy (`-D warnings`), policy, cargo-deny | ✅ PASS |
+| gitleaks (staged and full history) | ✅ PASS (see commit) |
+| Unit tests | ✅ PASS — 90/90 (78 core + 12 bridge) |
+| Profiles: save/load, backup fallback, damaged file set aside, limits, invalid entries skipped | ✅ |
+| Export contains no password, id, saved-password flag or history; import turns clipboard off | ✅ |
+| Wake-on-LAN packet sent and received over loopback; MAC formats; reachability | ✅ |
+| Live connection suite, debug and release (in a keyring session) | ✅ PASS — 10/10 each |
+| Live clipboard suite | ✅ PASS — 6/6 |
+| Live vault: round trip; refuses to save with no keyring | ✅ PASS |
+| Dart syntax of every app file (new checker) | ✅ PASS |
+| OSV-Scanner | ⛔ **NOT RUN** here — downloading the scanner was blocked; runs in CI |
+| Flutter build, `flutter analyze`, Dart unit tests (8 new), integration tests (3 new) | ⛔ **NOT RUN** — needs Flutter (CI) |
+| Trackpad mode, pinch-zoom, Wake-on-LAN to a real computer, Windows Hello toggle | ⛔ **NOT RUN** — needs devices |
+
+### Known issues (end-of-stage review)
+- **KI-25:** No Dart compiler is available here. The new checker proves the Dart files parse,
+  but types and imports are only checked by `flutter analyze` in CI. **The Flutter app has
+  still never been compiled**; the first CI run may find errors to fix.
+- **KI-26:** On Android, export shows the text (with a Copy button) and import takes pasted
+  text, because the file picker is desktop-only here. The export holds no passwords, but
+  copying it puts addresses and usernames on the clipboard.
+- **KI-27:** Changing a connection's address leaves the old computer's trusted certificate in
+  the list; it can be removed under Settings → Trusted computers.
+- **KI-28:** Wake-on-LAN uses a local broadcast, so it works only on the same network as the
+  computer (not through a VPN or router), and the computer must have it turned on.
+- **KI-29:** The Windows Hello toggle only affects Windows. Android always asks (the Keystore
+  key requires it); Linux relies on the keyring (KI-15).
+- **KI-30:** `file_selector` ^1.0.3 was added without being able to resolve it here; the first
+  CI run will confirm the version.
+
+### Next step
+Stage 8 — reliability: reconnecting after network drops, Android background behaviour
+(decision 8), long-session and memory checks.
+
+---
+
+## Review of Stage 7 and earlier work (29 Oct 2026)
+
+| # | Problem found | Fix |
+|---|---------------|-----|
+| R21 | **The app did not compile since Stage 6:** a stray `),` after the clipboard drop-down in the connection form (committed in `ed52b46`). Not caught because no Dart tools run here. | Removed. Added `tools/dart-syntax` and a pre-commit check; all Dart files and every earlier version of that file checked |
+| R22 | On desktop, every mouse click and drag was sent **twice** (once by the mouse listener, once by the touch gesture handler) — since Stage 4 | The gesture handler now accepts only touch and pen; the mouse listener ignores them |
+| R23 | After a pinch, the finger that stayed down started a drag (an unwanted click on the remote computer) | Fingers are counted; after a pinch nothing is sent until all fingers are lifted |
+| R24 | The new integration test looked for `password"`, which also matches the allowed `save_password` key | Now checks for the exact `"password"` key |
+| R25 | Leaving the session screen recorded no history entry, and recording it during the screen's disposal could rebuild widgets at a forbidden moment | Recorded when leaving, deferred until the screen is gone |
+| R26 | Saving could silently drop connections over 500, and an import could exceed the limit | The form refuses a new connection at the limit; import adds only what fits and says so |
+| R27 | Readiness check and shared-certificate check compared addresses case-sensitively, unlike the certificate store | Both ignore case now |

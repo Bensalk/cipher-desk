@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:secure_rdp_viewer/src/rust/api/session.dart' show ClipboardMode;
 import 'package:secure_rdp_viewer/state/profiles.dart';
@@ -76,11 +77,83 @@ void main() {
     expect(ids.contains(ProfileStore().newId()), isFalse);
   });
 
+  group('history and stage 7 helpers', () {
+    test('history is newest first, capped, and removed with its connection', () {
+      final s = ProfileStore();
+      final a = _p(s, 'A', 'a.example.com');
+      final b = _p(s, 'B', 'b.example.com');
+      s.upsert(a);
+      s.upsert(b);
+      for (var i = 0; i < ProfileStore.maxHistory + 5; i++) {
+        s.addHistory(i.isEven ? a.id : b.id, 'connected', DateTime(2026, 1, 1).add(Duration(minutes: i)));
+      }
+      expect(s.history, hasLength(ProfileStore.maxHistory));
+      expect(s.history.first.time.isAfter(s.history.last.time), isTrue);
+      s.remove(a.id);
+      expect(s.history.every((h) => h.connectionId == b.id), isTrue);
+    });
+
+    test('shared endpoint check ignores case and the connection itself', () {
+      final s = ProfileStore();
+      final a = _p(s, 'A', 'Office-PC');
+      final b = _p(s, 'B', 'office-pc');
+      final c = _p(s, 'C', 'office-pc').copyWith(port: 3390);
+      s.upsert(a);
+      expect(s.endpointSharedWithOthers(a), isFalse);
+      s.upsert(c);
+      expect(s.endpointSharedWithOthers(a), isFalse); // different port
+      s.upsert(b);
+      expect(s.endpointSharedWithOthers(a), isTrue);
+    });
+
+    test('copyWith can change the id and clear the wake address', () {
+      const p = ConnectionProfile(
+          id: 'x', name: 'n', host: 'h', port: 1, username: 'u', wakeMac: '00:11:22:33:44:55');
+      expect(p.copyWith(id: 'y').id, 'y');
+      expect(p.copyWith(name: 'm').wakeMac, '00:11:22:33:44:55');
+      expect(p.copyWith(clearWakeMac: true).wakeMac, isNull);
+    });
+
+    test('replaceAll does not notify (loading must not write the file back)', () {
+      final s = ProfileStore();
+      var notified = 0;
+      s.addListener(() => notified++);
+      s.replaceAll([_p(s, 'A', 'a')], const []);
+      expect(notified, 0);
+      expect(s.profiles, hasLength(1));
+      s.addAll([_p(s, 'B', 'b'), _p(s, 'C', 'c')]);
+      expect(notified, 1);
+      expect(s.byId(s.profiles.first.id), isNotNull);
+      expect(s.byId('missing'), isNull);
+    });
+  });
+
   group('AppSettings', () {
     test('secure defaults', () {
       final s = AppSettings();
       expect(s.blockScreenshots, isTrue);
       expect(s.clipboardDefault, isFalse);
+      expect(s.confirmSavedPassword, isTrue);
+      expect(s.idleMinutes, 30);
+    });
+
+    test('load does not notify; setters do, and ignore invalid values', () {
+      final s = AppSettings();
+      var notified = 0;
+      s.addListener(() => notified++);
+      s.load(
+        themeMode: ThemeMode.dark,
+        blockScreenshots: false,
+        clipboardDefault: true,
+        confirmSavedPassword: false,
+        idleMinutes: 0,
+      );
+      expect(notified, 0);
+      expect(s.idleMinutes, 0);
+      s.idleMinutes = -1;
+      expect(s.idleMinutes, 0);
+      s.idleMinutes = 15;
+      expect(notified, 1);
     });
   });
 }

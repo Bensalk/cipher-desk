@@ -8,6 +8,7 @@ import 'api/form.dart';
 import 'api/info.dart';
 import 'api/pins.dart';
 import 'api/session.dart';
+import 'api/store.dart';
 import 'api/vault.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -42,13 +43,21 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
 @protected String dco_decode_String(dynamic raw);
 
+@protected AppTheme dco_decode_app_theme(dynamic raw);
+
 @protected bool dco_decode_bool(dynamic raw);
 
 @protected ErrorInfo dco_decode_box_autoadd_error_info(dynamic raw);
 
+@protected PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw);
+
+@protected SettingsData dco_decode_box_autoadd_settings_data(dynamic raw);
+
 @protected int dco_decode_box_autoadd_u_16(dynamic raw);
 
 @protected ClipboardMode dco_decode_clipboard_mode(dynamic raw);
+
+@protected ConnectionData dco_decode_connection_data(dynamic raw);
 
 @protected ErrorInfo dco_decode_error_info(dynamic raw);
 
@@ -56,27 +65,51 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
 @protected FormCheckResult dco_decode_form_check_result(dynamic raw);
 
+@protected HistoryData dco_decode_history_data(dynamic raw);
+
 @protected int dco_decode_i_16(dynamic raw);
 
 @protected int dco_decode_i_32(dynamic raw);
 
+@protected PlatformInt64 dco_decode_i_64(dynamic raw);
+
+@protected ImportResult dco_decode_import_result(dynamic raw);
+
 @protected List<String> dco_decode_list_String(dynamic raw);
+
+@protected List<ConnectionData> dco_decode_list_connection_data(dynamic raw);
 
 @protected List<ErrorInfo> dco_decode_list_error_info(dynamic raw);
 
 @protected List<FieldProblem> dco_decode_list_field_problem(dynamic raw);
 
+@protected List<HistoryData> dco_decode_list_history_data(dynamic raw);
+
+@protected Uint32List dco_decode_list_prim_u_32_strict(dynamic raw);
+
 @protected Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+@protected List<TrustedComputer> dco_decode_list_trusted_computer(dynamic raw);
+
+@protected LoadResult dco_decode_load_result(dynamic raw);
 
 @protected String? dco_decode_opt_String(dynamic raw);
 
 @protected ErrorInfo? dco_decode_opt_box_autoadd_error_info(dynamic raw);
 
+@protected PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw);
+
 @protected int? dco_decode_opt_box_autoadd_u_16(dynamic raw);
 
 @protected SessionUpdate dco_decode_session_update(dynamic raw);
 
+@protected SettingsData dco_decode_settings_data(dynamic raw);
+
+@protected TrustedComputer dco_decode_trusted_computer(dynamic raw);
+
 @protected int dco_decode_u_16(dynamic raw);
+
+@protected int dco_decode_u_32(dynamic raw);
 
 @protected int dco_decode_u_8(dynamic raw);
 
@@ -87,6 +120,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 @protected BigInt dco_decode_usize(dynamic raw);
 
 @protected VaultResult dco_decode_vault_result(dynamic raw);
+
+@protected WakeResult dco_decode_wake_result(dynamic raw);
 
 @protected AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
 
@@ -100,13 +135,21 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
 @protected String sse_decode_String(SseDeserializer deserializer);
 
+@protected AppTheme sse_decode_app_theme(SseDeserializer deserializer);
+
 @protected bool sse_decode_bool(SseDeserializer deserializer);
 
 @protected ErrorInfo sse_decode_box_autoadd_error_info(SseDeserializer deserializer);
 
+@protected PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer);
+
+@protected SettingsData sse_decode_box_autoadd_settings_data(SseDeserializer deserializer);
+
 @protected int sse_decode_box_autoadd_u_16(SseDeserializer deserializer);
 
 @protected ClipboardMode sse_decode_clipboard_mode(SseDeserializer deserializer);
+
+@protected ConnectionData sse_decode_connection_data(SseDeserializer deserializer);
 
 @protected ErrorInfo sse_decode_error_info(SseDeserializer deserializer);
 
@@ -114,27 +157,51 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
 @protected FormCheckResult sse_decode_form_check_result(SseDeserializer deserializer);
 
+@protected HistoryData sse_decode_history_data(SseDeserializer deserializer);
+
 @protected int sse_decode_i_16(SseDeserializer deserializer);
 
 @protected int sse_decode_i_32(SseDeserializer deserializer);
 
+@protected PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
+
+@protected ImportResult sse_decode_import_result(SseDeserializer deserializer);
+
 @protected List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+@protected List<ConnectionData> sse_decode_list_connection_data(SseDeserializer deserializer);
 
 @protected List<ErrorInfo> sse_decode_list_error_info(SseDeserializer deserializer);
 
 @protected List<FieldProblem> sse_decode_list_field_problem(SseDeserializer deserializer);
 
+@protected List<HistoryData> sse_decode_list_history_data(SseDeserializer deserializer);
+
+@protected Uint32List sse_decode_list_prim_u_32_strict(SseDeserializer deserializer);
+
 @protected Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+@protected List<TrustedComputer> sse_decode_list_trusted_computer(SseDeserializer deserializer);
+
+@protected LoadResult sse_decode_load_result(SseDeserializer deserializer);
 
 @protected String? sse_decode_opt_String(SseDeserializer deserializer);
 
 @protected ErrorInfo? sse_decode_opt_box_autoadd_error_info(SseDeserializer deserializer);
 
+@protected PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer);
+
 @protected int? sse_decode_opt_box_autoadd_u_16(SseDeserializer deserializer);
 
 @protected SessionUpdate sse_decode_session_update(SseDeserializer deserializer);
 
+@protected SettingsData sse_decode_settings_data(SseDeserializer deserializer);
+
+@protected TrustedComputer sse_decode_trusted_computer(SseDeserializer deserializer);
+
 @protected int sse_decode_u_16(SseDeserializer deserializer);
+
+@protected int sse_decode_u_32(SseDeserializer deserializer);
 
 @protected int sse_decode_u_8(SseDeserializer deserializer);
 
@@ -145,6 +212,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 @protected BigInt sse_decode_usize(SseDeserializer deserializer);
 
 @protected VaultResult sse_decode_vault_result(SseDeserializer deserializer);
+
+@protected WakeResult sse_decode_wake_result(SseDeserializer deserializer);
 
 @protected void sse_encode_AnyhowException(AnyhowException self, SseSerializer serializer);
 
@@ -158,13 +227,21 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
 @protected void sse_encode_String(String self, SseSerializer serializer);
 
+@protected void sse_encode_app_theme(AppTheme self, SseSerializer serializer);
+
 @protected void sse_encode_bool(bool self, SseSerializer serializer);
 
 @protected void sse_encode_box_autoadd_error_info(ErrorInfo self, SseSerializer serializer);
 
+@protected void sse_encode_box_autoadd_i_64(PlatformInt64 self, SseSerializer serializer);
+
+@protected void sse_encode_box_autoadd_settings_data(SettingsData self, SseSerializer serializer);
+
 @protected void sse_encode_box_autoadd_u_16(int self, SseSerializer serializer);
 
 @protected void sse_encode_clipboard_mode(ClipboardMode self, SseSerializer serializer);
+
+@protected void sse_encode_connection_data(ConnectionData self, SseSerializer serializer);
 
 @protected void sse_encode_error_info(ErrorInfo self, SseSerializer serializer);
 
@@ -172,27 +249,51 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
 @protected void sse_encode_form_check_result(FormCheckResult self, SseSerializer serializer);
 
+@protected void sse_encode_history_data(HistoryData self, SseSerializer serializer);
+
 @protected void sse_encode_i_16(int self, SseSerializer serializer);
 
 @protected void sse_encode_i_32(int self, SseSerializer serializer);
 
+@protected void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
+
+@protected void sse_encode_import_result(ImportResult self, SseSerializer serializer);
+
 @protected void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+@protected void sse_encode_list_connection_data(List<ConnectionData> self, SseSerializer serializer);
 
 @protected void sse_encode_list_error_info(List<ErrorInfo> self, SseSerializer serializer);
 
 @protected void sse_encode_list_field_problem(List<FieldProblem> self, SseSerializer serializer);
 
+@protected void sse_encode_list_history_data(List<HistoryData> self, SseSerializer serializer);
+
+@protected void sse_encode_list_prim_u_32_strict(Uint32List self, SseSerializer serializer);
+
 @protected void sse_encode_list_prim_u_8_strict(Uint8List self, SseSerializer serializer);
+
+@protected void sse_encode_list_trusted_computer(List<TrustedComputer> self, SseSerializer serializer);
+
+@protected void sse_encode_load_result(LoadResult self, SseSerializer serializer);
 
 @protected void sse_encode_opt_String(String? self, SseSerializer serializer);
 
 @protected void sse_encode_opt_box_autoadd_error_info(ErrorInfo? self, SseSerializer serializer);
 
+@protected void sse_encode_opt_box_autoadd_i_64(PlatformInt64? self, SseSerializer serializer);
+
 @protected void sse_encode_opt_box_autoadd_u_16(int? self, SseSerializer serializer);
 
 @protected void sse_encode_session_update(SessionUpdate self, SseSerializer serializer);
 
+@protected void sse_encode_settings_data(SettingsData self, SseSerializer serializer);
+
+@protected void sse_encode_trusted_computer(TrustedComputer self, SseSerializer serializer);
+
 @protected void sse_encode_u_16(int self, SseSerializer serializer);
+
+@protected void sse_encode_u_32(int self, SseSerializer serializer);
 
 @protected void sse_encode_u_8(int self, SseSerializer serializer);
 
@@ -203,6 +304,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 @protected void sse_encode_usize(BigInt self, SseSerializer serializer);
 
 @protected void sse_encode_vault_result(VaultResult self, SseSerializer serializer);
+
+@protected void sse_encode_wake_result(WakeResult self, SseSerializer serializer);
                 }
                 
 

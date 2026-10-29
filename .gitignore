@@ -63,3 +63,6 @@ SAM
 *.iml
 .DS_Store
 Thumbs.db
+
+# Node tool dependencies (tools/dart-syntax)
+node_modules/

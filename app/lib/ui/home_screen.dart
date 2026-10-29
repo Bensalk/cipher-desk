@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import 'package:path_provider/path_provider.dart';
-
 import '../platform/password_vault.dart';
 import '../src/rust/api/errors.dart';
 import '../src/rust/api/pins.dart';
+import '../src/rust/api/store.dart';
+import '../state/persistence.dart';
 import '../state/profiles.dart';
 import '../state/settings.dart';
 import 'connection_form.dart';
@@ -16,10 +16,22 @@ import 'status_chip.dart';
 /// Main window: saved connections with search, and quick actions.
 /// Uses a side rail on wide screens and a bottom bar on phones.
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.store, required this.settings});
+  const HomeScreen({
+    super.key,
+    required this.store,
+    required this.settings,
+    this.paths,
+    this.startupNotice,
+  });
 
   final ProfileStore store;
   final AppSettings settings;
+
+  /// App data paths; resolved on first use when null (tests).
+  final AppPaths? paths;
+
+  /// Shown once at start-up (for example, a damaged connections file).
+  final String? startupNotice;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -30,8 +42,34 @@ class _HomeScreenState extends State<HomeScreen> {
   String _query = '';
   ErrorInfo? _notice;
   final RdpConnectionState _state = RdpConnectionState.disconnected;
+  AppPaths? _paths;
+
+  Future<AppPaths> _appPaths() async => _paths ??= widget.paths ?? await AppPaths.resolve();
+
+  @override
+  void initState() {
+    super.initState();
+    final notice = widget.startupNotice;
+    if (notice != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(notice), duration: const Duration(seconds: 10)),
+        );
+      });
+    }
+  }
+
+  void _snack(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
 
   Future<void> _openForm([ConnectionProfile? existing]) async {
+    if (existing == null && widget.store.isFull) {
+      _snack('You have reached the limit of ${ProfileStore.maxConnections} saved connections.');
+      return;
+    }
     await Navigator.of(context).push<ConnectionProfile>(
       MaterialPageRoute(
         builder: (_) => ConnectionFormScreen(
@@ -59,7 +97,10 @@ class _HomeScreenState extends State<HomeScreen> {
         } else {
           return; // The user cancelled the confirmation.
         }
-      } else if (await PasswordVault.confirmUser('Confirm to use the saved password')) {
+      } else if (await PasswordVault.confirmUser(
+        'Confirm to use the saved password',
+        required: widget.settings.confirmSavedPassword,
+      )) {
         // Windows / Linux: Rust reads the vault itself; the password never enters Dart.
         useSaved = true;
       } else {
@@ -75,17 +116,49 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       if (password == null) return;
     }
+    final paths = await _appPaths();
     if (!mounted) return;
     widget.store.markUsed(p.id, DateTime.now());
     setState(() => _notice = null);
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
+    final reconnect = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (_) => SessionScreen(
           profile: p,
           password: password,
           useSavedPassword: useSaved,
+          pinsPath: paths.pins,
+          idleMinutes: widget.settings.idleMinutes,
+          onOutcome: (outcome) => widget.store.addHistory(p.id, outcome, DateTime.now()),
         ),
       ),
+    );
+    password = null;
+    // After re-trusting a changed certificate, connect again (asks to check it).
+    if (reconnect == true && mounted) {
+      final current = widget.store.byId(p.id);
+      if (current != null) await _connect(current);
+    }
+  }
+
+  Future<void> _wake(ConnectionProfile p) async {
+    final mac = p.wakeMac;
+    if (mac == null) return;
+    switch (wakeOnLan(mac: mac)) {
+      case WakeResult.sent:
+        _snack('Wake-up signal sent to ${p.displayName}. It may take a minute to start.');
+      case WakeResult.invalidMac:
+        _snack('The saved MAC address is not valid. Edit the connection to fix it.');
+      case WakeResult.sendFailed:
+        _snack('The wake-up signal could not be sent. Check that you are on the same network.');
+    }
+  }
+
+  Future<void> _checkReadiness(ConnectionProfile p) async {
+    final paths = await _appPaths();
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _ReadinessDialog(profile: p, pinsPath: paths.pins),
     );
   }
 
@@ -103,11 +176,16 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
     if (ok != true) return;
+    // The trusted certificate belongs to the computer, so keep it while another
+    // connection still uses the same computer and port (KI-17).
+    final shared = widget.store.endpointSharedWithOthers(p);
     widget.store.remove(p.id);
     // Remove everything kept for this connection: saved password and trusted certificate.
     await PasswordVault.delete(p.id);
-    final dir = await getApplicationSupportDirectory();
-    forgetCertificate(pinsPath: pinsFilePath(dir.path), host: p.host, port: p.port);
+    if (!shared) {
+      final paths = await _appPaths();
+      forgetCertificate(pinsPath: paths.pins, host: p.host, port: p.port);
+    }
   }
 
   Widget _connections() {
@@ -154,6 +232,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             onConnect: () => _connect(items[i]),
                             onEdit: () => _openForm(items[i]),
                             onDelete: () => _confirmDelete(items[i]),
+                            onWake: () => _wake(items[i]),
+                            onCheck: () => _checkReadiness(items[i]),
                           ),
                         ),
             ),
@@ -166,7 +246,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 720;
-    final body = _tab == 0 ? _connections() : SettingsScreen(settings: widget.settings);
+    final body = _tab == 0
+        ? _connections()
+        : SettingsScreen(settings: widget.settings, store: widget.store, paths: _appPaths);
     final destinations = const [
       (Icons.computer_outlined, Icons.computer, 'Connections'),
       (Icons.settings_outlined, Icons.settings, 'Settings'),
@@ -222,12 +304,16 @@ class _ProfileTile extends StatelessWidget {
     required this.onConnect,
     required this.onEdit,
     required this.onDelete,
+    required this.onWake,
+    required this.onCheck,
   });
 
   final ConnectionProfile profile;
   final VoidCallback onConnect;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onWake;
+  final VoidCallback onCheck;
 
   @override
   Widget build(BuildContext context) {
@@ -252,10 +338,17 @@ class _ProfileTile extends StatelessWidget {
             ),
           PopupMenuButton<String>(
             tooltip: 'More',
-            onSelected: (v) => v == 'edit' ? onEdit() : onDelete(),
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'edit', child: Text('Edit')),
-              PopupMenuItem(value: 'delete', child: Text('Delete')),
+            onSelected: (v) => switch (v) {
+              'edit' => onEdit(),
+              'wake' => onWake(),
+              'check' => onCheck(),
+              _ => onDelete(),
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'edit', child: Text('Edit')),
+              if (profile.wakeMac != null) const PopupMenuItem(value: 'wake', child: Text('Wake up')),
+              const PopupMenuItem(value: 'check', child: Text('Check readiness')),
+              const PopupMenuItem(value: 'delete', child: Text('Delete')),
             ],
           ),
         ],
@@ -298,8 +391,71 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
+/// Checks what a connection needs before connecting (F12). Nothing is sent to
+/// the computer: reachability only opens and closes a TCP connection.
+class _ReadinessDialog extends StatefulWidget {
+  const _ReadinessDialog({required this.profile, required this.pinsPath});
+
+  final ConnectionProfile profile;
+  final String pinsPath;
+
+  @override
+  State<_ReadinessDialog> createState() => _ReadinessDialogState();
+}
+
+class _ReadinessDialogState extends State<_ReadinessDialog> {
+  bool? _reachable;
+  late final bool _trusted;
+
+  @override
+  void initState() {
+    super.initState();
+    final p = widget.profile;
+    _trusted = trustedComputers(pinsPath: widget.pinsPath).any((t) => t.endpoint == p.endpoint.toLowerCase());
+    checkReachable(host: p.host, port: p.port, timeoutMs: 5000).then((ok) {
+      if (mounted) setState(() => _reachable = ok);
+    });
+  }
+
+  Widget _row(bool? ok, String good, String bad, {String? pending}) {
+    final icon = ok == null
+        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+        : Icon(ok ? Icons.check_circle_outline : Icons.error_outline,
+            color: ok ? Colors.green : Theme.of(context).colorScheme.error);
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: icon,
+      title: Text(ok == null ? (pending ?? '') : (ok ? good : bad)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.profile;
+    return AlertDialog(
+      title: Text('Ready to connect to ${p.displayName}?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _row(_reachable, 'The computer answers on port ${p.port}',
+              'The computer does not answer on port ${p.port}. Check that it is on, awake, '
+                  'and that you are on the same network or VPN.',
+              pending: 'Checking the computer…'),
+          _row(_trusted, 'Its certificate is trusted',
+              'Not connected before: you will be asked to check its certificate'),
+          _row(p.username.isNotEmpty, 'Username: ${p.username}', 'No username set'),
+          _row(p.savePassword, 'Password saved in this device\'s secure storage',
+              'The password will be asked for when connecting'),
+          if (p.wakeMac != null) _row(true, 'Wake-on-LAN set up', ''),
+        ],
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+    );
+  }
+}
+
 /// Asks for the password for one connection. The text is cleared when the
-/// dialog closes; it is never stored by the app (saving arrives in Stage 5).
+/// dialog closes; it is never stored by the app.
 class _PasswordDialog extends StatefulWidget {
   const _PasswordDialog({required this.profile, this.notice});
 

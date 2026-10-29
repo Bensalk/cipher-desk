@@ -11,6 +11,10 @@ Requirements: Rust (version pinned in `rust-toolchain.toml`), Flutter stable,
 and for Android builds the Android SDK + NDK. `gitleaks` must be installed for
 the pre-commit hook.
 
+Optional, for machines without Flutter: `cd tools/dart-syntax && npm ci` installs a
+syntax-only Dart checker that the pre-commit hook then runs on staged Dart files. It finds
+bracket and similar mistakes; it does not replace `flutter analyze`.
+
 ## Golden rules (security)
 
 1. **No secrets or personal data in the repository** — no passwords,

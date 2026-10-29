@@ -17,6 +17,7 @@ class ConnectionProfile {
     this.savePassword = false,
     this.clipboardMode = ClipboardMode.off,
     this.lastUsed,
+    this.wakeMac,
   });
 
   final String id;
@@ -34,6 +35,9 @@ class ConnectionProfile {
   bool get clipboardEnabled => clipboardMode != ClipboardMode.off;
   final DateTime? lastUsed;
 
+  /// MAC address for Wake-on-LAN (F11), or null.
+  final String? wakeMac;
+
   /// "host:port", bracketing IPv6 addresses.
   String get endpoint => host.contains(':') ? '[$host]:$port' : '$host:$port';
 
@@ -41,6 +45,7 @@ class ConnectionProfile {
   String get displayName => name.trim().isEmpty ? endpoint : name.trim();
 
   ConnectionProfile copyWith({
+    String? id,
     String? name,
     String? host,
     int? port,
@@ -48,9 +53,11 @@ class ConnectionProfile {
     bool? savePassword,
     ClipboardMode? clipboardMode,
     DateTime? lastUsed,
+    String? wakeMac,
+    bool clearWakeMac = false,
   }) {
     return ConnectionProfile(
-      id: id,
+      id: id ?? this.id,
       name: name ?? this.name,
       host: host ?? this.host,
       port: port ?? this.port,
@@ -58,13 +65,34 @@ class ConnectionProfile {
       savePassword: savePassword ?? this.savePassword,
       clipboardMode: clipboardMode ?? this.clipboardMode,
       lastUsed: lastUsed ?? this.lastUsed,
+      wakeMac: clearWakeMac ? null : (wakeMac ?? this.wakeMac),
     );
   }
 }
 
-/// In-memory list of profiles for Stage 3. Saving to disk arrives in Stage 7.
+/// One connection attempt, for the history screen (no secrets).
+@immutable
+class HistoryItem {
+  const HistoryItem({required this.connectionId, required this.time, required this.outcome});
+
+  final String connectionId;
+  final DateTime time;
+
+  /// "connected", "disconnected", "cancelled" or an error id such as "WrongCredentials".
+  final String outcome;
+}
+
+/// Saved connections and their history. Pure Dart; saving to disk is done by
+/// `ProfilePersistence` (lib/state/persistence.dart), which listens for changes.
 class ProfileStore extends ChangeNotifier {
   final List<ConnectionProfile> _profiles = [];
+  final List<HistoryItem> _history = [];
+
+  /// Most history entries kept (matches the Rust store).
+  static const maxHistory = 100;
+
+  /// Most saved connections (matches the Rust store, which refuses more).
+  static const maxConnections = 500;
   final Random _random = Random.secure();
 
   /// Profiles, most recently used first, then by name.
@@ -81,6 +109,44 @@ class ProfileStore extends ChangeNotifier {
   }
 
   bool get isEmpty => _profiles.isEmpty;
+
+  bool get isFull => _profiles.length >= maxConnections;
+
+  /// History, newest first.
+  List<HistoryItem> get history => List.unmodifiable(_history.reversed);
+
+  /// Replaces everything (used when loading from disk). Does not notify, so
+  /// loading does not immediately write the file back.
+  void replaceAll(List<ConnectionProfile> profiles, List<HistoryItem> history) {
+    _profiles
+      ..clear()
+      ..addAll(profiles);
+    _history
+      ..clear()
+      ..addAll(history);
+  }
+
+  /// Raw lists in storage order (for saving).
+  List<ConnectionProfile> get storageList => List.unmodifiable(_profiles);
+  List<HistoryItem> get storageHistory => List.unmodifiable(_history);
+
+  void addHistory(String connectionId, String outcome, DateTime when) {
+    _history.add(HistoryItem(connectionId: connectionId, time: when, outcome: outcome));
+    if (_history.length > maxHistory) _history.removeRange(0, _history.length - maxHistory);
+    notifyListeners();
+  }
+
+  /// True if another connection uses the same host and port.
+  /// (Names are compared ignoring case, like the certificate store does.)
+  bool endpointSharedWithOthers(ConnectionProfile p) => _profiles.any(
+      (o) => o.id != p.id && o.endpoint.toLowerCase() == p.endpoint.toLowerCase());
+
+  ConnectionProfile? byId(String id) {
+    for (final p in _profiles) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
 
   /// A random 128-bit id. Ids key saved passwords in the OS vault, so they must
   /// never be reused for a different connection (e.g. after an app restart).
@@ -100,8 +166,15 @@ class ProfileStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Adds several new profiles with one change notification (import).
+  void addAll(Iterable<ConnectionProfile> profiles) {
+    _profiles.addAll(profiles);
+    notifyListeners();
+  }
+
   void remove(String id) {
     _profiles.removeWhere((p) => p.id == id);
+    _history.removeWhere((h) => h.connectionId == id);
     notifyListeners();
   }
 

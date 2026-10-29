@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../platform/password_vault.dart';
+import '../src/rust/api/store.dart';
 import '../src/rust/api/form.dart';
 import '../src/rust/api/session.dart' show ClipboardMode;
 import '../state/profiles.dart';
@@ -31,6 +32,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
   late final TextEditingController _port;
   late final TextEditingController _username;
   final TextEditingController _password = TextEditingController();
+  late final TextEditingController _mac;
 
   bool _obscure = true;
   late bool _savePassword;
@@ -46,6 +48,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
     _host = TextEditingController(text: p?.host ?? '');
     _port = TextEditingController(text: p == null ? '' : '${p.port}');
     _username = TextEditingController(text: p?.username ?? '');
+    _mac = TextEditingController(text: p?.wakeMac ?? '');
     _savePassword = p?.savePassword ?? false;
     _clipboard = p?.clipboardMode ??
         (widget.clipboardDefault ? ClipboardMode.both : ClipboardMode.off);
@@ -55,7 +58,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
   void dispose() {
     // Clear the password from the controller before disposing it.
     _password.clear();
-    for (final c in [_name, _host, _port, _username, _password]) {
+    for (final c in [_name, _host, _port, _username, _password, _mac]) {
       c.dispose();
     }
     super.dispose();
@@ -73,10 +76,17 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
     );
   }
 
+  /// Problems from the Rust form check plus the optional Wake-on-LAN address.
+  Map<String, String> _allProblems(FormCheckResult r) => {
+        for (final p in r.problems) p.field: p.message,
+        if (_mac.text.trim().isNotEmpty && !isValidMac(text: _mac.text.trim()))
+          'mac': 'Enter a MAC address like 00:11:22:33:44:55, or leave it empty.',
+      };
+
   void _revalidate() {
     if (!_submitted) return;
     final r = _check();
-    setState(() => _problems = {for (final p in r.problems) p.field: p.message});
+    setState(() => _problems = _allProblems(r));
   }
 
   bool _saving = false;
@@ -86,9 +96,9 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
     final r = _check();
     setState(() {
       _submitted = true;
-      _problems = {for (final p in r.problems) p.field: p.message};
+      _problems = _allProblems(r);
     });
-    if (!r.valid) return;
+    if (!r.valid || _problems.isNotEmpty) return;
 
     final id = widget.existing?.id ?? widget.store.newId();
     var savePassword = _savePassword;
@@ -121,6 +131,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
       savePassword: savePassword,
       clipboardMode: _clipboard,
       lastUsed: widget.existing?.lastUsed,
+      wakeMac: _mac.text.trim().isEmpty ? null : _mac.text.trim(),
     );
     widget.store.upsert(profile);
     _password.clear();
@@ -272,6 +283,22 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                   ],
                   onChanged: (v) => setState(() => _clipboard = v ?? ClipboardMode.off),
                 ),
+                const SizedBox(height: 16),
+                TextField(
+                  key: const Key('field-mac'),
+                  controller: _mac,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  onChanged: (_) => _revalidate(),
+                  decoration: InputDecoration(
+                    labelText: 'Wake-on-LAN MAC address (optional)',
+                    hintText: '00:11:22:33:44:55',
+                    helperText: 'Lets you wake the computer from the connection menu. '
+                        'Works only on the same local network, and Wake-on-LAN must be turned on '
+                        'in the computer\'s settings.',
+                    helperMaxLines: 3,
+                    errorText: _problems['mac'],
+                  ),
                 ),
                 const SizedBox(height: 16),
                 FilledButton.icon(

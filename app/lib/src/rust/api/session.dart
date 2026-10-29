@@ -56,13 +56,13 @@ static RdpSession  create()=>RustLib.instance.api.crateApiSessionRdpSessionCreat
 /// The password is used for this connection only and never stored here.
 /// `pins_path` is the certificate pin file in the app's private data folder.
 /// Can be called once per handle.
- Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection });
+ Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required int idleMinutes });
 
 
 /// Like [`RdpSession::start`], but reads the saved password from the OS
 /// vault inside Rust, so it never passes through the UI (Windows, Linux).
 /// The caller must have confirmed the user's identity first (S5).
- Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection });
+ Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required int idleMinutes });
 
 
 /// Types text (on-screen keyboards, IMEs, pasted text is NOT sent this way).
