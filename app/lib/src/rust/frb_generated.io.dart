@@ -3,6 +3,8 @@
 
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
+import 'api/errors.dart';
+import 'api/form.dart';
 import 'api/info.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -25,9 +27,29 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
                   @protected String dco_decode_String(dynamic raw);
 
+@protected bool dco_decode_bool(dynamic raw);
+
+@protected int dco_decode_box_autoadd_u_16(dynamic raw);
+
+@protected ErrorInfo dco_decode_error_info(dynamic raw);
+
+@protected FieldProblem dco_decode_field_problem(dynamic raw);
+
+@protected FormCheckResult dco_decode_form_check_result(dynamic raw);
+
 @protected List<String> dco_decode_list_String(dynamic raw);
 
+@protected List<ErrorInfo> dco_decode_list_error_info(dynamic raw);
+
+@protected List<FieldProblem> dco_decode_list_field_problem(dynamic raw);
+
 @protected Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+@protected String? dco_decode_opt_String(dynamic raw);
+
+@protected int? dco_decode_opt_box_autoadd_u_16(dynamic raw);
+
+@protected int dco_decode_u_16(dynamic raw);
 
 @protected int dco_decode_u_8(dynamic raw);
 
@@ -35,9 +57,29 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
 @protected String sse_decode_String(SseDeserializer deserializer);
 
+@protected bool sse_decode_bool(SseDeserializer deserializer);
+
+@protected int sse_decode_box_autoadd_u_16(SseDeserializer deserializer);
+
+@protected ErrorInfo sse_decode_error_info(SseDeserializer deserializer);
+
+@protected FieldProblem sse_decode_field_problem(SseDeserializer deserializer);
+
+@protected FormCheckResult sse_decode_form_check_result(SseDeserializer deserializer);
+
 @protected List<String> sse_decode_list_String(SseDeserializer deserializer);
 
+@protected List<ErrorInfo> sse_decode_list_error_info(SseDeserializer deserializer);
+
+@protected List<FieldProblem> sse_decode_list_field_problem(SseDeserializer deserializer);
+
 @protected Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+@protected String? sse_decode_opt_String(SseDeserializer deserializer);
+
+@protected int? sse_decode_opt_box_autoadd_u_16(SseDeserializer deserializer);
+
+@protected int sse_decode_u_16(SseDeserializer deserializer);
 
 @protected int sse_decode_u_8(SseDeserializer deserializer);
 
@@ -45,21 +87,37 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
 @protected int sse_decode_i_32(SseDeserializer deserializer);
 
-@protected bool sse_decode_bool(SseDeserializer deserializer);
-
 @protected void sse_encode_String(String self, SseSerializer serializer);
+
+@protected void sse_encode_bool(bool self, SseSerializer serializer);
+
+@protected void sse_encode_box_autoadd_u_16(int self, SseSerializer serializer);
+
+@protected void sse_encode_error_info(ErrorInfo self, SseSerializer serializer);
+
+@protected void sse_encode_field_problem(FieldProblem self, SseSerializer serializer);
+
+@protected void sse_encode_form_check_result(FormCheckResult self, SseSerializer serializer);
 
 @protected void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
+@protected void sse_encode_list_error_info(List<ErrorInfo> self, SseSerializer serializer);
+
+@protected void sse_encode_list_field_problem(List<FieldProblem> self, SseSerializer serializer);
+
 @protected void sse_encode_list_prim_u_8_strict(Uint8List self, SseSerializer serializer);
+
+@protected void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+@protected void sse_encode_opt_box_autoadd_u_16(int? self, SseSerializer serializer);
+
+@protected void sse_encode_u_16(int self, SseSerializer serializer);
 
 @protected void sse_encode_u_8(int self, SseSerializer serializer);
 
 @protected void sse_encode_unit(void self, SseSerializer serializer);
 
 @protected void sse_encode_i_32(int self, SseSerializer serializer);
-
-@protected void sse_encode_bool(bool self, SseSerializer serializer);
                 }
                 
 

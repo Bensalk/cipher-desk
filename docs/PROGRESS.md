@@ -95,6 +95,68 @@ build configuration, automated tests, CI, and secret/privacy protection (SA-9).
   file only (Apache-2.0); cargo-deny reports a warning, not a failure.
 
 ### Next step
-1. Push to a **private** GitHub repository and let CI run. Fix anything the
-   Flutter/Android/Windows jobs report. Stage 2 is complete only when CI is green.
-2. Then start **Stage 3 — Desktop & mobile user interface**.
+Push to a **private** GitHub repository and let CI run. Stage 2 is complete
+only when CI is green.
+
+---
+
+## Stage 3 — User Interface ⏳ Rust logic tested; Flutter screens awaiting first CI run (29 Oct 2026)
+
+Started before Stage 2's CI run at the user's request ("continue"), because the
+GitHub repository does not exist yet. Any CI failures in Stage 2 or 3 are fixed
+before Stage 4 begins.
+
+### Objective
+Main window, connection form (host/IP, port, username, masked password, Save
+Password checkbox), saved connections, status indicator, settings, clear error
+messages; layouts for desktop and phone.
+
+### Completed
+- **Rust `input`:** validates host names (RFC 1123), IPv4, IPv6 (`[v6]:port`),
+  ports 1–65535 (also `host:port` in the host field), usernames (`user`,
+  `DOMAIN\user`, `user@domain`), password length/control characters and profile
+  names. All errors are collected per field. Messages never repeat the input.
+- **Rust `status`:** connection state machine (connecting, check identity,
+  connected, reconnecting, disconnecting, failed). Wrong password, account problems
+  and certificate changes **never auto-retry** (SA-8); network drops reconnect up to
+  the policy limit. Catalogue of 15 plain-language errors with advice; security
+  warnings flagged.
+- **Bridge:** `check_connection_form`, `default_port`, `all_connection_errors`.
+  Bindings regenerated with flutter_rust_bridge 2.13.0.
+- **Flutter:**
+  - Home: searchable connection list (F1), recently used first, edit/delete with
+    confirmation, empty state, status chip, error banner. Side rail on wide screens,
+    bottom bar on phones.
+  - Connection form: masked password with show/hide, no autocorrect, suggestions or
+    keyboard learning on the password field; Save Password checkbox with vault
+    explanation; per-connection clipboard switch (off by default) with a warning;
+    validation by the Rust core.
+  - Settings: theme (system/light/dark), Android "Block screenshots" (on by default,
+    S10), clipboard default for new connections (off), security defaults, error help,
+    version and open-source licences.
+  - Profiles hold **no password field**; passwords go only to the OS vault (Stage 5).
+  - Connect shows a clear "not available yet" notice until Stage 4.
+- **Android:** `MainActivity` channel `rdpv/secure_window` to turn `FLAG_SECURE` on/off.
+
+### Test results (local, Rust 1.97.0)
+
+| Check | Result |
+|-------|--------|
+| `cargo fmt --check` | ✅ PASS |
+| `cargo clippy --all-targets -D warnings` | ✅ PASS |
+| `cargo test` (debug / release) | ✅ PASS — 38/38 each (8 input, 10 status, 5 bridge, plus Stage 2 tests) |
+| Policy, cargo-deny, gitleaks pre-commit | ✅ PASS |
+| `unsafe` in hand-written code | ✅ 0 |
+| Dart unit tests (`test/profile_store_test.dart`, 6 tests) | ⛔ **NOT RUN** — no Flutter SDK here; runs in CI |
+| Integration tests (5 UI tests against the real Rust core) | ⛔ **NOT RUN** — runs in CI on Linux and Windows |
+| `flutter analyze`, builds for Windows/Linux/Android | ⛔ **NOT RUN** — runs in CI |
+| Android screenshot toggle on a device | ⛔ **NOT RUN** — needs an Android device or emulator |
+
+### Known issues
+- **KI-6:** The Dart/Kotlin code has never been compiled. Expect small fixes after
+  the first CI run.
+- **KI-7:** Settings and profiles are in memory only; saving to disk is Stage 7.
+
+### Next step
+Create the private GitHub repository so CI can verify Stages 2–3, then Stage 4
+(connection engine).

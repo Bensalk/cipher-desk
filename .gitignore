@@ -24,6 +24,12 @@ app/pubspec.lock.bak
 *.aab
 *.apk
 
+# ---- Archives / bundles (deliverables are built, never committed) ----
+*.zip
+*.bundle
+*.tar.gz
+*.7z
+
 # ---- Windows / Linux packages ----
 *.msi
 *.exe

@@ -9,7 +9,9 @@
 //! Later stages add the connection engine, certificate pinning, clipboard,
 //! profiles and vault access.
 
+pub mod input;
 pub mod logging;
 pub mod policy;
 pub mod secret;
+pub mod status;
 pub mod version;
