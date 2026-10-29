@@ -50,7 +50,7 @@ jobs:
           set -o pipefail
           flutter pub get
           flutter build linux --debug --verbose > ../build.log 2>&1 || {
-            { grep -n -E 'undefined reference|cannot find|multiple definition|error:|ld[.:]|FAILED' ../build.log | head -n 60; } \
+            { grep -n -i -E 'cargokit|cargo |Compiling rdpv|Finished|warning: build|Error' ../build.log | head -n 30; echo ----; grep -n -A4 -E 'undefined reference|cannot find|multiple definition|error:|FAILED' ../build.log | head -n 60; } \
               | cut -c1-400 | sed -e 's/%/%25/g' | awk '{printf "%s%%0A", $0}' > ../tail.txt
             echo "::error title=Linux build failed::$(cat ../tail.txt)"
             exit 1
