@@ -424,6 +424,10 @@ switch, one-direction options, a size limit, a visible indicator, and no other f
   notice on every check.
 - **KI-22:** On desktop, the local clipboard is checked once a second while connected;
   the content is only advertised, and sent only when the remote computer pastes.
+- **KI-24:** The test-only host (`tools/rdp-test-host`) uses `ironrdp-server` 0.13, which pins
+  `zstd-safe` 7.x with two advisories (RUSTSEC-2026-0398, -0403; fixed in 8.2). The app does
+  not use zstd at all (`cargo deny` on the app: clean). Recorded as test-only exceptions in
+  `tools/rdp-test-host/osv-scanner.toml`; remove when the server crate updates.
 - **KI-23:** The CI analysis step no longer fails on informational hints (warnings and
   errors still fail), because unused-import hints could not be checked without Flutter.
 

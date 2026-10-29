@@ -1,0 +1,14 @@
+# OSV-Scanner exceptions for the TEST-ONLY RDP host in this folder.
+# This program never ships; it runs only in CI, talking to our own client.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2023-0071"
+reason = "rsa Marvin timing attack (private-key operations). Test-only host; same review as the app (docs/PROGRESS.md KI-2)."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0398"
+reason = "zstd-safe 7.x pinned by ironrdp-server 0.13 (fix needs 8.2). Test-only host, never shipped; decompresses only data from our own client in CI. The app does not depend on zstd. Remove when ironrdp-server allows zstd-safe >= 8.2."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0403"
+reason = "Same as RUSTSEC-2026-0398 (zstd-safe 7.x via ironrdp-server 0.13); test-only host, never shipped."
