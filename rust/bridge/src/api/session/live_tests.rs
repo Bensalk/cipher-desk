@@ -1,6 +1,6 @@
 //! Live reliability tests (Stage 8) against the local test hosts started by
 //! `scripts/start-test-hosts.sh`. Ignored by default; run with
-//! `cargo test -p rdpv-bridge --lib live_ -- --ignored --test-threads=1`.
+//! `cargo test -p rust_lib_cipher_desk --lib live_ -- --ignored --test-threads=1`.
 //!
 //! A small TCP relay sits between the session and the host so the connection
 //! can be cut (reset) or redirected. L3 also black-holes it with iptables to

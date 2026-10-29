@@ -2698,17 +2698,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rdpv-bridge"
-version = "0.1.0"
-dependencies = [
- "flutter_rust_bridge",
- "rdpv-core",
- "tempfile",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "rdpv-core"
 version = "0.1.0"
 dependencies = [
@@ -2855,6 +2844,17 @@ dependencies = [
  "signature",
  "spki 0.8.1",
  "zeroize",
+]
+
+[[package]]
+name = "rust_lib_cipher_desk"
+version = "0.1.0"
+dependencies = [
+ "flutter_rust_bridge",
+ "rdpv-core",
+ "tempfile",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

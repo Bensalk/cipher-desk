@@ -825,8 +825,21 @@ the private Claude session used to build the project.
 The project was renamed from "Secure RDP Viewer" to **Cipher Desk** before its first
 upload: app and window name `Cipher Desk`, repository and packages `cipher-desk`, program
 `cipher_desk`, app ID and vault name `io.github.bensalk.cipherdesk` (Android, Linux),
-Rust library `rust_lib_cipher_desk`. Internal crate names (`rdpv-core`, `rdpv-bridge`)
-are unchanged. Nothing had been released, so no settings or saved passwords move.
+Rust library `rust_lib_cipher_desk`. Internal crate name `rdpv-core` is unchanged. (The bridge crate was later renamed
+from `rdpv-bridge` to `rust_lib_cipher_desk`: Cargokit finds the built library by the
+*package* name, so the first Linux build bundled no library — R43.) Nothing had been released, so no settings or saved passwords move.
 Checks after the rename: fmt, clippy, 107/107 unit tests, Dart/Kotlin syntax, policy,
 cargo-deny, actionlint, `.deb` install/uninstall — all pass. Commit messages no longer
 contain links to the development chat.
+
+### R43 — first Flutter builds in CI (30 Oct 2026)
+
+- **Linux link error** `cannot find -lrust_lib_cipher_desk`: the plugin's
+  `linux/CMakeLists.txt` linked the app binary to the Rust library, which is an FFI
+  plugin loaded at run time. Removed the line (the FRB template has none).
+- **Library not bundled** (`file INSTALL cannot find …/librust_lib_cipher_desk.so`):
+  Cargokit looks for `lib<package name>.so`, but the package was `rdpv-bridge` with a
+  different `[lib]` name, so the built library was silently skipped. The package is now
+  named `rust_lib_cipher_desk`, like the library (CI and the live-test comment updated).
+- Found by the new Screenshots workflow, which prints build errors as annotations
+  because job logs can't be downloaded from this environment.
