@@ -270,6 +270,13 @@ keyboard/mouse/touch input, server reactivation and graceful disconnect.
   pin file.
 - **KI-12:** Screen updates are copied in full rectangles over the bridge; fine on a LAN,
   to be optimised if slow on phones (Stage 8).
+- **KI-13 (end-of-stage review):** Our code wipes its own password copy (`SecretString`),
+  but IronRDP's connector takes the password as a plain `String`, and Dart strings cannot
+  be wiped; those copies live until freed. Inherent to the libraries; documented in
+  SECURITY.md limitations at release.
+- **KI-14 (end-of-stage review):** Host-name lookup uses the operating system resolver
+  without its own timeout (the TCP connect and every read/write do have timeouts). A
+  broken DNS server can delay the "Computer not found" message. Revisit in Stage 8.
 
 ### Next step
 Stage 5 — secure credential management (OS vaults, biometric/PIN unlock, delete).
