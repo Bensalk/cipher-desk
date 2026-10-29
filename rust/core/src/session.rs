@@ -359,7 +359,10 @@ impl Session {
         if !clip.policy.local_to_host {
             return Ok(ClipboardOffer::Disabled);
         }
-        if text.is_empty() || !clip.policy.fits(&text) {
+        if text.is_empty() {
+            return Ok(ClipboardOffer::Unchanged);
+        }
+        if !clip.policy.fits(&text) {
             return Ok(ClipboardOffer::TooLarge);
         }
         if clip.local_text.as_deref() == Some(text.as_str())
@@ -409,6 +412,8 @@ impl Session {
     }
 
     /// Acts on what the clipboard channel reported, applying the policy.
+    /// A clipboard protocol problem is logged and skipped; only a network
+    /// failure ends the session.
     fn service_clipboard(&mut self, events: &mut Vec<SessionEvent>) -> Result<(), ConnectionError> {
         let actions: Vec<ClipAction> = match self.clip.as_ref() {
             Some(c) => c
@@ -419,6 +424,20 @@ impl Session {
             None => return Ok(()),
         };
         for action in actions {
+            match self.handle_clip_action(action, events) {
+                Ok(()) | Err(ConnectionError::Unexpected) => {}
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(())
+    }
+
+    fn handle_clip_action(
+        &mut self,
+        action: ClipAction,
+        events: &mut Vec<SessionEvent>,
+    ) -> Result<(), ConnectionError> {
+        {
             let Some(clip) = self.clip.as_mut() else {
                 return Ok(());
             };
@@ -458,7 +477,7 @@ impl Session {
                 ClipAction::DataReceived(Some(bytes)) if policy.host_to_local => {
                     if bytes.len() > policy.max_bytes + 2 {
                         events.push(SessionEvent::RemoteClipboardTooLarge);
-                        continue;
+                        return Ok(());
                     }
                     if let Some(text) = decode_unicode_text(&bytes) {
                         if !text.is_empty() {

@@ -169,6 +169,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
           RemoteClipboard.setText(text);
         }
       case UpdateKind.remoteClipboardTooLarge:
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Text copied on the remote computer was larger than 1 MB and was not copied.'),
         ));

@@ -435,3 +435,16 @@ switch, one-direction options, a size limit, a visible indicator, and no other f
 Stage 7 — connection and profile management (saved to disk), pin management, Android
 trackpad mode and pinch-zoom, settings for S5/S13.
 
+---
+
+## Review of Stage 6 (29 Oct 2026)
+
+| # | Problem found | Fix |
+|---|---------------|-----|
+| R18 | A clipboard protocol error (e.g. the channel rejecting one message) ended the whole session | Clipboard protocol errors are now skipped; only a network failure ends the session |
+| R19 | Offering empty clipboard text was reported as "too large" | Now "unchanged" (nothing to send); live test C5 checks it |
+| R20 | The "text too large" notice could be shown after the session screen was closed | Checks that the screen is still open first |
+
+After the fixes: unit tests 67/67; live connection suite 10/10 (in a keyring session);
+live clipboard suite 6/6.
+
