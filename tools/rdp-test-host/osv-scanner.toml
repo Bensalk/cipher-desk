@@ -12,3 +12,53 @@ reason = "zstd-safe 7.x pinned by ironrdp-server 0.13 (fix needs 8.2). Test-only
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0403"
 reason = "Same as RUSTSEC-2026-0398 (zstd-safe 7.x via ironrdp-server 0.13); test-only host, never shipped."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0395"
+ignoreUntil = 2027-01-31
+reason = "Same as RUSTSEC-2026-0398 (zstd-safe 7.x via ironrdp-server 0.13, fixed in 8.2); test-only host, never shipped. Re-review 2027-01-31."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0396"
+ignoreUntil = 2027-01-31
+reason = "Same as RUSTSEC-2026-0398 (zstd-safe 7.x via ironrdp-server 0.13, fixed in 8.2); test-only host, never shipped. Re-review 2027-01-31."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0397"
+ignoreUntil = 2027-01-31
+reason = "Same as RUSTSEC-2026-0398 (zstd-safe 7.x via ironrdp-server 0.13, fixed in 8.2); test-only host, never shipped. Re-review 2027-01-31."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0399"
+ignoreUntil = 2027-01-31
+reason = "Same as RUSTSEC-2026-0398 (zstd-safe 7.x via ironrdp-server 0.13, fixed in 8.2); test-only host, never shipped. Re-review 2027-01-31."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0400"
+ignoreUntil = 2027-01-31
+reason = "Same as RUSTSEC-2026-0398 (zstd-safe 7.x via ironrdp-server 0.13, fixed in 8.2); test-only host, never shipped. Re-review 2027-01-31."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0401"
+ignoreUntil = 2027-01-31
+reason = "Same as RUSTSEC-2026-0398 (zstd-safe 7.x via ironrdp-server 0.13, fixed in 8.2); test-only host, never shipped. Re-review 2027-01-31."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0402"
+ignoreUntil = 2027-01-31
+reason = "Same as RUSTSEC-2026-0398 (zstd-safe 7.x via ironrdp-server 0.13, fixed in 8.2); test-only host, never shipped. Re-review 2027-01-31."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0134"
+ignoreUntil = 2027-01-31
+reason = "rustls-pemfile is unmaintained (no vulnerability); pulled in by ironrdp-server 0.13. Test-only host, never shipped."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2023-0089"
+ignoreUntil = 2027-01-31
+reason = "atomic-polyfill is unmaintained (no vulnerability); via sspi -> winscard. Test-only host; same review as the app (osv-scanner.toml at the root)."
+
+[[IgnoredVulns]]
+id = "GHSA-qwgh-2vcv-g2f7"
+ignoreUntil = 2027-01-31
+reason = "block-buffer < 0.12.1; same review as the app (osv-scanner.toml at the root). Test-only host, never shipped."
