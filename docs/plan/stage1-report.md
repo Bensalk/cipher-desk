@@ -140,6 +140,12 @@
 - **Private until reviewed:** the repository stays private until a full history scan (gitleaks over every commit) is clean. Only then is it made public.
 - **Passwords never on the command line.** The real app takes them only through the masked field or the vault (the spike's `-p` flag was for testing only), so they don't end up in shell history or process lists.
 
+**SA-10: Portable mode.** A portable copy (for example on a USB drive) can be lost or copied, so:
+- Its `data` folder holds **no secrets**: only profiles and certificate pins.
+- Passwords are never written to the drive.
+- Save Password is off by default. If you turn it on, the password goes into the current PC's vault only, the app warns you, and it doesn't travel with the drive.
+- A changed or tampered pin file can't silently trust a new server: a mismatch still blocks the connection.
+
 **Known residual risks (documented, not fully fixable by the app):**
 - A compromised host can read anything sent over the clipboard.
 - The first connection relies on the user checking the fingerprint.
@@ -186,7 +192,7 @@ Each stage follows your workflow: plan → build → test → fix → record →
 | **7 Profiles** | Save/edit/delete/reconnect, history, import/export, unattended checklist, Wake-on-LAN | Corrupt-file and interrupted-write tests pass; exports contain no secrets |
 | **8 Reliability** | Every error path, auto-reconnect, Android background handling | Error-matrix tests; no secrets in any message or log (SA-7) |
 | **9 Security verification** | Threat-model review, fuzzing, static analysis, licence audit | No open critical/high issues; fuzzers run without crashes for the agreed time |
-| **10 Release** | Proper installation packages: **Windows** signed MSI installer (Start-menu and optional desktop shortcut, Add/Remove Programs entry, in-place upgrade, clean uninstall); **Linux** .deb package plus AppImage (app-menu entry and icon; Flatpak later); **Android** signed APK (plus AAB if Play Store is used); docs; make repo public | Clean install / upgrade / uninstall on each OS; credentials removed on uninstall (where the OS allows); docs complete; **full-history secret scan clean and binaries contain no local paths or personal data before going public** |
+| **10 Release** | Proper installation packages: **Windows** signed MSI installer (Start-menu and optional desktop shortcut, Add/Remove Programs entry, in-place upgrade, clean uninstall); **Linux** .deb package plus AppImage (app-menu entry and icon; Flatpak later); **Android** signed APK (plus AAB if Play Store is used); **portable versions**: Windows portable ZIP (signed EXE, runs without installing or admin rights) and Linux AppImage. In portable mode, profiles and certificate pins are kept in a `data` folder next to the app, never passwords; Save Password stays off by default and, if turned on, stores the password only in that PC's vault (with a warning); docs; make repo public | Clean install / upgrade / uninstall on each OS; credentials removed on uninstall (where the OS allows); docs complete; **full-history secret scan clean and binaries contain no local paths or personal data before going public** |
 
 ---
 
