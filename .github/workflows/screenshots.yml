@@ -47,10 +47,17 @@ jobs:
       - name: Take screenshots
         working-directory: app
         run: |
+          set -o pipefail
           flutter pub get
           xvfb-run -a -s "-screen 0 1920x1440x24" flutter test \
             integration_test/screenshots/screenshots_test.dart -d linux \
-            --dart-define=SHOT_DIR="$PWD/../shots"
+            --dart-define=SHOT_DIR="$PWD/../shots" 2>&1 | tee ../shots.log || {
+            # Job logs can be hard to reach; show the end of the output as an annotation.
+            # (The test host's password is masked by start-test-hosts.sh and never printed.)
+            tail -n 80 ../shots.log | sed -e 's/%/%25/g' | awk '{printf "%s%%0A", $0}' > ../tail.txt
+            echo "::error title=Screenshot test failed::$(cat ../tail.txt)"
+            exit 1
+          }
       - name: Save screenshots to the 'screenshots' branch
         if: always()
         env:
