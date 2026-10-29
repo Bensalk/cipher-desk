@@ -186,7 +186,7 @@ Each stage follows your workflow: plan → build → test → fix → record →
 | **7 Profiles** | Save/edit/delete/reconnect, history, import/export, unattended checklist, Wake-on-LAN | Corrupt-file and interrupted-write tests pass; exports contain no secrets |
 | **8 Reliability** | Every error path, auto-reconnect, Android background handling | Error-matrix tests; no secrets in any message or log (SA-7) |
 | **9 Security verification** | Threat-model review, fuzzing, static analysis, licence audit | No open critical/high issues; fuzzers run without crashes for the agreed time |
-| **10 Release** | Signed MSI, AppImage/Flatpak, APK; docs; make repo public | Clean install / upgrade / uninstall on each OS; credentials removed on uninstall (where the OS allows); docs complete; **full-history secret scan clean and binaries contain no local paths or personal data before going public** |
+| **10 Release** | Proper installation packages: **Windows** signed MSI installer (Start-menu and optional desktop shortcut, Add/Remove Programs entry, in-place upgrade, clean uninstall); **Linux** .deb package plus AppImage (app-menu entry and icon; Flatpak later); **Android** signed APK (plus AAB if Play Store is used); docs; make repo public | Clean install / upgrade / uninstall on each OS; credentials removed on uninstall (where the OS allows); docs complete; **full-history secret scan clean and binaries contain no local paths or personal data before going public** |
 
 ---
 
