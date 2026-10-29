@@ -1,0 +1,12 @@
+#!/bin/sh
+# Pre-commit: block commits that contain secrets or forbidden security patterns.
+set -eu
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-commit: gitleaks is not installed — install it to commit (see CONTRIBUTING.md)." >&2
+  exit 1
+fi
+gitleaks git --staged --no-banner --redact --config .gitleaks.toml || {
+  echo "pre-commit: possible secret found — commit blocked." >&2
+  exit 1
+}
+sh scripts/check-policy.sh

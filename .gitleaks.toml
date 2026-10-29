@@ -1,0 +1,38 @@
+# gitleaks configuration — extends the built-in ruleset with project rules.
+title = "secure-rdp-viewer secret scan"
+
+[extend]
+useDefault = true
+
+# Catch passwords assigned in code, scripts or config, e.g. password = "..."
+[[rules]]
+id = "rdpv-password-literal"
+description = "Hard-coded password value"
+regex = '''(?i)(password|passwd|pwd|secret)\s*[:=]\s*["'][^"'\s]{4,}["']'''
+keywords = ["password", "passwd", "pwd", "secret"]
+
+# Catch passwords passed as command-line flags in scripts/docs, e.g. -p 'xxx'
+[[rules]]
+id = "rdpv-password-cli-flag"
+description = "Password passed on a command line"
+regex = '''(?i)(\s-p|--password)[ =]["']?[^\s"'$<{][^\s"']{3,}'''
+keywords = ["-p", "--password"]
+
+# Catch email addresses that are not reserved placeholders or GitHub noreply.
+[[rules]]
+id = "rdpv-personal-email"
+description = "Personal email address"
+regex = '''[A-Za-z0-9._%+-]+@(gmail|yahoo|outlook|hotmail|icloud|proton|live)\.[a-z.]{2,}'''
+keywords = ["@gmail", "@yahoo", "@outlook", "@hotmail", "@icloud", "@proton", "@live"]
+
+[allowlist]
+description = "Reserved placeholders used in docs and tests"
+regexes = [
+  '''192\.0\.2\.\d+''',
+  '''example\.(com|org|net)''',
+  '''<PASSWORD>''',
+]
+paths = [
+  '''\.gitleaks\.toml$''',
+  '''LICENSE$''',
+]

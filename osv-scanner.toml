@@ -1,0 +1,6 @@
+# OSV-Scanner exceptions. Each entry must match a reviewed exception in deny.toml
+# and docs/PROGRESS.md.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2023-0071"
+reason = "rsa Marvin timing attack affects private-key operations; this client performs RSA public-key operations only (via IronRDP sspi/picky). See docs/PROGRESS.md KI-2."

@@ -1,0 +1,18 @@
+[package]
+name = "rdpv-core"
+description = "Shared core of Secure RDP Viewer: connection engine, security policy, profiles, vault access."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+ironrdp = { workspace = true, features = ["connector", "session", "graphics", "cliprdr", "pdu"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
+zeroize.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

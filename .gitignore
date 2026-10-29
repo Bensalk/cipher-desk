@@ -1,0 +1,59 @@
+# ---- Build output ----
+/target/
+**/target/
+*.pdb
+
+# ---- Flutter / Dart ----
+app/.dart_tool/
+app/.packages
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/build/
+app/.metadata
+app/pubspec.lock.bak
+**/ephemeral/
+**/Flutter/GeneratedPluginRegistrant.*
+**/generated_plugin_registrant.*
+
+# ---- Android ----
+**/local.properties
+**/.gradle/
+**/key.properties
+*.jks
+*.keystore
+*.aab
+*.apk
+
+# ---- Windows / Linux packages ----
+*.msi
+*.exe
+*.AppImage
+*.flatpak
+
+# ---- Secrets & personal data (SA-9) — never commit ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+secrets/
+# App data written at runtime: connection profiles, certificate pins, logs
+profiles*.json
+pins*.json
+pins.txt
+*.log
+logs/
+# Local test hosts / spike leftovers
+SAM
+**/test-hosts/local/
+
+# ---- Editors / OS ----
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.iml
+.DS_Store
+Thumbs.db

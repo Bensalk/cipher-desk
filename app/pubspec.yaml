@@ -1,0 +1,24 @@
+name: secure_rdp_viewer
+description: "Secure open-source RDP remote desktop viewer for Windows, Linux and Android."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  rust_lib_secure_rdp_viewer:
+    path: rust_builder
+  flutter_rust_bridge: 2.13.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  integration_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

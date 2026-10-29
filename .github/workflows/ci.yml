@@ -1,0 +1,140 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUST_TOOLCHAIN: "1.97.0"
+  FRB_VERSION: "2.13.0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: Rust core (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy (zero warnings)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Tests (debug)
+        run: cargo test --workspace
+      - name: Tests (release — checks release logging cap)
+        run: cargo test --workspace --release
+      - name: Security policy checks
+        shell: bash
+        run: sh scripts/check-policy.sh
+
+  flutter:
+    name: Flutter app (${{ matrix.target }})
+    needs: rust
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux
+            os: ubuntu-latest
+          - target: android
+            os: ubuntu-latest
+          - target: windows
+            os: windows-latest
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: ${{ matrix.target == 'android' && 'aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android' || '' }}
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          cache: true
+      - if: matrix.target == 'android'
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Linux build dependencies
+        if: matrix.target == 'linux'
+        working-directory: .
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev xvfb
+      - name: Install flutter_rust_bridge codegen
+        run: cargo install flutter_rust_bridge_codegen --version ${{ env.FRB_VERSION }} --locked
+      - name: Regenerate bridge code
+        run: flutter_rust_bridge_codegen generate --no-add-mod-to-lib
+      - name: Generated bridge code is up to date
+        shell: bash
+        run: |
+          dart format lib/src/rust
+          git diff --exit-code -- ../rust/bridge/src/frb_generated.rs || {
+            echo "::error::rust/bridge/src/frb_generated.rs is out of date — run flutter_rust_bridge_codegen generate";
+            exit 1; }
+      - run: flutter pub get
+      - name: Analyze
+        run: flutter analyze
+      - name: Unit tests
+        run: flutter test
+      - name: Build Linux
+        if: matrix.target == 'linux'
+        run: flutter build linux --debug
+      - name: Integration test (Linux, Rust ↔ Flutter)
+        if: matrix.target == 'linux'
+        run: xvfb-run -a flutter test integration_test -d linux
+      - name: Build Windows
+        if: matrix.target == 'windows'
+        run: flutter build windows --debug
+      - name: Integration test (Windows, Rust ↔ Flutter)
+        if: matrix.target == 'windows'
+        run: flutter test integration_test -d windows
+      - name: Build Android APK
+        if: matrix.target == 'android'
+        run: flutter build apk --debug
+      - name: Android manifest security settings
+        if: matrix.target == 'android'
+        shell: bash
+        run: |
+          m=android/app/src/main/AndroidManifest.xml
+          grep -q 'android:allowBackup="false"' $m
+          grep -q 'android:usesCleartextTraffic="false"' $m
+          grep -q 'minSdk = 29' android/app/build.gradle.kts
+          grep -q 'FLAG_SECURE' android/app/src/main/kotlin/io/github/securerdpviewer/app/MainActivity.kt
+      - name: Upload debug builds
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: debug-${{ matrix.target }}
+          path: |
+            app/build/linux/x64/debug/bundle
+            app/build/windows/x64/runner/Debug
+            app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: ignore
+          retention-days: 7

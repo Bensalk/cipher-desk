@@ -1,0 +1,29 @@
+[package]
+name = "rdpv-bridge"
+description = "flutter_rust_bridge API layer between the Flutter UI and rdpv-core."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+name = "rust_lib_secure_rdp_viewer"
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+rdpv-core = { path = "../core" }
+flutter_rust_bridge = "=2.13.0"
+
+# Same rules as the workspace, except `unsafe_code` is "deny" instead of "forbid"
+# so the generated FFI module alone can opt out (see src/lib.rs).
+[lints.rust]
+unsafe_code = "deny"
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(frb_expand)"] }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "deny"

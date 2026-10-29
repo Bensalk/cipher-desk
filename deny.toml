@@ -1,0 +1,43 @@
+# cargo-deny: licence, advisory, source and duplicate checks for Rust dependencies.
+
+[graph]
+all-features = false
+
+[advisories]
+# Fail on any known vulnerability; unmaintained crates are reported for review.
+version = 2
+yanked = "deny"
+unmaintained = "workspace"
+ignore = [
+  # RUSTSEC-2023-0071 (rsa "Marvin" timing attack on RSA *private-key* operations; no fix
+  # exists upstream). Reached only through IronRDP -> sspi/picky. Reviewed 2026-10-29:
+  # sspi 0.21.3 has no RsaPrivateKey use outside tests; this client authenticates with
+  # passwords (NTLM/Kerberos over CredSSP) and performs only RSA public-key operations.
+  # Re-review when smart-card/certificate login is added or when a patched rsa ships.
+  { id = "RUSTSEC-2023-0071", reason = "Client performs RSA public-key ops only; no private keys. See docs/PROGRESS.md (KI-2)." },
+]
+
+[licenses]
+version = 2
+# Permissive licences compatible with Apache-2.0 distribution.
+allow = [
+  "Apache-2.0",
+  "MIT",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "Unicode-3.0",
+]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# The workspace's own path dependencies have no version requirement.
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

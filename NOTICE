@@ -1,0 +1,12 @@
+Secure RDP Viewer
+Copyright 2026 The Secure RDP Viewer contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product depends on third-party open-source components, including:
+- IronRDP (https://github.com/Devolutions/IronRDP) — MIT OR Apache-2.0
+- Flutter (https://flutter.dev) — BSD-3-Clause
+- flutter_rust_bridge (https://github.com/fzyzcjy/flutter_rust_bridge) — MIT
+
+A full list of dependencies and their licences is produced for every release
+(SBOM) and checked automatically by cargo-deny (see deny.toml).
