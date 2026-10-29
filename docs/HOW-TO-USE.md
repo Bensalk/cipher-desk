@@ -1,4 +1,17 @@
-# Cipher Desk — User Guide
+# How to use Cipher Desk
+
+A step-by-step guide, from installing the app to your first secure connection. Back to the [README](../README.md).
+
+- [1. Install](#1-install)
+- [2. Add a computer](#2-add-a-computer)
+- [3. The first connection: check the certificate](#3-the-first-connection-check-the-certificate)
+- [4. During a session](#4-during-a-session)
+- [5. Settings](#5-settings)
+- [6. Portable copies](#6-portable-copies)
+- [7. Uninstall](#7-uninstall)
+- [8. Troubleshooting](#8-troubleshooting)
+
+---
 
 Before you start, set up the computer you want to connect to:
 [`HOST_SETUP.md`](HOST_SETUP.md). Only connect over your own network or a VPN.

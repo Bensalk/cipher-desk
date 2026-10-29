@@ -35,7 +35,7 @@ Run cipher_desk.exe. No installation or administrator rights are needed.
 - "Save password" is off by default. If you turn it on, the password is stored in
   the Windows Credential Manager of the computer you are using, not on the drive.
   Use Settings > Remove all saved passwords before leaving a computer you don't own.
-- Read docs/USER_GUIDE.md on the project page for more.
+- Read docs/HOW-TO-USE.md on the project page for more.
 "@ | Set-Content -Path "$stage\README-portable.txt" -Encoding utf8
 
 $zip = Join-Path (Resolve-Path $OutDir).Path "CipherDesk-$Version-windows-x64-portable.zip"
