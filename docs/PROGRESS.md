@@ -67,7 +67,10 @@ build configuration, automated tests, CI, and secret/privacy protection (SA-9).
 | `cargo deny check` | ✅ PASS (advisories, bans, licences, sources), with one reviewed exception (KI-2) |
 | Bridge native library builds and exports bridge functions | ✅ PASS (`librust_lib_secure_rdp_viewer.so`) |
 | Release binary contains no local folder paths | ✅ PASS — 0 found (unstripped debug build: 1,479, so the check is effective) |
-| gitleaks over git history | see commit record below |
+| gitleaks over full git history | ✅ PASS — no leaks |
+| Pre-commit hook blocks a staged secret | ✅ PASS — test file with a password was rejected, nothing committed |
+| Personal data in tracked files (email, name, local paths) | ✅ PASS — none (only gitleaks rule keywords) |
+| Commit author/committer email | ✅ GitHub noreply address only |
 | actionlint on workflows | ✅ PASS |
 | Flutter analyze / test / build (Linux, Windows, Android) | ⛔ **NOT RUN** — Flutter SDK can't be downloaded in the build sandbox. Runs in CI. |
 | Integration test Rust ↔ Flutter | ⛔ **NOT RUN** — needs Flutter; runs in CI on Linux and Windows. |
