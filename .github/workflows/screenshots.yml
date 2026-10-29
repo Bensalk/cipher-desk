@@ -44,6 +44,17 @@ jobs:
             xvfb xterm freerdp3-shadow-x11 winpr3-utils openssl fonts-noto-core
       - name: Start the test host (random password per run)
         run: bash scripts/start-test-hosts.sh
+      - name: Build the Linux app
+        working-directory: app
+        run: |
+          set -o pipefail
+          flutter pub get
+          flutter build linux --debug --verbose 2>&1 > ../build.log || {
+            { grep -n -E 'undefined reference|cannot find|multiple definition|error:|ld[.:]|FAILED' ../build.log | head -n 60; } \
+              | cut -c1-400 | sed -e 's/%/%25/g' | awk '{printf "%s%%0A", $0}' > ../tail.txt
+            echo "::error title=Linux build failed::$(cat ../tail.txt)"
+            exit 1
+          }
       - name: Take screenshots
         working-directory: app
         run: |
