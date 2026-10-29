@@ -65,7 +65,7 @@ jobs:
             --dart-define=SHOT_DIR="$PWD/../shots" 2>&1 | tee ../shots.log || {
             # Job logs can be hard to reach; show the end of the output as an annotation.
             # (The test host's password is masked by start-test-hosts.sh and never printed.)
-            { grep -n -i -E 'error|undefined|cannot find|warning: unused|ld:|lld' ../shots.log | head -n 60; echo ----; tail -n 25 ../shots.log; } | cut -c1-400 | sed -e 's/%/%25/g' | awk '{printf "%s%%0A", $0}' > ../tail.txt
+            { grep -n -A8 -E 'EXCEPTION CAUGHT|Timed out|TestFailure|Expected:|Error:|error:|\\[E\\]' ../shots.log | head -n 90; echo ----; grep -E '^saved |^[0-9:]+ \\+[0-9]' ../shots.log | tail -n 20; } | cut -c1-400 | sed -e 's/%/%25/g' | awk '{printf "%s%%0A", $0}' > ../tail.txt
             echo "::error title=Screenshot test failed::$(cat ../tail.txt)"
             exit 1
           }
