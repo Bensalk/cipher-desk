@@ -1,4 +1,4 @@
-# Secure RDP Viewer — User Guide
+# Cipher Desk — User Guide
 
 Before you start, set up the computer you want to connect to:
 [`HOST_SETUP.md`](HOST_SETUP.md). Only connect over your own network or a VPN.
@@ -10,11 +10,11 @@ Download from the project's **Releases** page and check the file against
 
 | System | File | Notes |
 |--------|------|-------|
-| Windows 10/11 (64-bit) | `SecureRdpViewer-<version>-x64.msi` | Installs for your user only (no administrator rights), adds a Start-menu entry and, if you keep it ticked, a desktop shortcut. Installing a newer version upgrades in place. |
-| Windows, no install | `SecureRdpViewer-<version>-windows-x64-portable.zip` | Unzip anywhere (e.g. a USB drive) and run `secure_rdp_viewer.exe`. See *Portable copies*. |
-| Debian / Ubuntu | `secure-rdp-viewer_<version>_amd64.deb` | `sudo apt install ./secure-rdp-viewer_<version>_amd64.deb`. Adds an app-menu entry. |
-| Other Linux | `Secure_RDP_Viewer-<version>-x86_64.AppImage` | Make it executable and run it. |
-| Android 10+ | `SecureRdpViewer-<version>-android.apk` | Allow installing from this source when asked. Compare the signing certificate with the one in the release notes. |
+| Windows 10/11 (64-bit) | `CipherDesk-<version>-x64.msi` | Installs for your user only (no administrator rights), adds a Start-menu entry and, if you keep it ticked, a desktop shortcut. Installing a newer version upgrades in place. |
+| Windows, no install | `CipherDesk-<version>-windows-x64-portable.zip` | Unzip anywhere (e.g. a USB drive) and run `cipher_desk.exe`. See *Portable copies*. |
+| Debian / Ubuntu | `cipher-desk_<version>_amd64.deb` | `sudo apt install ./cipher-desk_<version>_amd64.deb`. Adds an app-menu entry. |
+| Other Linux | `Cipher_Desk-<version>-x86_64.AppImage` | Make it executable and run it. |
+| Android 10+ | `CipherDesk-<version>-android.apk` | Allow installing from this source when asked. Compare the signing certificate with the one in the release notes. |
 
 If the release notes say the Windows files are **unsigned**, Windows SmartScreen
 may warn you; check the SHA-256 checksum first.
@@ -80,7 +80,7 @@ connections always start with clipboard sharing off.
 - **Windows portable ZIP:** the `portable.txt` file next to the app keeps your
   connections, settings and trusted certificates in a `data` folder beside it.
 - **Linux AppImage:** create a folder named like the AppImage plus `.data` (for example
-  `Secure_RDP_Viewer-1.0.0-x86_64.AppImage.data`) next to it to do the same.
+  `Cipher_Desk-1.0.0-x86_64.AppImage.data`) next to it to do the same.
 
 Passwords are never written to the drive. "Save password" is off by default; if you
 turn it on, the password is stored on the computer you are using, not on the drive,
@@ -92,16 +92,16 @@ usernames, so keep it safe.
 
 | System | How | Saved passwords |
 |--------|-----|-----------------|
-| Windows (MSI) | *Settings → Apps → Secure RDP Viewer → Uninstall* | Removed automatically for your user |
+| Windows (MSI) | *Settings → Apps → Cipher Desk → Uninstall* | Removed automatically for your user |
 | Windows portable | Delete the folder | Use *Remove all saved passwords* first |
-| Debian / Ubuntu | `sudo apt remove secure-rdp-viewer` | Use *Remove all saved passwords* **before** uninstalling (a package cannot reach your keyring) |
+| Debian / Ubuntu | `sudo apt remove cipher-desk` | Use *Remove all saved passwords* **before** uninstalling (a package cannot reach your keyring) |
 | AppImage | Delete the file (and its `.data` folder) | Use *Remove all saved passwords* first |
 | Android | Uninstall the app | Removed automatically by Android |
 
 Connections and settings are kept after uninstalling on Windows and Linux, so a
 reinstall finds them. To remove them too, delete the app's folder:
-`%APPDATA%\Secure RDP Viewer contributors\Secure RDP Viewer` on Windows, or
-`~/.local/share/io.github.securerdpviewer.app` on Linux.
+`%APPDATA%\Cipher Desk contributors\Cipher Desk` on Windows, or
+`~/.local/share/io.github.bensalk.cipherdesk` on Linux.
 
 ## 8. Troubleshooting
 

@@ -131,7 +131,7 @@ class SettingsScreen extends StatelessWidget {
     if (text == null || !context.mounted) return;
     final r = connectionsImport(text: text);
     if (r.notAnExport) {
-      _snack(context, 'That is not a Secure RDP Viewer connections export.');
+      _snack(context, 'That is not a Cipher Desk connections export.');
       return;
     }
     // Imported connections get fresh ids and never a saved password.
@@ -293,7 +293,7 @@ class SettingsScreen extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.description_outlined),
             title: const Text('Open-source licences'),
-            onTap: () => showLicensePage(context: context, applicationName: 'Secure RDP Viewer'),
+            onTap: () => showLicensePage(context: context, applicationName: 'Cipher Desk'),
           ),
           // Creator credit: last, plain and small (deliberately not highlighted).
           Padding(

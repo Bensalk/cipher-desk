@@ -1,4 +1,4 @@
-# Secure RDP Viewer
+# Cipher Desk
 
 A secure, open-source remote desktop (RDP) viewer for **Windows, Linux and Android**.
 

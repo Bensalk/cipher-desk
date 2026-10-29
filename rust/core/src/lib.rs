@@ -1,4 +1,4 @@
-//! Shared core of Secure RDP Viewer.
+//! Shared core of Cipher Desk.
 //!
 //! Stage 2 (foundation) provides:
 //! - [`secret`]: a password wrapper that never prints and is wiped from memory on drop,

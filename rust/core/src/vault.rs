@@ -18,7 +18,7 @@ use keyring_core::{CredentialStore, Entry, Error as KError};
 use crate::secret::SecretString;
 
 /// Service name shown in the OS vault.
-pub const SERVICE: &str = "io.github.securerdpviewer";
+pub const SERVICE: &str = "io.github.bensalk.cipherdesk";
 
 /// Why a vault operation failed. Messages contain no secrets or names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]

@@ -1,5 +1,5 @@
 # gitleaks configuration — extends the built-in ruleset with project rules.
-title = "secure-rdp-viewer secret scan"
+title = "cipher-desk secret scan"
 
 [extend]
 useDefault = true

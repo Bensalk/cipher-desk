@@ -37,7 +37,7 @@ build configuration, automated tests, CI, and secret/privacy protection (SA-9).
   - `version`: build summary; links IronRDP 0.17 (crates.io).
 - **`rdpv-bridge`:** flutter_rust_bridge 2.13.0 API (`hello_from_rust`,
   `core_summary`, `security_defaults_summary`) with generated bindings committed.
-  Library name `rust_lib_secure_rdp_viewer`.
+  Library name `rust_lib_cipher_desk`.
 - **Flutter app (`app/`):** start screen calling the Rust core; integration test;
   Windows/Linux/Android platform folders taken from flutter_rust_bridge's own CI-tested
   2.13.0 example and renamed; Cargokit `rust_builder` pointed at `rust/bridge`.
@@ -65,7 +65,7 @@ build configuration, automated tests, CI, and secret/privacy protection (SA-9).
 | `cargo test --release` | ✅ PASS — 17/17 |
 | `scripts/check-policy.sh` | ✅ PASS |
 | `cargo deny check` | ✅ PASS (advisories, bans, licences, sources), with one reviewed exception (KI-2) |
-| Bridge native library builds and exports bridge functions | ✅ PASS (`librust_lib_secure_rdp_viewer.so`) |
+| Bridge native library builds and exports bridge functions | ✅ PASS (`librust_lib_cipher_desk.so`) |
 | Release binary contains no local folder paths | ✅ PASS — 0 found (unstripped debug build: 1,479, so the check is effective) |
 | gitleaks over full git history | ✅ PASS — no leaks |
 | Pre-commit hook blocks a staged secret | ✅ PASS — test file with a password was rejected, nothing committed |
@@ -170,7 +170,7 @@ starting Stage 4. Corrections made:
 
 | # | Area | Problem found | Fix |
 |---|------|---------------|-----|
-| R1 | Repository | A deliverable zip (`secure-rdp-viewer-stage3.zip`) had been committed into the repository | Removed from the (unpushed) Stage 3 commit, so it is not in the history; `*.zip`, `*.bundle`, `*.tar.gz`, `*.7z` added to `.gitignore` |
+| R1 | Repository | A deliverable zip (`cipher-desk-stage3.zip`) had been committed into the repository | Removed from the (unpushed) Stage 3 commit, so it is not in the history; `*.zip`, `*.bundle`, `*.tar.gz`, `*.7z` added to `.gitignore` |
 | R2 | Plan | No stage covered keyboard, mouse and touch input | Added to Stage 4 (with Android touch/trackpad modes and special-keys bar, F8–F10) |
 | R3 | Plan | Stack table said flutter_rust_bridge 2.12 and "IronRDP 0.17 commit f01f9b5" | Now 2.13.0 (pinned), and the prototype commit is separated from the published crates the app uses |
 | R4 | Plan | "Approval needed" section still asked for Stage 1 approval | Replaced with the approval record and the two items still open |
@@ -293,7 +293,7 @@ Optional saved passwords in the operating system's vault only; confirmation befo
 ### Completed
 - **Rust `vault`** (`keyring-core` 1.0 with the Windows Credential Manager store and the
   Linux Secret Service store, pure-Rust D-Bus): save / load / exists / delete. Entries are
-  named `connection-<random id>` under `io.github.securerdpviewer`, so the vault list
+  named `connection-<random id>` under `io.github.bensalk.cipherdesk`, so the vault list
   reveals no host or user names. No vault → `Unavailable`, never a file fallback. Ids are
   validated before the store is touched.
 - **Connecting with a saved password (Windows, Linux):** `RdpSession.startWithSavedPassword`
@@ -799,7 +799,7 @@ repository public.
 - **KI-25 (still open):** the Flutter app has still never been compiled.
 
 ### Next step
-Owner: create the private repository `secure-rdp-viewer` and push; then CI's first run
+Owner: create the private repository `cipher-desk` and push; then CI's first run
 (fix what it finds, commit `pubspec.lock` from its artifacts), then "Run workflow" on
 Release to build all packages without publishing, then the device checklist. Going
 public only after SA-5 and the checklist in `docs/RELEASING.md`.
@@ -817,3 +817,16 @@ no real passwords anywhere. Changed: the one fixed dummy password in an app test
 random per run (SA-9). Added: "Created by Bensal" as the last line of Settings → About,
 in small plain text. Open point for the owner: each commit message ends with a link to
 the private Claude session used to build the project.
+
+---
+
+## Project renamed: Cipher Desk (30 Oct 2026)
+
+The project was renamed from "Secure RDP Viewer" to **Cipher Desk** before its first
+upload: app and window name `Cipher Desk`, repository and packages `cipher-desk`, program
+`cipher_desk`, app ID and vault name `io.github.bensalk.cipherdesk` (Android, Linux),
+Rust library `rust_lib_cipher_desk`. Internal crate names (`rdpv-core`, `rdpv-bridge`)
+are unchanged. Nothing had been released, so no settings or saved passwords move.
+Checks after the rename: fmt, clippy, 107/107 unit tests, Dart/Kotlin syntax, policy,
+cargo-deny, actionlint, `.deb` install/uninstall — all pass. Commit messages no longer
+contain links to the development chat.

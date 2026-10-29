@@ -34,7 +34,7 @@
 
 - [ ] Windows: install MSI → Start menu and desktop shortcut work → connect → save a
       password → install the next version over it (upgrade keeps connections) →
-      uninstall → Credential Manager has no entries for `io.github.securerdpviewer`.
+      uninstall → Credential Manager has no entries for `io.github.bensalk.cipherdesk`.
 - [ ] Windows portable ZIP from a USB drive: `data` folder created next to the app;
       the Save-password warning appears.
 - [ ] Ubuntu: `.deb` install, app-menu entry, connect, *Remove all saved passwords*, remove.

@@ -9,7 +9,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
             
 
-            /// One-line build summary, e.g. "Secure RDP Viewer 0.1.0 (IronRDP 0.17, release)".
+            /// One-line build summary, e.g. "Cipher Desk 0.1.0 (IronRDP 0.17, release)".
 String  coreSummary() => RustLib.instance.api.crateApiInfoCoreSummary();
 
 /// Greeting shown on the Stage 2 start screen to prove the bridge works.

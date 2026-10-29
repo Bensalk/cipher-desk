@@ -11,13 +11,13 @@
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
-  <Package Name="Secure RDP Viewer"
-           Manufacturer="Secure RDP Viewer contributors"
+  <Package Name="Cipher Desk"
+           Manufacturer="Cipher Desk contributors"
            Version="$(var.Version)"
            UpgradeCode="{E56EAB74-3E6E-4A89-948B-8E6CC77A3275}"
            Scope="perUserOrMachine"
            Compressed="yes">
-    <SummaryInformation Description="Secure RDP Viewer installer" />
+    <SummaryInformation Description="Cipher Desk installer" />
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
@@ -30,12 +30,12 @@
     <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
 
     <StandardDirectory Id="ProgramFiles6432Folder">
-      <Directory Id="INSTALLFOLDER" Name="Secure RDP Viewer" />
+      <Directory Id="INSTALLFOLDER" Name="Cipher Desk" />
     </StandardDirectory>
     <StandardDirectory Id="ProgramMenuFolder" />
     <StandardDirectory Id="DesktopFolder" />
 
-    <Feature Id="Main" Title="Secure RDP Viewer" Level="1" AllowAbsent="no"
+    <Feature Id="Main" Title="Cipher Desk" Level="1" AllowAbsent="no"
              Description="The app, with a Start-menu shortcut.">
       <ComponentGroupRef Id="AppFiles" />
       <ComponentRef Id="MainExe" />
@@ -62,26 +62,26 @@
   <Fragment>
     <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
       <Files Include="$(var.BundleDir)\**">
-        <Exclude Files="$(var.BundleDir)\secure_rdp_viewer.exe" />
+        <Exclude Files="$(var.BundleDir)\cipher_desk.exe" />
       </Files>
     </ComponentGroup>
 
     <Component Id="MainExe" Directory="INSTALLFOLDER">
-      <File Id="MainExeFile" Source="$(var.BundleDir)\secure_rdp_viewer.exe" KeyPath="yes" />
+      <File Id="MainExeFile" Source="$(var.BundleDir)\cipher_desk.exe" KeyPath="yes" />
     </Component>
 
     <Component Id="StartMenuShortcut" Directory="ProgramMenuFolder">
-      <Shortcut Id="StartMenuLink" Name="Secure RDP Viewer"
+      <Shortcut Id="StartMenuLink" Name="Cipher Desk"
                 Description="Connect securely with Remote Desktop"
-                Target="[INSTALLFOLDER]secure_rdp_viewer.exe" WorkingDirectory="INSTALLFOLDER" />
-      <RegistryValue Root="HKCU" Key="Software\SecureRdpViewer" Name="StartMenuShortcut"
+                Target="[INSTALLFOLDER]cipher_desk.exe" WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU" Key="Software\CipherDesk" Name="StartMenuShortcut"
                      Type="integer" Value="1" KeyPath="yes" />
     </Component>
 
     <Component Id="DesktopShortcut" Directory="DesktopFolder">
-      <Shortcut Id="DesktopLink" Name="Secure RDP Viewer"
-                Target="[INSTALLFOLDER]secure_rdp_viewer.exe" WorkingDirectory="INSTALLFOLDER" />
-      <RegistryValue Root="HKCU" Key="Software\SecureRdpViewer" Name="DesktopShortcut"
+      <Shortcut Id="DesktopLink" Name="Cipher Desk"
+                Target="[INSTALLFOLDER]cipher_desk.exe" WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU" Key="Software\CipherDesk" Name="DesktopShortcut"
                      Type="integer" Value="1" KeyPath="yes" />
     </Component>
   </Fragment>

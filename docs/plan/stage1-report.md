@@ -229,7 +229,7 @@ source-code privacy rules (SA-9) and portable-mode rules (SA-10).
 
 Still open:
 1. **GitHub repository:** to be created by the owner as a **private** repository
-   (suggested name `secure-rdp-viewer`); it stays private until the SA-9 checks pass.
+   (suggested name `cipher-desk`); it stays private until the SA-9 checks pass.
 2. **Private report to Devolutions about SF-2:** to be drafted for the owner's approval.
 
 ---

@@ -260,7 +260,7 @@ class _HomeScreenState extends State<HomeScreen> {
       (Icons.settings_outlined, Icons.settings, 'Settings'),
     ];
     return Scaffold(
-      appBar: AppBar(title: const Text('Secure RDP Viewer')),
+      appBar: AppBar(title: const Text('Cipher Desk')),
       floatingActionButton: _tab == 0
           ? FloatingActionButton.extended(
               key: const Key('button-new'),

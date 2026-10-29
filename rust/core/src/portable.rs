@@ -47,7 +47,7 @@ mod tests {
     #[test]
     fn installed_copy_is_not_portable() -> std::io::Result<()> {
         let dir = tempfile::tempdir()?;
-        let exe = dir.path().join("secure_rdp_viewer.exe");
+        let exe = dir.path().join("cipher_desk.exe");
         std::fs::write(&exe, b"")?;
         assert_eq!(data_dir(&exe, None), None);
         Ok(())
@@ -56,7 +56,7 @@ mod tests {
     #[test]
     fn marker_next_to_the_exe_turns_portable_on() -> std::io::Result<()> {
         let dir = tempfile::tempdir()?;
-        let exe = dir.path().join("secure_rdp_viewer.exe");
+        let exe = dir.path().join("cipher_desk.exe");
         std::fs::write(&exe, b"")?;
         std::fs::write(dir.path().join(MARKER), b"")?;
         assert_eq!(data_dir(&exe, None), Some(dir.path().join(DATA_DIR)));
@@ -70,11 +70,11 @@ mod tests {
     #[test]
     fn appimage_uses_a_data_folder_next_to_it_only_if_present() -> std::io::Result<()> {
         let dir = tempfile::tempdir()?;
-        let image = dir.path().join("Secure_RDP_Viewer-x86_64.AppImage");
+        let image = dir.path().join("Cipher_Desk-x86_64.AppImage");
         std::fs::write(&image, b"")?;
-        let exe = Path::new("/tmp/.mount_abc/usr/bin/secure_rdp_viewer");
+        let exe = Path::new("/tmp/.mount_abc/usr/bin/cipher_desk");
         assert_eq!(data_dir(exe, Some(&image)), None);
-        let data = dir.path().join("Secure_RDP_Viewer-x86_64.AppImage.data");
+        let data = dir.path().join("Cipher_Desk-x86_64.AppImage.data");
         std::fs::create_dir(&data)?;
         assert_eq!(data_dir(exe, Some(&image)), Some(data));
         // A relative APPIMAGE value is ignored (not set by the AppImage runtime).

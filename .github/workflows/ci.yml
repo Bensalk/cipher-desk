@@ -174,7 +174,7 @@ jobs:
           grep -q 'android:allowBackup="false"' $m
           grep -q 'android:usesCleartextTraffic="false"' $m
           grep -q 'minSdk = 29' android/app/build.gradle.kts
-          grep -q 'FLAG_SECURE' android/app/src/main/kotlin/io/github/securerdpviewer/app/MainActivity.kt
+          grep -q 'FLAG_SECURE' android/app/src/main/kotlin/io/github/bensalk/cipherdesk/MainActivity.kt
       - name: Upload debug builds
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:

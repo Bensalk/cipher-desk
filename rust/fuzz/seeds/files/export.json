@@ -1,1 +1,1 @@
-{"format": "secure-rdp-viewer-connections", "version": 1, "connections": [{"name": "Office PC", "host": "192.0.2.10", "port": 3389, "username": "alice", "clipboard": "both", "wake_mac": "00-11-22-33-44-55"}]}
+{"format": "cipher-desk-connections", "version": 1, "connections": [{"name": "Office PC", "host": "192.0.2.10", "port": 3389, "username": "alice", "clipboard": "both", "wake_mac": "00-11-22-33-44-55"}]}

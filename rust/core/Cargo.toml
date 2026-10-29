@@ -1,6 +1,6 @@
 [package]
 name = "rdpv-core"
-description = "Shared core of Secure RDP Viewer: connection engine, security policy, profiles, vault access."
+description = "Shared core of Cipher Desk: connection engine, security policy, profiles, vault access."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

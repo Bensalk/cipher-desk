@@ -77,7 +77,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
                   int get rustContentHash => 1808095405;
 
                   static const kDefaultExternalLibraryLoaderConfig = ExternalLibraryLoaderConfig(
-                    stem: 'rust_lib_secure_rdp_viewer',
+                    stem: 'rust_lib_cipher_desk',
                     ioDirectory: '../rust/bridge/target/release/',
                     webPrefix: 'pkg/',
                     wasmBindgenName: 'wasm_bindgen',

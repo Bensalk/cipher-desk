@@ -1,7 +1,7 @@
 //! Build and engine information shown in the app's About screen.
 
 /// Application display name.
-pub const APP_NAME: &str = "Secure RDP Viewer";
+pub const APP_NAME: &str = "Cipher Desk";
 
 /// Version of this core library (from Cargo).
 pub const CORE_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -9,7 +9,7 @@ pub const CORE_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The RDP engine this build uses.
 pub const ENGINE: &str = "IronRDP (connector 0.12, session 0.13)";
 
-/// Short one-line description, e.g. "Secure RDP Viewer 0.1.0 (IronRDP 0.17, release)".
+/// Short one-line description, e.g. "Cipher Desk 0.1.0 (IronRDP 0.17, release)".
 pub fn summary() -> String {
     let profile = if cfg!(debug_assertions) {
         "debug"

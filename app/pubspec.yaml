@@ -1,4 +1,4 @@
-name: secure_rdp_viewer
+name: cipher_desk
 description: "Secure open-source RDP remote desktop viewer for Windows, Linux and Android."
 publish_to: 'none'
 version: 0.1.0+1
@@ -9,7 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  rust_lib_secure_rdp_viewer:
+  rust_lib_cipher_desk:
     path: rust_builder
   flutter_rust_bridge: 2.13.0
   path_provider: ^2.1.5

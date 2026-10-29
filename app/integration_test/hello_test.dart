@@ -4,13 +4,13 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:secure_rdp_viewer/main.dart';
-import 'package:secure_rdp_viewer/platform/session_service.dart';
-import 'package:secure_rdp_viewer/src/rust/api/errors.dart';
-import 'package:secure_rdp_viewer/src/rust/frb_generated.dart';
-import 'package:secure_rdp_viewer/state/persistence.dart';
-import 'package:secure_rdp_viewer/state/profiles.dart';
-import 'package:secure_rdp_viewer/state/settings.dart';
+import 'package:cipher_desk/main.dart';
+import 'package:cipher_desk/platform/session_service.dart';
+import 'package:cipher_desk/src/rust/api/errors.dart';
+import 'package:cipher_desk/src/rust/frb_generated.dart';
+import 'package:cipher_desk/state/persistence.dart';
+import 'package:cipher_desk/state/profiles.dart';
+import 'package:cipher_desk/state/settings.dart';
 
 /// A throwaway password, different on every run (SA-9: no fixed test passwords).
 String _randomPassword() {
@@ -37,7 +37,7 @@ void main() {
 
   Future<ProfileStore> start(WidgetTester tester) async {
     final store = ProfileStore();
-    await tester.pumpWidget(SecureRdpViewerApp(store: store, settings: AppSettings()));
+    await tester.pumpWidget(CipherDeskApp(store: store, settings: AppSettings()));
     await tester.pumpAndSettle();
     return store;
   }

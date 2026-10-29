@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:secure_rdp_viewer/src/rust/api/session.dart' show ClipboardMode;
-import 'package:secure_rdp_viewer/state/profiles.dart';
-import 'package:secure_rdp_viewer/state/settings.dart';
+import 'package:cipher_desk/src/rust/api/session.dart' show ClipboardMode;
+import 'package:cipher_desk/state/profiles.dart';
+import 'package:cipher_desk/state/settings.dart';
 
 ConnectionProfile _p(ProfileStore s, String name, String host, {String user = 'alice'}) =>
     ConnectionProfile(id: s.newId(), name: name, host: host, port: 3389, username: user);

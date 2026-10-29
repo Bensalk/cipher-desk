@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "Secure RDP Viewer contributors" "\0"
-            VALUE "FileDescription", "Secure RDP Viewer" "\0"
+            VALUE "CompanyName", "Cipher Desk contributors" "\0"
+            VALUE "FileDescription", "Cipher Desk" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "secure_rdp_viewer" "\0"
-            VALUE "LegalCopyright", "Copyright 2026 Secure RDP Viewer contributors. Apache-2.0." "\0"
-            VALUE "OriginalFilename", "secure_rdp_viewer.exe" "\0"
-            VALUE "ProductName", "Secure RDP Viewer" "\0"
+            VALUE "InternalName", "cipher_desk" "\0"
+            VALUE "LegalCopyright", "Copyright 2026 Cipher Desk contributors. Apache-2.0." "\0"
+            VALUE "OriginalFilename", "cipher_desk.exe" "\0"
+            VALUE "ProductName", "Cipher Desk" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

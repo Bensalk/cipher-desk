@@ -10,24 +10,24 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $bundle = (Resolve-Path $BundleDir).Path
-if (-not (Test-Path "$bundle\secure_rdp_viewer.exe")) { throw "secure_rdp_viewer.exe not found in $bundle" }
+if (-not (Test-Path "$bundle\cipher_desk.exe")) { throw "cipher_desk.exe not found in $bundle" }
 New-Item -ItemType Directory -Force $OutDir | Out-Null
-$stage = Join-Path ([IO.Path]::GetTempPath()) "SecureRDPViewer-$Version-portable"
+$stage = Join-Path ([IO.Path]::GetTempPath()) "CipherDesk-$Version-portable"
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 Copy-Item -Recurse $bundle $stage
 if (Test-Path "$stage\data\connections.json") { throw "The bundle must not contain user data" }
 
 @"
-This file makes Secure RDP Viewer run as a PORTABLE copy.
+This file makes Cipher Desk run as a PORTABLE copy.
 Connections, settings and trusted certificates are kept in the "data" folder
 next to this file. Passwords are never stored on the drive.
 Delete this file to use the normal folders of the signed-in Windows user instead.
 "@ | Set-Content -Path "$stage\portable.txt" -Encoding utf8
 
 @"
-Secure RDP Viewer $Version - portable copy for Windows (64-bit)
+Cipher Desk $Version - portable copy for Windows (64-bit)
 
-Run secure_rdp_viewer.exe. No installation or administrator rights are needed.
+Run cipher_desk.exe. No installation or administrator rights are needed.
 
 - Your connections and settings are saved in the "data" folder next to the app.
   Keep the drive safe: anyone with it can see your computer names and usernames
@@ -38,7 +38,7 @@ Run secure_rdp_viewer.exe. No installation or administrator rights are needed.
 - Read docs/USER_GUIDE.md on the project page for more.
 "@ | Set-Content -Path "$stage\README-portable.txt" -Encoding utf8
 
-$zip = Join-Path (Resolve-Path $OutDir).Path "SecureRdpViewer-$Version-windows-x64-portable.zip"
+$zip = Join-Path (Resolve-Path $OutDir).Path "CipherDesk-$Version-windows-x64-portable.zip"
 if (Test-Path $zip) { Remove-Item $zip }
 Compress-Archive -Path $stage -DestinationPath $zip
 Remove-Item -Recurse -Force $stage

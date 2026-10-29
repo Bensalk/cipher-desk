@@ -34,11 +34,11 @@ Future<void> main(List<String> args) async {
   final store = ProfileStore();
   final notice = ProfilePersistence(paths, store, onSaveFailed: saveFailed).start();
   await SecureWindow.setEnabled(settings.blockScreenshots);
-  runApp(SecureRdpViewerApp(store: store, settings: settings, paths: paths, startupNotice: notice));
+  runApp(CipherDeskApp(store: store, settings: settings, paths: paths, startupNotice: notice));
 }
 
-class SecureRdpViewerApp extends StatelessWidget {
-  const SecureRdpViewerApp({
+class CipherDeskApp extends StatelessWidget {
+  const CipherDeskApp({
     super.key,
     required this.store,
     required this.settings,
@@ -59,7 +59,7 @@ class SecureRdpViewerApp extends StatelessWidget {
       listenable: settings,
       builder: (context, _) => MaterialApp(
         scaffoldMessengerKey: messengerKey,
-        title: 'Secure RDP Viewer',
+        title: 'Cipher Desk',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(colorSchemeSeed: Colors.teal, brightness: Brightness.light),
         darkTheme: ThemeData(colorSchemeSeed: Colors.teal, brightness: Brightness.dark),

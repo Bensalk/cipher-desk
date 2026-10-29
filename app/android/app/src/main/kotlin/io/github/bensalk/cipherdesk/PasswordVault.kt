@@ -1,4 +1,4 @@
-package io.github.securerdpviewer.app
+package io.github.bensalk.cipherdesk
 
 import android.content.Context
 import android.os.Build

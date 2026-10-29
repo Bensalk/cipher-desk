@@ -92,10 +92,10 @@ jobs:
       - name: Install, run and remove the .deb
         run: |
           sudo apt-get install -y ./dist/*.deb
-          test -x /usr/bin/secure-rdp-viewer
-          test -f /usr/share/applications/secure-rdp-viewer.desktop
-          sudo apt-get remove -y secure-rdp-viewer
-          test ! -e /opt/secure-rdp-viewer
+          test -x /usr/bin/cipher-desk
+          test -f /usr/share/applications/cipher-desk.desktop
+          sudo apt-get remove -y cipher-desk
+          test ! -e /opt/cipher-desk
       - name: Dart dependency list (for the SBOM; KI-36)
         run: cp app/pubspec.lock dist/pubspec.lock
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -155,9 +155,9 @@ jobs:
           $msi = Get-ChildItem dist/*.msi | Select-Object -First 1
           $p = Start-Process msiexec -ArgumentList "/i `"$($msi.FullName)`" /qn /l*v install.log" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content install.log -Tail 50; throw "install failed: $($p.ExitCode)" }
-          $exe = "$env:LOCALAPPDATA\Programs\Secure RDP Viewer\secure_rdp_viewer.exe"
+          $exe = "$env:LOCALAPPDATA\Programs\Cipher Desk\cipher_desk.exe"
           if (-not (Test-Path $exe)) { throw "not installed per user at $exe" }
-          if (-not (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Secure RDP Viewer.lnk")) { throw "no Start-menu shortcut" }
+          if (-not (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Cipher Desk.lnk")) { throw "no Start-menu shortcut" }
           $p = Start-Process msiexec -ArgumentList "/x `"$($msi.FullName)`" /qn /l*v uninstall.log" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content uninstall.log -Tail 50; throw "uninstall failed: $($p.ExitCode)" }
           if (Test-Path $exe) { throw "files left after uninstall" }
@@ -209,7 +209,7 @@ jobs:
           flutter pub get
           flutter build apk --release
           mkdir -p ../dist
-          cp build/app/outputs/flutter-apk/app-release.apk "../dist/SecureRdpViewer-${{ needs.version.outputs.version }}-android.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "../dist/CipherDesk-${{ needs.version.outputs.version }}-android.apk"
           rm -f "$RUNNER_TEMP/release.jks"
       - name: Signature check (never the debug key) and certificate fingerprint
         env:
@@ -275,4 +275,4 @@ jobs:
             echo
             echo "Android signing certificate:"; echo '```'; cat release/android-signing-certificate.txt; echo '```'
           } > notes.md
-          gh release create "$TAG" --draft --verify-tag --title "Secure RDP Viewer $TAG" --notes-file notes.md release/*
+          gh release create "$TAG" --draft --verify-tag --title "Cipher Desk $TAG" --notes-file notes.md release/*

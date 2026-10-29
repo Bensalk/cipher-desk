@@ -11,7 +11,7 @@ $ErrorActionPreference = 'Stop'
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw "Version must look like 1.2.3, got '$Version'" }
 $repo = (Resolve-Path "$PSScriptRoot\..\..").Path
 $bundle = (Resolve-Path $BundleDir).Path
-if (-not (Test-Path "$bundle\secure_rdp_viewer.exe")) { throw "secure_rdp_viewer.exe not found in $bundle" }
+if (-not (Test-Path "$bundle\cipher_desk.exe")) { throw "cipher_desk.exe not found in $bundle" }
 if (Test-Path "$bundle\portable.txt") { throw "The installer must not contain portable.txt" }
 New-Item -ItemType Directory -Force $OutDir | Out-Null
 $out = (Resolve-Path $OutDir).Path
@@ -23,8 +23,8 @@ $rtf = "{\rtf1\ansi\deff0{\fonttbl{\f0 Consolas;}}\f0\fs16 $escaped}"
 $license = Join-Path $out 'License.rtf'
 Set-Content -Path $license -Value $rtf -Encoding ascii
 
-$msi = Join-Path $out "SecureRdpViewer-$Version-x64.msi"
-wix build "$PSScriptRoot\SecureRdpViewer.wxs" -arch x64 -ext WixToolset.UI.wixext `
+$msi = Join-Path $out "CipherDesk-$Version-x64.msi"
+wix build "$PSScriptRoot\CipherDesk.wxs" -arch x64 -ext WixToolset.UI.wixext `
   -d "Version=$Version" -d "BundleDir=$bundle" -d "RepoDir=$repo" -d "LicenseRtf=$license" `
   -o $msi
 if ($LASTEXITCODE -ne 0) { throw "wix build failed" }

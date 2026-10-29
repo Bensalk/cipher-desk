@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "io.github.securerdpviewer.app"
+    namespace = "io.github.bensalk.cipherdesk"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -18,7 +18,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "io.github.securerdpviewer.app"
+        applicationId = "io.github.bensalk.cipherdesk"
         // Android 10+ only: blocks background apps from reading the clipboard (decision 7).
         minSdk = 29
         targetSdk = flutter.targetSdkVersion

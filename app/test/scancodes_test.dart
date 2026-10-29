@@ -1,6 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:secure_rdp_viewer/session/scancodes.dart';
+import 'package:cipher_desk/session/scancodes.dart';
 
 void main() {
   test('common keys map to PC scancodes', () {

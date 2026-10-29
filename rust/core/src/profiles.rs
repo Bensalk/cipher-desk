@@ -17,7 +17,7 @@ use crate::fsutil;
 use crate::input;
 
 const FORMAT_VERSION: u32 = 1;
-const EXPORT_FORMAT: &str = "secure-rdp-viewer-connections";
+const EXPORT_FORMAT: &str = "cipher-desk-connections";
 /// Most connections kept or imported.
 pub const MAX_CONNECTIONS: usize = 500;
 /// Most history entries kept (oldest are dropped).

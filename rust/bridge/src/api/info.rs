@@ -1,6 +1,6 @@
 //! Read-only information for the UI (Stage 2 smoke test: "Hello from Rust").
 
-/// One-line build summary, e.g. "Secure RDP Viewer 0.1.0 (IronRDP 0.17, release)".
+/// One-line build summary, e.g. "Cipher Desk 0.1.0 (IronRDP 0.17, release)".
 #[flutter_rust_bridge::frb(sync)]
 pub fn core_summary() -> String {
     rdpv_core::version::summary()
