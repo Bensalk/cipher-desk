@@ -51,6 +51,10 @@ the port (leave empty for 3389) and the username (`user`, `DOMAIN\user` or
 **Check readiness** in the connection's menu tests whether the computer answers and
 whether everything is set up.
 
+| New connection | Connection menu | Check readiness |
+|:---:|:---:|:---:|
+| <img src="screenshots/phone-new-connection.png" width="230"> | <img src="screenshots/phone-connection-menu.png" width="230"> | <img src="screenshots/phone-readiness.png" width="230"> |
+
 ## 3. The first connection: check the certificate
 
 The first time, the app shows the computer's **certificate fingerprint** and has not
@@ -62,6 +66,8 @@ connection is blocked and no password is sent. This can follow a Windows reinsta
 but it can also mean someone is intercepting the connection. Only use **"I know why
 it changed — trust the new certificate"** after checking the new fingerprint on the
 computer itself.
+
+<p align="center"><img src="screenshots/desktop-certificate.png" width="640" alt="Check this computer's identity"></p>
 
 ## 4. During a session
 
@@ -78,6 +84,8 @@ computer itself.
 - **Android:** a notification shows while a session is open. If you leave the app for
   5 minutes, the session ends; tap **Reconnect** when you come back.
 
+<p align="center"><img src="screenshots/desktop-session.png" width="640" alt="A remote session with the key bar"></p>
+
 ## 5. Settings
 
 Theme · block screenshots (Android, on by default) · share clipboard for new
@@ -87,6 +95,10 @@ connection history · export / import · what each error message means.
 
 **Export** contains names, addresses, ports and usernames, never passwords. Imported
 connections always start with clipboard sharing off.
+
+| Settings | About | Connection history |
+|:---:|:---:|:---:|
+| <img src="screenshots/phone-settings.png" width="230"> | <img src="screenshots/phone-settings-about.png" width="230"> | <img src="screenshots/phone-history.png" width="230"> |
 
 ## 6. Portable copies
 
@@ -120,6 +132,11 @@ reinstall finds them. To remove them too, delete the app's folder:
 
 Every error message says what to do next; *Settings → What error messages mean*
 lists them all. Common ones:
+
+| An error with advice | All error messages |
+|:---:|:---:|
+| <img src="screenshots/phone-wrong-password.png" width="230"> | <img src="screenshots/phone-error-help.png" width="230"> |
+
 
 - **Computer didn't respond** — it is off or asleep, you are not on the same network or
   VPN, or a firewall blocks port 3389.
