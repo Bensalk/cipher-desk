@@ -1,9 +1,9 @@
 # Secure Open-Source Remote Desktop Viewer — Stage 1 Report & Final Plan
 
-**Stage:** 1 — Research and Planning (complete, awaiting approval)
+**Stage:** 1 — Research and Planning (approved 29 Oct 2026; updated with installers, portable versions and source-code privacy rules)
 **Date:** 29 October 2026
 **Platforms:** Windows, Linux, Android (all as viewers / clients)
-**Next step:** Stage 2 (Project Foundation) starts only after you approve this report.
+**Next step:** Stage 2 (Project Foundation) — local checks done; awaiting first GitHub CI run.
 
 ---
 
@@ -27,7 +27,7 @@
 | 3 | Suggestions | **All approved:** S1–S13, F1–F13, T1–T4, plus the security additions in section 6 |
 | 4 | Network scope | Local network directly; **outside access only through a VPN** (WireGuard/Tailscale) with two-factor login. No public RDP port. |
 | 5 | Linux hosts | **Supported** (xrdp / GNOME Remote Desktop), secondary to Windows hosts. Verified working with xrdp in the spike. |
-| 6 | Distribution | Windows: MSI. Linux: AppImage + Flatpak. Android: signed APK on GitHub first, F-Droid later. |
+| 6 | Distribution | **Windows:** signed MSI installer + portable ZIP. **Linux:** .deb + AppImage (portable); Flatpak later. **Android:** signed APK on GitHub first, F-Droid later (AAB if Play Store). Details in Stage 10 and SA-10. |
 | 7 | Android minimum | **Android 10 (API 29)**. Android's security guidance recommends this because it blocks background apps from reading the clipboard. |
 | 8 | Android background | Foreground-service notification with a **5-minute grace period**, then a clean disconnect with one-tap reconnect. |
 | 9 | Unattended defaults | **On:** biometric/PIN before using a saved password, and idle disconnect. |
