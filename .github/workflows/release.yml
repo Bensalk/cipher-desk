@@ -1,0 +1,278 @@
+name: Release
+
+# Builds every installable package (Stage 10). A tag like v1.2.3 builds,
+# checks and publishes a DRAFT GitHub release; the owner reviews and publishes it.
+# "Run workflow" by hand builds the packages without publishing anything.
+#
+# Secrets (Settings > Secrets and variables > Actions), never in the repository:
+#   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+#   WINDOWS_CERT_PFX_BASE64, WINDOWS_CERT_PASSWORD   (optional: without them Windows files are unsigned)
+# The AppImage tool is pinned by version and SHA-256 (computed 29 Oct 2026); a
+# repository variable APPIMAGETOOL_SHA256 can override the checksum after an update.
+# See docs/RELEASING.md.
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  RUST_TOOLCHAIN: "1.97.0"
+  CARGO_TERM_COLOR: always
+  APPIMAGETOOL_URL: https://github.com/AppImage/appimagetool/releases/download/1.9.0/appimagetool-x86_64.AppImage
+  APPIMAGETOOL_SHA256_PINNED: 46fdd785094c7f6e545b61afcfb0f3d98d8eab243f644b4b17698c01d06083d1
+
+jobs:
+  version:
+    name: Version check
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - id: v
+        name: Tag, app and Rust versions must match
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          app=$(sed -n 's/^version: *\([0-9.]*\).*/\1/p' app/pubspec.yaml)
+          rust=$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -1)
+          [ "$app" = "$rust" ] || { echo "::error::pubspec.yaml ($app) and Cargo.toml ($rust) differ"; exit 1; }
+          if [ "$REF_TYPE" = tag ] && [ "v$app" != "$REF_NAME" ]; then
+            echo "::error::tag $REF_NAME does not match version $app"; exit 1
+          fi
+          echo "version=$app" >> "$GITHUB_OUTPUT"
+
+  linux:
+    name: Linux (.deb, AppImage)
+    needs: version
+    runs-on: ubuntu-22.04 # older base = runs on more distributions
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+      - name: Build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev file
+      - name: Build release bundle (local paths removed, SA-9)
+        working-directory: app
+        run: |
+          export RUSTFLAGS="--remap-path-prefix=$HOME=/home --remap-path-prefix=$HOME/.cargo=/cargo --remap-path-prefix=$GITHUB_WORKSPACE=/src"
+          flutter pub get
+          flutter build linux --release
+      - name: No local paths in the binaries
+        run: bash scripts/check-binaries.sh app/build/linux/x64/release/bundle
+      - name: .deb package
+        env:
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: bash packaging/linux/build-deb.sh app/build/linux/x64/release/bundle "${{ needs.version.outputs.version }}" dist
+      - name: AppImage (portable)
+        env:
+          EXPECTED: ${{ vars.APPIMAGETOOL_SHA256 || env.APPIMAGETOOL_SHA256_PINNED }}
+          APPIMAGE_EXTRACT_AND_RUN: "1" # no FUSE on the runner
+        run: |
+          curl -sSfL -o appimagetool "$APPIMAGETOOL_URL"
+          echo "$EXPECTED  appimagetool" | sha256sum -c - || { echo "::error::appimagetool checksum mismatch"; exit 1; }
+          chmod +x appimagetool
+          bash packaging/linux/build-appimage.sh app/build/linux/x64/release/bundle \
+            "${{ needs.version.outputs.version }}" dist "$PWD/appimagetool"
+      - name: Install, run and remove the .deb
+        run: |
+          sudo apt-get install -y ./dist/*.deb
+          test -x /usr/bin/secure-rdp-viewer
+          test -f /usr/share/applications/secure-rdp-viewer.desktop
+          sudo apt-get remove -y secure-rdp-viewer
+          test ! -e /opt/secure-rdp-viewer
+      - name: Dart dependency list (for the SBOM; KI-36)
+        run: cp app/pubspec.lock dist/pubspec.lock
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: linux
+          path: dist/
+          if-no-files-found: error
+
+  windows:
+    name: Windows (MSI, portable ZIP)
+    needs: version
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+      - name: Build release bundle (local paths removed, SA-9)
+        working-directory: app
+        run: |
+          $env:RUSTFLAGS = "--remap-path-prefix=$env:USERPROFILE=C:\home --remap-path-prefix=$env:GITHUB_WORKSPACE=C:\src"
+          flutter pub get
+          flutter build windows --release
+      - name: No local paths in the binaries
+        shell: bash
+        run: bash scripts/check-binaries.sh app/build/windows/x64/runner/Release
+      - name: Sign the program (if a certificate is configured)
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          $files = Get-ChildItem app/build/windows/x64/runner/Release -Include *.exe,*.dll -Recurse | ForEach-Object FullName
+          ./packaging/windows/sign.ps1 @files
+      - name: Install WiX Toolset v5
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          wix extension add -g WixToolset.UI.wixext/5.0.2
+      - name: MSI installer
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          $msi = ./packaging/windows/build-msi.ps1 -BundleDir app/build/windows/x64/runner/Release -Version "${{ needs.version.outputs.version }}" -OutDir dist
+          ./packaging/windows/sign.ps1 $msi
+      - name: Portable ZIP (SA-10)
+        run: ./packaging/windows/build-portable.ps1 -BundleDir app/build/windows/x64/runner/Release -Version "${{ needs.version.outputs.version }}" -OutDir dist
+      - name: Install, check and uninstall the MSI (per user, silently)
+        run: |
+          $msi = Get-ChildItem dist/*.msi | Select-Object -First 1
+          $p = Start-Process msiexec -ArgumentList "/i `"$($msi.FullName)`" /qn /l*v install.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content install.log -Tail 50; throw "install failed: $($p.ExitCode)" }
+          $exe = "$env:LOCALAPPDATA\Programs\Secure RDP Viewer\secure_rdp_viewer.exe"
+          if (-not (Test-Path $exe)) { throw "not installed per user at $exe" }
+          if (-not (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Secure RDP Viewer.lnk")) { throw "no Start-menu shortcut" }
+          $p = Start-Process msiexec -ArgumentList "/x `"$($msi.FullName)`" /qn /l*v uninstall.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content uninstall.log -Tail 50; throw "uninstall failed: $($p.ExitCode)" }
+          if (Test-Path $exe) { throw "files left after uninstall" }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: windows
+          path: dist/
+          if-no-files-found: error
+
+  android:
+    name: Android (signed APK)
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Release keystore from secrets (S12)
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          IS_TAG: ${{ github.ref_type == 'tag' }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            if [ "$IS_TAG" = true ]; then echo "::error::ANDROID_KEYSTORE_BASE64 is not set; refusing to release a debug-signed APK"; exit 1; fi
+            echo "::warning::No release keystore: this test build is debug-signed and must not be published"
+            exit 0
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "RDPV_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+      - name: Build release APK (local paths removed, SA-9)
+        working-directory: app
+        env:
+          RDPV_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          RDPV_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          RDPV_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          export RUSTFLAGS="--remap-path-prefix=$HOME=/home --remap-path-prefix=$HOME/.cargo=/cargo --remap-path-prefix=$GITHUB_WORKSPACE=/src"
+          flutter pub get
+          flutter build apk --release
+          mkdir -p ../dist
+          cp build/app/outputs/flutter-apk/app-release.apk "../dist/SecureRdpViewer-${{ needs.version.outputs.version }}-android.apk"
+          rm -f "$RUNNER_TEMP/release.jks"
+      - name: Signature check (never the debug key) and certificate fingerprint
+        env:
+          IS_TAG: ${{ github.ref_type == 'tag' }}
+        run: |
+          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          apk=$(ls dist/*.apk)
+          "$apksigner" verify --print-certs "$apk" | tee dist/android-signing-certificate.txt
+          if grep -q "CN=Android Debug" dist/android-signing-certificate.txt && [ "$IS_TAG" = true ]; then
+            echo "::error::APK is signed with the debug key"; exit 1
+          fi
+      - name: No local paths in the native libraries
+        run: |
+          mkdir apk && unzip -q dist/*.apk 'lib/*' -d apk
+          bash scripts/check-binaries.sh apk/lib
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: android
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: Draft GitHub release (checksums, SBOM)
+    needs: [version, linux, windows, android]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the draft release
+      actions: read # download this run's build artifacts
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Download the packages built above
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --dir artifacts
+          ls -R artifacts
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: SBOM (S8)
+        run: |
+          cargo install cargo-cyclonedx --version 0.5.7 --locked
+          bash scripts/make-sbom.sh release
+          cp artifacts/linux/pubspec.lock "release/dart-dependencies.pubspec.lock"
+      - name: Collect files and checksums
+        run: |
+          cp artifacts/linux/*.deb artifacts/linux/*.AppImage artifacts/windows/*.msi \
+             artifacts/windows/*.zip artifacts/android/*.apk \
+             artifacts/android/android-signing-certificate.txt release/
+          cd release && sha256sum -- * > SHA256SUMS && cat SHA256SUMS
+      - name: Create a draft release (the owner reviews and publishes it)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          {
+            echo "Draft created by the release workflow. Before publishing, check docs/RELEASING.md."
+            echo
+            echo "Verify downloads with: sha256sum -c SHA256SUMS"
+            echo
+            echo "Android signing certificate:"; echo '```'; cat release/android-signing-certificate.txt; echo '```'
+          } > notes.md
+          gh release create "$TAG" --draft --verify-tag --title "Secure RDP Viewer $TAG" --notes-file notes.md release/*

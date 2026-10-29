@@ -16,11 +16,20 @@ import '../state/settings.dart';
 /// Settings, saved connections tools and About. Settings are saved to disk by
 /// `SettingsPersistence` whenever they change.
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key, required this.settings, required this.store, required this.paths});
+  const SettingsScreen({
+    super.key,
+    required this.settings,
+    required this.store,
+    required this.paths,
+    this.portableDir,
+  });
 
   final AppSettings settings;
   final ProfileStore store;
   final Future<AppPaths> Function() paths;
+
+  /// Set when running as a portable copy (SA-10): where its data is kept.
+  final String? portableDir;
 
   static bool get _isAndroid => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
   static bool get _isWindows => !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
@@ -53,6 +62,29 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
     if (ok == true) settings.confirmSavedPassword = false;
+  }
+
+  Future<void> _removeAllPasswords(BuildContext context) async {
+    final count = store.profiles.where((p) => p.savePassword).length;
+    if (count == 0) {
+      _snack(context, 'No passwords are saved on this device.');
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove all saved passwords?'),
+        content: Text('$count saved password(s) will be deleted from this device. '
+            'Your connections are kept; you will type the password when connecting.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Remove')),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final removed = await removeAllSavedPasswords(store);
+    if (context.mounted) _snack(context, 'Removed $removed saved password(s).');
   }
 
   void _snack(BuildContext context, String text) =>
@@ -185,6 +217,13 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           ListTile(
+            key: const Key('button-remove-passwords'),
+            leading: const Icon(Icons.key_off_outlined),
+            title: const Text('Remove all saved passwords'),
+            subtitle: const Text('Do this before uninstalling on Linux, or before giving the device away.'),
+            onTap: () => _removeAllPasswords(context),
+          ),
+          ListTile(
             leading: const Icon(Icons.verified_outlined),
             title: const Text('Trusted computers'),
             subtitle: const Text('Certificates you have approved'),
@@ -233,6 +272,14 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           const _Header('About'),
+          if (portableDir != null)
+            ListTile(
+              key: const Key('portable-info'),
+              leading: const Icon(Icons.usb_outlined),
+              title: const Text('Portable copy'),
+              subtitle: Text('Connections and settings are kept in $portableDir. '
+                  'Passwords are never stored there.'),
+            ),
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('Version'),

@@ -16,11 +16,16 @@ class ConnectionFormScreen extends StatefulWidget {
     required this.store,
     this.existing,
     this.clipboardDefault = false,
+    this.portable = false,
   });
 
   final ProfileStore store;
   final ConnectionProfile? existing;
   final bool clipboardDefault;
+
+  /// Running as a portable copy (SA-10): warn that a saved password stays on
+  /// this computer only.
+  final bool portable;
 
   @override
   State<ConnectionFormScreen> createState() => _ConnectionFormScreenState();
@@ -259,6 +264,17 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                     'is usually unlocked when you log in.',
                   ),
                 ),
+                if (widget.portable && _savePassword)
+                  Padding(
+                    key: const Key('portable-password-warning'),
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'This is a portable copy. The password is saved only on this computer, '
+                      'not on the drive, so on another computer you will be asked for it. '
+                      "Don't save passwords on computers you don't own.",
+                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    ),
+                  ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<ClipboardMode>(
                   key: const Key('field-clipboard'),

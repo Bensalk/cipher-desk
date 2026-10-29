@@ -64,7 +64,7 @@ B4 other apps on the device · B5 build and release pipeline · B6 public reposi
 | T-1 | T1 changes traffic in transit | TLS (rustls, ring provider; TLS 1.2/1.3 only) | `tls.rs` |
 | T-2 | T5 edits the pin file on a portable drive to trust a new server | A pin mismatch still blocks; a missing pin causes a visible first-connection prompt (SA-10) | `pins.rs`; live T4 |
 | T-3 | Damaged or hostile app data files (connections, settings, pins) | Size limit 4 MB, strict parsing, invalid entries skipped, damaged files set aside not deleted, atomic writes with backup; an unreadable file is never overwritten | `fsutil.rs`, `profiles.rs`, `settings.rs`; `persistence.dart` (R29) |
-| T-4 | T6 tampers with dependencies or CI | `Cargo.lock` with `--locked`; cargo-deny (sources, bans, advisories, licences); OSV-Scanner; GitHub Actions pinned to commit hashes; CodeQL | `.github/workflows/*.yml`, `deny.toml` |
+| T-4 | T6 tampers with dependencies, build tools or releases | `Cargo.lock` with `--locked`; cargo-deny; OSV-Scanner; GitHub Actions pinned to commit hashes; CodeQL; the AppImage tool pinned by SHA-256; releases are drafts the owner reviews; `SHA256SUMS`, SBOM, signed APK (and Authenticode when configured) | `.github/workflows/*.yml`, `deny.toml`, `docs/RELEASING.md` |
 
 ### Repudiation
 
@@ -83,7 +83,7 @@ connection outcomes (no content, no passwords) for the user's own reference.
 | I6 | Clipboard leaks (T2 reads what you copy; T3 reads what the host copies) | Clipboard off by default per connection; text only; 1 MB limit; one-direction options; host text marked sensitive on Android; Android reads only in the foreground | `clipboard.rs`; live C1–C6 |
 | I7 | Backups or device transfer copy app data (T5) | `allowBackup=false` and data-extraction rules exclude everything | `AndroidManifest.xml`, `data_extraction_rules.xml` |
 | I8 | Other local users read app data on Linux | Files written with mode 0600 | `fsutil.rs` `files_are_private` |
-| I9 | Owner's data in the public repository (T7) | SA-9: gitleaks pre-commit and CI over full history, noreply identity, `.gitignore`, paths stripped from release builds | `scripts/hooks/pre-commit`, `.gitleaks.toml`, `release-build.sh` |
+| I9 | Owner's data in the public repository or release files (T7) | SA-9: gitleaks pre-commit and CI over full history, noreply identity, `.gitignore`, local paths removed from release builds and the SBOM and checked | `scripts/hooks/pre-commit`, `.gitleaks.toml`, `release-build.sh`, `check-binaries.sh`, `make-sbom.sh` |
 
 ### Denial of service
 

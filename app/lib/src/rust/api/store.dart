@@ -35,6 +35,11 @@ List<TrustedComputer>  trustedComputers({required String pinsPath }) => RustLib.
 /// Forgets a trusted computer by its "host:port" key.
 bool  forgetTrustedComputer({required String pinsPath , required String endpoint }) => RustLib.instance.api.crateApiStoreForgetTrustedComputer(pinsPath: pinsPath, endpoint: endpoint);
 
+/// The portable data folder when running as a portable copy (Windows portable
+/// ZIP with `portable.txt`, or an AppImage with a `.data` folder next to it);
+/// `None` for an installed copy, which uses the normal per-user folders.
+String?  portableDataDir() => RustLib.instance.api.crateApiStorePortableDataDir();
+
 bool  isValidMac({required String text }) => RustLib.instance.api.crateApiStoreIsValidMac(text: text);
 
 /// Sends a Wake-on-LAN packet on the local network.

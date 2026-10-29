@@ -28,6 +28,7 @@ pub mod input;
 pub mod logging;
 pub mod pins;
 pub mod policy;
+pub mod portable;
 pub mod profiles;
 pub mod secret;
 pub mod session;

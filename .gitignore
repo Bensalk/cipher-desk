@@ -66,3 +66,6 @@ Thumbs.db
 
 # Node tool dependencies (tools/dart-syntax)
 node_modules/
+
+# SBOM output (scripts/make-sbom.sh writes to a chosen folder)
+*.cdx.json

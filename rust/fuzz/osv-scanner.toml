@@ -1,0 +1,7 @@
+# OSV-Scanner exceptions for the TEST-ONLY fuzzing crate in this folder.
+# It is never shipped; it links the app's core library, so the app's reviewed
+# exceptions apply here too.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2023-0071"
+reason = "rsa Marvin timing attack (private-key operations). Same review as the app: no RSA private-key operations (see deny.toml and docs/PROGRESS.md KI-2)."

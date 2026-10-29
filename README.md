@@ -27,8 +27,10 @@ A secure, open-source remote desktop (RDP) viewer for **Windows, Linux and Andro
 | `scripts/` | Git hooks, security policy checks, test hosts, release build helper |
 | `rust/fuzz` | Fuzzers for our parsers of untrusted input (test-only, separate workspace) |
 | `tools/rdp-test-host` | Test-only RDP host (NLA + scriptable clipboard) for live tests; never shipped |
+| `tools/icon` | Draws the app icon (original artwork) for every platform |
 | `tools/syntax-check` | Syntax-only Dart/Kotlin checker for machines without Flutter (optional) |
-| `docs/` | Plan, progress record and design notes |
+| `packaging/` | Installers and portable packages: Linux `.deb`/AppImage, Windows MSI (WiX)/portable ZIP, icons |
+| `docs/` | User guide, host setup, threat model, security review, releasing, progress record, plan |
 
 ## Building
 
@@ -54,7 +56,9 @@ flutter run -d linux                  # or: -d windows, or an Android device
 Please read [`SECURITY.md`](SECURITY.md). Report vulnerabilities privately,
 never in a public issue.
 
+- [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md): install, use, portable copies, uninstall
 - [`docs/HOST_SETUP.md`](docs/HOST_SETUP.md): set up the remote computer safely (start here)
+- [`docs/RELEASING.md`](docs/RELEASING.md): building releases, and the checklist before going public
 - [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md): threats, mitigations and accepted risks
 - [`docs/SECURITY_REVIEW.md`](docs/SECURITY_REVIEW.md): how each security requirement was verified
 

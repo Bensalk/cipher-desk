@@ -712,3 +712,94 @@ right after connecting). Both are intended.
 ### Next step
 Stage 10 — packaging and release: MSI, .deb, AppImage, portable ZIP (SA-10), signed APK,
 checksums and SBOM (S8), and the steps to make the repository public.
+
+---
+
+## Review of Stage 9 (29 Oct 2026)
+
+| # | Problem found | Fix |
+|---|---------------|-----|
+| R40 | The weekly OSV scan used `--config osv-scanner.toml`, which applies the root file to every folder, so the test host's and fuzzers' reviewed exceptions were ignored and the scan would have failed | Each folder's own file applies now (`--config` removed); the fuzz folder got its own file |
+| R41 | `release-build.sh` listed the broad `$HOME` path rule last, and rustc uses the **last** matching rule, so the Cargo and Rustup rules never applied (paths became `/home/.cargo/...`; no user name leaked) | Broadest rule first; verified with the new `check-binaries.sh` |
+| R42 | The app icons were still Flutter's template icons (the Flutter logo, a Google trademark) | Original icon (`tools/icon/make_icons.py`) for Android, Windows and Linux |
+
+Also checked: npm tool dependencies (`npm audit`: 0 vulnerabilities); app identity in the
+Windows and Linux runners is correct; all commits use the noreply identity.
+
+---
+
+## Stage 10 — Packaging and Release ⏳ Packages defined; first build waits for the GitHub repository (29 Oct 2026)
+
+### Objective
+Proper installers and portable versions for Windows, Linux and Android, signed
+releases with checksums and an SBOM, complete documentation, and the steps to make the
+repository public.
+
+### Completed
+- **Portable mode (SA-10):** Rust `portable.rs` decides where data lives: next to the
+  Windows `.exe` when `portable.txt` is present (portable ZIP), or in a
+  `<AppImage>.data` folder next to an AppImage; otherwise the normal per-user folders.
+  A read-only drive falls back to the normal folders. Passwords are never stored there;
+  ticking *Save password* in a portable copy shows a warning that it stays on this
+  computer. Settings shows where a portable copy keeps its data.
+- **Remove all saved passwords** (Settings) and the uninstall hook
+  `--remove-saved-passwords`, which the Windows uninstaller runs (no window is shown).
+- **Linux:** `.deb` (to `/opt`, launcher, app-menu entry, icons, AppStream metadata) and
+  AppImage (portable). **Tested here** with a stand-in for the Flutter bundle: install →
+  launch → upgrade 0.1.0 → 0.1.1 in place → uninstall left nothing behind.
+- **Windows:** WiX v5 MSI — per-user by default (no administrator rights,
+  `%LOCALAPPDATA%\Programs`), Start-menu shortcut, optional desktop shortcut, Add/Remove
+  Programs entry with icon, in-place upgrade, downgrade refused, licence page from
+  `LICENSE`, saved passwords removed on uninstall. Portable ZIP with `portable.txt` and
+  a short README. Authenticode signing when a certificate is configured.
+- **Android:** release APK signed with the owner's key from secrets; the workflow refuses
+  to release a debug-signed APK and publishes the signing certificate's fingerprint.
+- **Release workflow** (`.github/workflows/release.yml`): tag `vX.Y.Z` → version check →
+  Linux, Windows and Android builds with local paths removed and checked → `.deb`
+  installed and removed, MSI installed and uninstalled silently on clean runners → SBOM
+  and `SHA256SUMS` → **draft** release for the owner to review. Only actions already
+  pinned in this repository are used; the AppImage tool is pinned by version and SHA-256.
+- **`scripts/check-binaries.sh`** (SA-9): fails if any release file contains a home or
+  user-profile path (other than the anonymous CI runner's). Tested on our release
+  library and with Linux- and Windows-style control files.
+- **`scripts/make-sbom.sh`**: CycloneDX 1.5 SBOM for the Rust code (341 and 360
+  components, all with licences), build folder replaced by `/src`; tested here.
+- **Docs:** `docs/USER_GUIDE.md` (install, first connection, sessions, settings, portable,
+  uninstall, troubleshooting) and `docs/RELEASING.md` (setup, release steps, manual
+  device checklist, **going-public checklist**). README and security docs updated.
+
+### Test results (Ubuntu 24.04, Rust 1.97.0)
+
+| Check | Result |
+|-------|--------|
+| fmt, clippy (`-D warnings`), policy, cargo-deny, actionlint (3 workflows) | ✅ PASS |
+| Unit tests | ✅ PASS — 107/107 (87 core + 20 bridge), incl. portable-mode rules |
+| Dart and Kotlin syntax (all files) | ✅ PASS |
+| `.deb` build, install, upgrade, uninstall (stand-in bundle) | ✅ PASS |
+| Local-path check on the release Rust library; controls caught | ✅ PASS (after R41) |
+| SBOM generation without local paths | ✅ PASS |
+| Icons drawn and rendered (PNG and SVG) | ✅ |
+| Flutter release builds, AppImage, MSI, portable ZIP, signed APK, install tests in the workflow | ⛔ **NOT RUN** — need Flutter, WiX/.NET and Windows (CI) |
+| Manual device checklist in `docs/RELEASING.md` | ⛔ **NOT RUN** — needs devices |
+
+### Known issues (end-of-stage review)
+- **KI-39:** The WiX file, PowerShell scripts and release workflow have only been checked
+  for syntax here (XML, actionlint); their first real run is the first tagged release
+  (or "Run workflow" by hand, which builds without publishing).
+- **KI-40:** Uninstall cleanup removes the passwords of connections in the connections
+  file. If that file was deleted by hand first, its vault entries stay (the vault
+  cannot be listed by app).
+- **KI-41:** A `.deb` cannot remove passwords from users' keyrings on uninstall; the user
+  guide says to use *Remove all saved passwords* first.
+- **KI-42:** Release builds use Flutter's current stable version, not a pinned one.
+- **KI-43:** Without a code-signing certificate, Windows files are unsigned and
+  SmartScreen warns; the release notes and user guide explain how to check checksums.
+- **KI-44:** The AppImage is built on Ubuntu 22.04, so it needs glibc 2.35 or newer.
+- **SA-5 (open):** independent security review before going public.
+- **KI-25 (still open):** the Flutter app has still never been compiled.
+
+### Next step
+Owner: create the private repository `secure-rdp-viewer` and push; then CI's first run
+(fix what it finds, commit `pubspec.lock` from its artifacts), then "Run workflow" on
+Release to build all packages without publishing, then the device checklist. Going
+public only after SA-5 and the checklist in `docs/RELEASING.md`.

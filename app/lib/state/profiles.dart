@@ -172,6 +172,14 @@ class ProfileStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Marks every connection as having no saved password (one notification).
+  void clearSavedPasswordFlags() {
+    for (var i = 0; i < _profiles.length; i++) {
+      if (_profiles[i].savePassword) _profiles[i] = _profiles[i].copyWith(savePassword: false);
+    }
+    notifyListeners();
+  }
+
   void remove(String id) {
     _profiles.removeWhere((p) => p.id == id);
     _history.removeWhere((h) => h.connectionId == id);

@@ -183,5 +183,6 @@ jobs:
             app/build/linux/x64/debug/bundle
             app/build/windows/x64/runner/Debug
             app/build/app/outputs/flutter-apk/app-debug.apk
+            app/pubspec.lock
           if-no-files-found: ignore
           retention-days: 7

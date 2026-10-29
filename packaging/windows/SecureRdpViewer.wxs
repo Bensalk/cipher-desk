@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Windows installer (WiX Toolset v5). Built by packaging/windows/build-msi.ps1.
+  - Per-user install by default (no administrator rights) into %LOCALAPPDATA%\Programs.
+  - Start-menu shortcut, optional desktop shortcut, Add/Remove Programs entry.
+  - In-place upgrade (MajorUpgrade); downgrades are refused.
+  - Uninstall removes the program and, first, this user's saved passwords from
+    Windows Credential Manager (the app's "remove saved passwords" option). Connections
+    and settings in %APPDATA% are kept, in case the app is installed again.
+  UpgradeCode must NEVER change: it is how Windows recognises an upgrade.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="Secure RDP Viewer"
+           Manufacturer="Secure RDP Viewer contributors"
+           Version="$(var.Version)"
+           UpgradeCode="{E56EAB74-3E6E-4A89-948B-8E6CC77A3275}"
+           Scope="perUserOrMachine"
+           Compressed="yes">
+    <SummaryInformation Description="Secure RDP Viewer installer" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="AppIcon" SourceFile="$(var.RepoDir)\app\windows\runner\resources\app_icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+    <!-- Default to a per-user install (no administrator rights): with a dual-purpose
+         package, Windows then redirects Program Files to %LOCALAPPDATA%\Programs. -->
+    <Property Id="MSIINSTALLPERUSER" Value="1" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="Secure RDP Viewer" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+    <StandardDirectory Id="DesktopFolder" />
+
+    <Feature Id="Main" Title="Secure RDP Viewer" Level="1" AllowAbsent="no"
+             Description="The app, with a Start-menu shortcut.">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="MainExe" />
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+    <Feature Id="DesktopShortcutFeature" Title="Desktop shortcut" Level="1"
+             Description="A shortcut on the desktop.">
+      <ComponentRef Id="DesktopShortcut" />
+    </Feature>
+
+    <ui:WixUI Id="WixUI_FeatureTree" />
+
+    <!-- Before files are removed on a real uninstall (not an upgrade), delete this
+         user's saved passwords. Failure must not block uninstalling. -->
+    <CustomAction Id="RemoveSavedPasswords" FileRef="MainExeFile"
+                  ExeCommand="--remove-saved-passwords" Execute="immediate"
+                  Return="ignore" Impersonate="yes" />
+    <InstallExecuteSequence>
+      <Custom Action="RemoveSavedPasswords" Before="RemoveFiles"
+              Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+    </InstallExecuteSequence>
+  </Package>
+
+  <Fragment>
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.BundleDir)\**">
+        <Exclude Files="$(var.BundleDir)\secure_rdp_viewer.exe" />
+      </Files>
+    </ComponentGroup>
+
+    <Component Id="MainExe" Directory="INSTALLFOLDER">
+      <File Id="MainExeFile" Source="$(var.BundleDir)\secure_rdp_viewer.exe" KeyPath="yes" />
+    </Component>
+
+    <Component Id="StartMenuShortcut" Directory="ProgramMenuFolder">
+      <Shortcut Id="StartMenuLink" Name="Secure RDP Viewer"
+                Description="Connect securely with Remote Desktop"
+                Target="[INSTALLFOLDER]secure_rdp_viewer.exe" WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU" Key="Software\SecureRdpViewer" Name="StartMenuShortcut"
+                     Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Component Id="DesktopShortcut" Directory="DesktopFolder">
+      <Shortcut Id="DesktopLink" Name="Secure RDP Viewer"
+                Target="[INSTALLFOLDER]secure_rdp_viewer.exe" WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU" Key="Software\SecureRdpViewer" Name="DesktopShortcut"
+                     Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+  </Fragment>
+</Wix>

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Secure RDP Viewer
+GenericName=Remote Desktop Viewer
+Comment=Connect securely to Windows computers with Remote Desktop
+Exec=secure-rdp-viewer
+Icon=secure-rdp-viewer
+Terminal=false
+Categories=Network;RemoteAccess;
+Keywords=RDP;remote;desktop;windows;
+StartupWMClass=secure_rdp_viewer

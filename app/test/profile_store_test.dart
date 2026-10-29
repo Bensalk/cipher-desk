@@ -128,6 +128,20 @@ void main() {
     });
   });
 
+  test('clearing saved-password flags keeps the connections', () {
+    final s = ProfileStore();
+    final a = _p(s, 'A', 'a').copyWith(savePassword: true);
+    final b = _p(s, 'B', 'b');
+    s.upsert(a);
+    s.upsert(b);
+    var notified = 0;
+    s.addListener(() => notified++);
+    s.clearSavedPasswordFlags();
+    expect(notified, 1);
+    expect(s.profiles, hasLength(2));
+    expect(s.profiles.any((p) => p.savePassword), isFalse);
+  });
+
   group('AppSettings', () {
     test('secure defaults', () {
       final s = AppSettings();

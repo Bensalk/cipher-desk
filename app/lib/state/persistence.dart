@@ -3,22 +3,50 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../platform/password_vault.dart';
 import '../src/rust/api/store.dart';
 import 'profiles.dart';
 import 'settings.dart';
 
 /// Where the app keeps its private files (no passwords in any of them).
 class AppPaths {
-  AppPaths(this.dir);
+  AppPaths(this.dir, {this.portable = false});
 
   final String dir;
+
+  /// Running as a portable copy (SA-10): [dir] is next to the program, e.g. on
+  /// a USB drive. Passwords are never stored there.
+  final bool portable;
 
   String get connections => '$dir${Platform.pathSeparator}connections.json';
   String get settings => '$dir${Platform.pathSeparator}settings.json';
   String get pins => '$dir${Platform.pathSeparator}certificate_pins.json';
 
-  static Future<AppPaths> resolve() async =>
-      AppPaths((await getApplicationSupportDirectory()).path);
+  static Future<AppPaths> resolve() async {
+    final portableDir = portableDataDir();
+    if (portableDir != null) {
+      try {
+        await Directory(portableDir).create(recursive: true);
+        return AppPaths(portableDir, portable: true);
+      } on FileSystemException {
+        // Read-only drive: fall back to the normal folders rather than failing.
+      }
+    }
+    return AppPaths((await getApplicationSupportDirectory()).path);
+  }
+}
+
+/// Deletes every saved password from this device's vault and clears the
+/// "password saved" flags. Used by Settings and by the Windows uninstaller
+/// (`--remove-saved-passwords`). Returns how many passwords were removed.
+Future<int> removeAllSavedPasswords(ProfileStore store) async {
+  var removed = 0;
+  for (final p in store.profiles.where((p) => p.savePassword)) {
+    final outcome = await PasswordVault.delete(p.id);
+    if (outcome == VaultOutcome.ok) removed++;
+  }
+  store.clearSavedPasswordFlags();
+  return removed;
 }
 
 /// What happened when the saved connections were loaded, for a startup notice.

@@ -32,7 +32,7 @@ No critical or high-severity issue is open.
 | S5 | OS confirmation before a saved password is used | 🟡 | Windows Hello toggle with warning; Android BiometricPrompt; Linux keyring (KI-15). Needs devices |
 | S6 | Clipboard limit, indicator, one direction, sensitive on Android | 🟡 | Live C1–C6 (engine); indicator and Android flag need Flutter/device |
 | S7 | Idle disconnect | 🟡 | Engine timer (bridge `drive`); setting saved; UI needs Flutter |
-| S8 | Signed releases, checksums, SBOM, `SECURITY.md` | ⏳ | `SECURITY.md` ✅; signing, checksums and SBOM in Stage 10 |
+| S8 | Signed releases, checksums, SBOM, `SECURITY.md` | 🟡 (Stage 10) | Release workflow: APK signature verified (never the debug key), Authenticode when a certificate is configured, `SHA256SUMS`, CycloneDX SBOM with local paths removed (SBOM tested here). Packages are built in CI only |
 | S9 | Linux files private (0600) in the user's folders | ✅ | `fsutil::files_are_private`; files in the XDG data folder chosen by `path_provider` (`~/.local/share/...`) |
 | S10 | Android `FLAG_SECURE` on by default | 🟡 | `MainActivity.kt`; needs a device |
 | S11 | Android: no backup/transfer; minimal permissions | ✅ (code) | `allowBackup=false`, extraction rules; permissions: network, foreground service (special use), notifications |
@@ -51,8 +51,8 @@ No critical or high-severity issue is open.
 | SA-6 | Never accept any certificate | ✅ | `scripts/check-policy.sh` (pre-commit and CI); live T1 |
 | SA-7 | Logs capped at info in release; `sspi` off; password-in-logs test | ✅ | `logging.rs`; live T7 (with control) and L7 |
 | SA-8 | Never retry after an authentication failure | ✅ | Unit tests (reconnect rules, error matrix); live L5 |
-| SA-9 | No secrets or personal data in the source | ✅ | gitleaks on every commit and full history (clean); noreply identity; `.gitignore`; path remapping |
-| SA-10 | Portable mode rules | ⏳ | Stage 10 |
+| SA-9 | No secrets or personal data in the source | ✅ | gitleaks on every commit and full history (clean); noreply identity; `.gitignore`; path remapping (rule order fixed in Stage 10, R41), checked by `scripts/check-binaries.sh` on every release file and the SBOM |
+| SA-10 | Portable mode rules | 🟡 (Stage 10) | `portable.rs` (unit tests): data next to the app only with `portable.txt` (Windows ZIP) or a `.data` folder (AppImage); passwords never there; warning when saving one; a pin mismatch still blocks. App UI needs Flutter |
 
 ### Findings from the Stage 1 spike (SF-1 – SF-6)
 

@@ -73,7 +73,9 @@ jobs:
       - name: Run OSV-Scanner
         run: |
           go install github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.7.0
-          "$(go env GOPATH)/bin/osv-scanner" scan source --recursive --config osv-scanner.toml .
+          # No --config: each folder's own osv-scanner.toml applies (the app's at the
+          # root; the test-only host and fuzzers have their own reviewed exceptions).
+          "$(go env GOPATH)/bin/osv-scanner" scan source --recursive .
 
   codeql:
     name: CodeQL (${{ matrix.language }})

@@ -271,6 +271,16 @@ pub fn forget_trusted_computer(pins_path: String, endpoint: String) -> bool {
         .is_ok()
 }
 
+// ---------------------------------------------------------------- portable mode (SA-10)
+
+/// The portable data folder when running as a portable copy (Windows portable
+/// ZIP with `portable.txt`, or an AppImage with a `.data` folder next to it);
+/// `None` for an installed copy, which uses the normal per-user folders.
+#[flutter_rust_bridge::frb(sync)]
+pub fn portable_data_dir() -> Option<String> {
+    rdpv_core::portable::current().map(|p| p.to_string_lossy().into_owned())
+}
+
 // ---------------------------------------------------------------- wake-on-lan / reachability
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

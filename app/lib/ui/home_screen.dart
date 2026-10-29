@@ -76,6 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
           store: widget.store,
           existing: existing,
           clipboardDefault: widget.settings.clipboardDefault,
+          portable: widget.paths?.portable ?? false,
         ),
       ),
     );
@@ -248,7 +249,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final wide = MediaQuery.sizeOf(context).width >= 720;
     final body = _tab == 0
         ? _connections()
-        : SettingsScreen(settings: widget.settings, store: widget.store, paths: _appPaths);
+        : SettingsScreen(
+            settings: widget.settings,
+            store: widget.store,
+            paths: _appPaths,
+            portableDir: (widget.paths?.portable ?? false) ? widget.paths!.dir : null,
+          );
     final destinations = const [
       (Icons.computer_outlined, Icons.computer, 'Connections'),
       (Icons.settings_outlined, Icons.settings, 'Settings'),
