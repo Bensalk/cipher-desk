@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 
 /// A saved connection. Deliberately has **no password field**: passwords are
@@ -59,7 +61,7 @@ class ConnectionProfile {
 /// In-memory list of profiles for Stage 3. Saving to disk arrives in Stage 7.
 class ProfileStore extends ChangeNotifier {
   final List<ConnectionProfile> _profiles = [];
-  int _nextId = 1;
+  final Random _random = Random.secure();
 
   /// Profiles, most recently used first, then by name.
   List<ConnectionProfile> get profiles {
@@ -76,7 +78,12 @@ class ProfileStore extends ChangeNotifier {
 
   bool get isEmpty => _profiles.isEmpty;
 
-  String newId() => 'p${_nextId++}';
+  /// A random 128-bit id. Ids key saved passwords in the OS vault, so they must
+  /// never be reused for a different connection (e.g. after an app restart).
+  String newId() {
+    final bytes = List<int>.generate(16, (_) => _random.nextInt(256));
+    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  }
 
   /// Adds a profile, or replaces the one with the same id.
   void upsert(ConnectionProfile profile) {

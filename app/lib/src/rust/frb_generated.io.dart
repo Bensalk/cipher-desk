@@ -6,7 +6,9 @@
 import 'api/errors.dart';
 import 'api/form.dart';
 import 'api/info.dart';
+import 'api/pins.dart';
 import 'api/session.dart';
+import 'api/vault.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi' as ffi;
@@ -82,6 +84,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
 @protected BigInt dco_decode_usize(dynamic raw);
 
+@protected VaultResult dco_decode_vault_result(dynamic raw);
+
 @protected AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
 
 @protected RdpSession sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(SseDeserializer deserializer);
@@ -136,6 +140,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
 @protected BigInt sse_decode_usize(SseDeserializer deserializer);
 
+@protected VaultResult sse_decode_vault_result(SseDeserializer deserializer);
+
 @protected void sse_encode_AnyhowException(AnyhowException self, SseSerializer serializer);
 
 @protected void sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(RdpSession self, SseSerializer serializer);
@@ -189,6 +195,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 @protected void sse_encode_update_kind(UpdateKind self, SseSerializer serializer);
 
 @protected void sse_encode_usize(BigInt self, SseSerializer serializer);
+
+@protected void sse_encode_vault_result(VaultResult self, SseSerializer serializer);
                 }
                 
 

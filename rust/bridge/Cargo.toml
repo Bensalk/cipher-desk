@@ -18,6 +18,9 @@ tracing.workspace = true
 
 # Same rules as the workspace, except `unsafe_code` is "deny" instead of "forbid"
 # so the generated FFI module alone can opt out (see src/lib.rs).
+[dev-dependencies]
+tempfile = "3"
+
 [lints.rust]
 unsafe_code = "deny"
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(frb_expand)"] }

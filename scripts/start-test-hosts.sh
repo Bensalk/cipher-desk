@@ -1,10 +1,10 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Starts local RDP test hosts for the live integration tests (rust/core/tests/live_host.rs):
 #   - FreeRDP shadow server on port 3389 with NLA required (positive tests),
 #   - xrdp on port 3390, which does not support NLA (must be refused).
 # A random password is generated for every run; it is never written to the repository.
 #
-# Usage:   . scripts/start-test-hosts.sh   (Linux; needs: Xvfb xterm freerdp3-shadow-x11
+# Usage:   source scripts/start-test-hosts.sh   (bash, Linux; needs: Xvfb xterm freerdp3-shadow-x11
 #                                           winpr3-utils (winpr-hash3) xrdp xorgxrdp openssl)
 # In GitHub Actions the variables are written to $GITHUB_ENV and the password is masked.
 set -eu
@@ -58,11 +58,11 @@ if [ -n "${GITHUB_ENV:-}" ]; then
     echo "RDPV_TEST_PORT=3389"
     echo "RDPV_TEST_USER=$USER_NAME"
     echo "RDPV_TEST_PASSWORD=$PASSWORD"
-    [ -n "$NONLA_PORT" ] && echo "RDPV_TEST_NONLA_PORT=$NONLA_PORT"
+    if [ -n "$NONLA_PORT" ]; then echo "RDPV_TEST_NONLA_PORT=$NONLA_PORT"; fi
   } >>"$GITHUB_ENV"
 else
   export RDPV_TEST_HOST=127.0.0.1 RDPV_TEST_PORT=3389 RDPV_TEST_USER="$USER_NAME"
   export RDPV_TEST_PASSWORD="$PASSWORD"
-  [ -n "$NONLA_PORT" ] && export RDPV_TEST_NONLA_PORT="$NONLA_PORT"
+  if [ -n "$NONLA_PORT" ]; then export RDPV_TEST_NONLA_PORT="$NONLA_PORT"; fi
 fi
 echo "Test hosts ready (NLA on 3389${NONLA_PORT:+, no-NLA on $NONLA_PORT})."

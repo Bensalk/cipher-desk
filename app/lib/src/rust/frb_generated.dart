@@ -6,7 +6,9 @@
 import 'api/errors.dart';
 import 'api/form.dart';
 import 'api/info.dart';
+import 'api/pins.dart';
 import 'api/session.dart';
+import 'api/vault.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'frb_generated.dart';
@@ -71,7 +73,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
                   String get codegenVersion => '2.13.0';
 
                   @override
-                  int get rustContentHash => 571096346;
+                  int get rustContentHash => 7256367;
 
                   static const kDefaultExternalLibraryLoaderConfig = ExternalLibraryLoaderConfig(
                     stem: 'rust_lib_secure_rdp_viewer',
@@ -99,6 +101,8 @@ void crateApiSessionRdpSessionMouseMove({required RdpSession that , required int
 
 Stream<SessionUpdate> crateApiSessionRdpSessionStart({required RdpSession that , required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath });
 
+Stream<SessionUpdate> crateApiSessionRdpSessionStartWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath });
+
 void crateApiSessionRdpSessionTypeText({required RdpSession that , required String text });
 
 void crateApiSessionRdpSessionWheel({required RdpSession that , required bool vertical , required int delta });
@@ -111,9 +115,17 @@ String crateApiInfoCoreSummary();
 
 int crateApiFormDefaultPort();
 
+bool crateApiPinsForgetCertificate({required String pinsPath , required String host , required int port });
+
 String crateApiInfoHelloFromRust();
 
 List<String> crateApiInfoSecurityDefaultsSummary();
+
+VaultResult crateApiVaultVaultCheckPassword({required String connectionId });
+
+VaultResult crateApiVaultVaultDeletePassword({required String connectionId });
+
+VaultResult crateApiVaultVaultSavePassword({required String connectionId , required String password });
 
 RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_RdpSession;
 
@@ -355,12 +367,49 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
         );
         
 
+@override Stream<SessionUpdate> crateApiSessionRdpSessionStartWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath })  { 
+            final sink = RustStreamSink<SessionUpdate>();
+            unawaited(handler.executeNormal(NormalTask(
+            callFfi: (port_) {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
+sse_encode_String(connectionId, serializer);
+sse_encode_String(host, serializer);
+sse_encode_u_16(port, serializer);
+sse_encode_String(username, serializer);
+sse_encode_u_16(width, serializer);
+sse_encode_u_16(height, serializer);
+sse_encode_String(pinsPath, serializer);
+sse_encode_StreamSink_session_update_Sse(sink, serializer);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9, port: port_);
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiSessionRdpSessionStartWithSavedPasswordConstMeta,
+            argValues: [that, connectionId, host, port, username, width, height, pinsPath, sink],
+            apiImpl: this,
+        )));
+            return sink.stream;
+             }
+
+
+        TaskConstMeta get kCrateApiSessionRdpSessionStartWithSavedPasswordConstMeta => const TaskConstMeta(
+            debugName: "RdpSession_start_with_saved_password",
+            argNames: ["that", "connectionId", "host", "port", "username", "width", "height", "pinsPath", "sink"],
+        );
+        
+
 @override void crateApiSessionRdpSessionTypeText({required RdpSession that , required String text })  { return handler.executeSync(SyncTask(
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
 sse_encode_String(text, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
             
             },
             codec: 
@@ -387,7 +436,7 @@ sse_encode_String(text, serializer);
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
 sse_encode_bool(vertical, serializer);
 sse_encode_i_16(delta, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
             
             },
             codec: 
@@ -412,7 +461,7 @@ sse_encode_i_16(delta, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
             
             },
             codec: 
@@ -442,7 +491,7 @@ sse_encode_String(port, serializer);
 sse_encode_String(username, serializer);
 sse_encode_String(password, serializer);
 sse_encode_bool(hasSavedPassword, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13)!;
             
             },
             codec: 
@@ -467,7 +516,7 @@ sse_encode_bool(hasSavedPassword, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
             
             },
             codec: 
@@ -492,7 +541,7 @@ sse_encode_bool(hasSavedPassword, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15)!;
             
             },
             codec: 
@@ -513,11 +562,38 @@ sse_encode_bool(hasSavedPassword, serializer);
         );
         
 
+@override bool crateApiPinsForgetCertificate({required String pinsPath , required String host , required int port })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(pinsPath, serializer);
+sse_encode_String(host, serializer);
+sse_encode_u_16(port, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiPinsForgetCertificateConstMeta,
+            argValues: [pinsPath, host, port],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiPinsForgetCertificateConstMeta => const TaskConstMeta(
+            debugName: "forget_certificate",
+            argNames: ["pinsPath", "host", "port"],
+        );
+        
+
 @override String crateApiInfoHelloFromRust()  { return handler.executeSync(SyncTask(
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17)!;
             
             },
             codec: 
@@ -542,7 +618,7 @@ sse_encode_bool(hasSavedPassword, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18)!;
             
             },
             codec: 
@@ -560,6 +636,82 @@ sse_encode_bool(hasSavedPassword, serializer);
         TaskConstMeta get kCrateApiInfoSecurityDefaultsSummaryConstMeta => const TaskConstMeta(
             debugName: "security_defaults_summary",
             argNames: [],
+        );
+        
+
+@override VaultResult crateApiVaultVaultCheckPassword({required String connectionId })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(connectionId, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_vault_result,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiVaultVaultCheckPasswordConstMeta,
+            argValues: [connectionId],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiVaultVaultCheckPasswordConstMeta => const TaskConstMeta(
+            debugName: "vault_check_password",
+            argNames: ["connectionId"],
+        );
+        
+
+@override VaultResult crateApiVaultVaultDeletePassword({required String connectionId })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(connectionId, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_vault_result,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiVaultVaultDeletePasswordConstMeta,
+            argValues: [connectionId],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiVaultVaultDeletePasswordConstMeta => const TaskConstMeta(
+            debugName: "vault_delete_password",
+            argNames: ["connectionId"],
+        );
+        
+
+@override VaultResult crateApiVaultVaultSavePassword({required String connectionId , required String password })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(connectionId, serializer);
+sse_encode_String(password, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_vault_result,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiVaultVaultSavePasswordConstMeta,
+            argValues: [connectionId, password],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiVaultVaultSavePasswordConstMeta => const TaskConstMeta(
+            debugName: "vault_save_password",
+            argNames: ["connectionId", "password"],
         );
         
 
@@ -675,6 +827,9 @@ return UpdateKind.values[raw as int]; }
 
 @protected BigInt dco_decode_usize(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return dcoDecodeU64(raw); }
+
+@protected VaultResult dco_decode_vault_result(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return VaultResult.values[raw as int]; }
 
 @protected AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 var inner = sse_decode_String(deserializer);
@@ -816,6 +971,10 @@ var inner = sse_decode_i_32(deserializer);
 @protected BigInt sse_decode_usize(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 return deserializer.buffer.getBigUint64(); }
 
+@protected VaultResult sse_decode_vault_result(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+var inner = sse_decode_i_32(deserializer);
+        return VaultResult.values[inner]; }
+
 @protected void sse_encode_AnyhowException(AnyhowException self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_String(self.message, serializer); }
 
@@ -940,6 +1099,9 @@ sse_encode_i_32(self.index, serializer); }
 
 @protected void sse_encode_usize(BigInt self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 serializer.buffer.putBigUint64(self); }
+
+@protected void sse_encode_vault_result(VaultResult self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_i_32(self.index, serializer); }
                 }
                 
 
@@ -987,6 +1149,12 @@ serializer.buffer.putBigUint64(self); }
 /// `pins_path` is the certificate pin file in the app's private data folder.
 /// Can be called once per handle.
  Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath })=>RustLib.instance.api.crateApiSessionRdpSessionStart(that: this, host: host, port: port, username: username, password: password, width: width, height: height, pinsPath: pinsPath);
+
+
+/// Like [`RdpSession::start`], but reads the saved password from the OS
+/// vault inside Rust, so it never passes through the UI (Windows, Linux).
+/// The caller must have confirmed the user's identity first (S5).
+ Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath })=>RustLib.instance.api.crateApiSessionRdpSessionStartWithSavedPassword(that: this, connectionId: connectionId, host: host, port: port, username: username, width: width, height: height, pinsPath: pinsPath);
 
 
 /// Types text (on-screen keyboards, IMEs, pasted text is NOT sent this way).

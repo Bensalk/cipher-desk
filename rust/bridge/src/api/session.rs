@@ -162,7 +162,50 @@ impl RdpSession {
         pins_path: String,
         sink: StreamSink<SessionUpdate>,
     ) {
-        let password = SecretString::new(password);
+        let target = Target {
+            host,
+            port,
+            username,
+            width,
+            height,
+            pins_path,
+        };
+        self.spawn(target, Some(SecretString::new(password)), None, sink);
+    }
+
+    /// Like [`RdpSession::start`], but reads the saved password from the OS
+    /// vault inside Rust, so it never passes through the UI (Windows, Linux).
+    /// The caller must have confirmed the user's identity first (S5).
+    #[allow(clippy::too_many_arguments)]
+    pub fn start_with_saved_password(
+        &self,
+        connection_id: String,
+        host: String,
+        port: u16,
+        username: String,
+        width: u16,
+        height: u16,
+        pins_path: String,
+        sink: StreamSink<SessionUpdate>,
+    ) {
+        let target = Target {
+            host,
+            port,
+            username,
+            width,
+            height,
+            pins_path,
+        };
+        self.spawn(target, None, Some(connection_id), sink);
+    }
+
+    fn spawn(
+        &self,
+        target: Target,
+        password: Option<SecretString>,
+        saved_id: Option<String>,
+        sink: StreamSink<SessionUpdate>,
+    ) {
         let rx = self.rx.lock().ok().and_then(|mut g| g.take());
         let Some(rx) = rx else {
             let _ = sink.add(SessionUpdate::ended(Some(ConnectionError::Unexpected)));
@@ -171,9 +214,23 @@ impl RdpSession {
         let spawned = std::thread::Builder::new()
             .name("rdp-session".into())
             .spawn(move || {
-                run(
-                    &host, port, &username, password, width, height, &pins_path, &sink, &rx,
-                )
+                let password = match (password, saved_id) {
+                    (Some(p), _) => p,
+                    (None, Some(id)) => match rdpv_core::vault::load(&id) {
+                        Ok(p) => p,
+                        Err(_) => {
+                            let _ = sink.add(SessionUpdate::ended(Some(
+                                ConnectionError::VaultUnavailable,
+                            )));
+                            return;
+                        }
+                    },
+                    (None, None) => {
+                        let _ = sink.add(SessionUpdate::ended(Some(ConnectionError::Unexpected)));
+                        return;
+                    }
+                };
+                run(&target, password, &sink, &rx);
             });
         if spawned.is_err() {
             tracing::error!("could not start the session thread");
@@ -277,18 +334,31 @@ impl RdpSession {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn run(
-    host: &str,
+/// Where to connect (everything except the password).
+struct Target {
+    host: String,
     port: u16,
-    username: &str,
-    password: SecretString,
+    username: String,
     width: u16,
     height: u16,
-    pins_path: &str,
+    pins_path: String,
+}
+
+fn run(
+    target: &Target,
+    password: SecretString,
     sink: &StreamSink<SessionUpdate>,
     rx: &Receiver<Command>,
 ) {
+    let Target {
+        host,
+        port,
+        username,
+        width,
+        height,
+        pins_path,
+    } = target;
+    let (port, width, height) = (*port, *width, *height);
     let send = |u: SessionUpdate| {
         let _ = sink.add(u);
     };

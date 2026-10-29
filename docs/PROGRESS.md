@@ -282,3 +282,72 @@ keyboard/mouse/touch input, server reactivation and graceful disconnect.
 Stage 5 — secure credential management (OS vaults, biometric/PIN unlock, delete).
 CI still needs the private GitHub repository.
 
+---
+
+## Stage 5 — Secure Credential Management ✅ Linux vault verified live; Windows and Android awaiting first CI run (29 Oct 2026)
+
+### Objective
+Optional saved passwords in the operating system's vault only; confirmation before use
+(S5); deletion; no plain-text copies; refuse to save when no vault exists (I8).
+
+### Completed
+- **Rust `vault`** (`keyring-core` 1.0 with the Windows Credential Manager store and the
+  Linux Secret Service store, pure-Rust D-Bus): save / load / exists / delete. Entries are
+  named `connection-<random id>` under `io.github.securerdpviewer`, so the vault list
+  reveals no host or user names. No vault → `Unavailable`, never a file fallback. Ids are
+  validated before the store is touched.
+- **Connecting with a saved password (Windows, Linux):** `RdpSession.startWithSavedPassword`
+  reads the vault inside Rust, so the password never enters Dart.
+- **Android vault (Kotlin):** AES-256-GCM key in the Android Keystore that can only be used
+  for 30 s after fingerprint, face or screen-lock confirmation; ciphertext in private app
+  storage excluded from backup; no screen lock → nothing saved; key invalidated by new
+  biometric enrolment → all saved passwords deleted. `MainActivity` is now a
+  `FlutterFragmentActivity` (needed for the system prompt).
+- **Confirmation before use (S5):** Windows Hello via `local_auth` (if Windows Hello is not
+  set up, the saved password is not used and the user types it); Android Keystore prompt;
+  Linux keyring lock.
+- **Flutter:** the form saves to / deletes from the vault and reports clearly when nothing
+  was saved; connect uses the saved password after confirmation or asks for it; deleting a
+  connection also deletes its saved password and trusted certificate.
+- **Fix found during the stage (security):** connection ids were `p1`, `p2`, … and restarted
+  each launch (profiles are only saved to disk in Stage 7), so a new connection could have
+  picked up an old connection's saved password and sent it to a different computer. Ids are
+  now random 128-bit values (Dart test added).
+- **Fix found during the stage (tooling):** `start-test-hosts.sh` used a bash-only feature
+  under `sh`, so its readiness check always failed; it is now a bash script, and a
+  `set -e` trap when xrdp is absent was removed. CI updated.
+- **CI:** keyring tests on Linux (inside a D-Bus session with GNOME Keyring), the
+  "no keyring → refuse" test, and a Credential Manager round trip on Windows.
+
+### Test results (Ubuntu 24.04, Rust 1.97.0)
+
+| Check | Result |
+|-------|--------|
+| fmt, clippy (`-D warnings`), policy, cargo-deny, actionlint | ✅ PASS |
+| Unit tests (debug / release) | ✅ PASS — 62/62 each |
+| Live: save / replace / read / delete in GNOME Keyring; deleted = gone | ✅ PASS |
+| Live: no plain-text password in the keyring files on disk | ✅ PASS (0 matches) |
+| Live: no keyring available → save refused (I8) | ✅ PASS |
+| Live: password saved in the keyring, read back, used to connect to the NLA host (T11) | ✅ PASS |
+| Live RDP suite T1–T11 inside a keyring session | ✅ PASS — 10/10 |
+| Windows Credential Manager + Windows Hello | ⛔ **NOT RUN** — Windows runner in CI |
+| Android Keystore vault + biometric prompt | ⛔ **NOT RUN** — needs an Android device or emulator |
+| Dart tests (random ids) and Flutter wiring | ⛔ **NOT RUN** — needs Flutter (CI) |
+
+### Known issues (end-of-stage review)
+- **KI-15:** On Linux the keyring is usually unlocked at login, so a saved password can be
+  used without a new prompt. That is the platform's model; users who want a prompt every
+  time should not save passwords on Linux. To be stated in the user documentation.
+- **KI-16:** On Android the password passes through Dart after the Keystore prompt
+  (extends KI-13). On Windows and Linux it stays in Rust.
+- **KI-17:** Deleting a connection also forgets the trusted certificate for its host:port,
+  even if another connection uses the same computer; that one will ask to approve again.
+  Fix with pin management in Stage 7.
+- **KI-18:** The plan's S13 option to turn off confirmation (with a warning) is not built;
+  confirmation is always on. Settings arrive in Stage 7.
+- **KI-19:** Saved passwords remain in the OS vault if the app is uninstalled on Windows or
+  Linux; uninstall cleanup is part of Stage 10.
+
+### Next step
+Stage 6 — bidirectional text clipboard.
+

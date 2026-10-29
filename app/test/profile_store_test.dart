@@ -55,6 +55,17 @@ void main() {
     });
   });
 
+  test('connection ids are random, unique and vault-safe', () {
+    final s = ProfileStore();
+    final ids = {for (var i = 0; i < 200; i++) s.newId()};
+    expect(ids, hasLength(200));
+    for (final id in ids) {
+      expect(id, matches(RegExp(r'^[0-9a-f]{32}$')));
+    }
+    // A new store (e.g. after an app restart) must not reproduce earlier ids.
+    expect(ids.contains(ProfileStore().newId()), isFalse);
+  });
+
   group('AppSettings', () {
     test('secure defaults', () {
       final s = AppSettings();

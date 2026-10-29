@@ -8,8 +8,8 @@ import 'errors.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 
-            // These functions are ignored because they are not marked as `pub`: `approval`, `changed`, `drive`, `ended`, `frame`, `new`, `resized`, `run`, `send`, `status`, `union`, `wait_for_approval`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Command`
+            // These functions are ignored because they are not marked as `pub`: `approval`, `changed`, `drive`, `ended`, `frame`, `new`, `resized`, `run`, `send`, `spawn`, `status`, `union`, `wait_for_approval`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Command`, `Target`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `eq`, `fmt`, `fmt`
 
 
@@ -51,6 +51,12 @@ static RdpSession  create()=>RustLib.instance.api.crateApiSessionRdpSessionCreat
 /// `pins_path` is the certificate pin file in the app's private data folder.
 /// Can be called once per handle.
  Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath });
+
+
+/// Like [`RdpSession::start`], but reads the saved password from the OS
+/// vault inside Rust, so it never passes through the UI (Windows, Linux).
+/// The caller must have confirmed the user's identity first (S5).
+ Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath });
 
 
 /// Types text (on-screen keyboards, IMEs, pasted text is NOT sent this way).

@@ -383,3 +383,32 @@ fn t7_password_never_reaches_the_logs() -> TestResult {
     }
     Ok(())
 }
+
+#[test]
+#[ignore = "needs a live RDP host and an OS vault (RDPV_TEST_VAULT=available)"]
+fn t11_saved_password_from_the_os_vault_connects() -> TestResult {
+    if std::env::var("RDPV_TEST_VAULT").as_deref() != Ok("available") {
+        return Err("set RDPV_TEST_VAULT=available and provide an OS vault".into());
+    }
+    let e = env()?;
+    let id = "live-host-saved";
+    rdpv_core::vault::save(id, &SecretString::new(e.password.clone()))
+        .map_err(|x| x.to_string())?;
+    let saved = rdpv_core::vault::load(id).map_err(|x| x.to_string())?;
+    let fp = learn_fingerprint(&e)?;
+    let mut p = params(&e, &e.port, "", Some(fp), 1280, 800)?;
+    p.password = saved;
+    let result = connect(p);
+    rdpv_core::vault::delete(id).map_err(|x| x.to_string())?;
+    let mut s = result.map_err(|f| format!("connect with saved password failed: {f:?}"))?;
+    let events = poll_until(&mut s, 5, |ev| matches!(ev, SessionEvent::Updated(_)));
+    assert!(
+        events
+            .iter()
+            .any(|ev| matches!(ev, SessionEvent::Updated(_))),
+        "{events:?}"
+    );
+    s.disconnect();
+    assert_eq!(rdpv_core::vault::exists(id), Ok(false));
+    Ok(())
+}

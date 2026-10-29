@@ -11,7 +11,10 @@
 //! - [`tls`]: TLS configuration that only accepts the pinned certificate,
 //! - [`session`]: connect, display updates, input and disconnect.
 //!
-//! Later stages add clipboard, profiles and vault access.
+//! Stage 5 (credentials) adds:
+//! - [`vault`]: saved passwords in the OS vault (Windows/Linux).
+//!
+//! Later stages add clipboard and saved profiles.
 
 pub mod input;
 pub mod logging;
@@ -21,4 +24,5 @@ pub mod secret;
 pub mod session;
 pub mod status;
 pub mod tls;
+pub mod vault;
 pub mod version;

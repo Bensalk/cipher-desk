@@ -20,12 +20,20 @@ import 'status_chip.dart';
 /// certificate prompt, the remote screen, keyboard/mouse/touch input and a
 /// small bar of special keys.
 class SessionScreen extends StatefulWidget {
-  const SessionScreen({super.key, required this.profile, required this.password});
+  const SessionScreen({
+    super.key,
+    required this.profile,
+    this.password,
+    this.useSavedPassword = false,
+  });
 
   final ConnectionProfile profile;
 
-  /// Used once to connect, then dropped. Never stored by this screen.
-  final String password;
+  /// Typed (or, on Android, vault-read) password. Used once, never stored here.
+  final String? password;
+
+  /// Windows/Linux: the Rust core reads the saved password from the OS vault.
+  final bool useSavedPassword;
 
   @override
   State<SessionScreen> createState() => _SessionScreenState();
@@ -57,22 +65,32 @@ class _SessionScreenState extends State<SessionScreen> {
 
   Future<void> _start() async {
     final dir = await getApplicationSupportDirectory();
-    final pinsPath = '${dir.path}${Platform.pathSeparator}certificate_pins.json';
+    final pinsPath = pinsFilePath(dir.path);
     if (!mounted) return;
     final view = View.of(context);
     final size = view.physicalSize;
     // Ask for a desktop the size of this window, within sensible limits.
     final w = (size.width.clamp(800, 3840) ~/ 2) * 2;
     final h = (size.height.clamp(600, 2160) ~/ 2) * 2;
-    final stream = _session.start(
-      host: widget.profile.host,
-      port: widget.profile.port,
-      username: widget.profile.username,
-      password: widget.password,
-      width: w,
-      height: h,
-      pinsPath: pinsPath,
-    );
+    final stream = widget.useSavedPassword
+        ? _session.startWithSavedPassword(
+            connectionId: widget.profile.id,
+            host: widget.profile.host,
+            port: widget.profile.port,
+            username: widget.profile.username,
+            width: w,
+            height: h,
+            pinsPath: pinsPath,
+          )
+        : _session.start(
+            host: widget.profile.host,
+            port: widget.profile.port,
+            username: widget.profile.username,
+            password: widget.password ?? '',
+            width: w,
+            height: h,
+            pinsPath: pinsPath,
+          );
     _sub = stream.listen(_onUpdate, onError: (_) => _onEnded(null));
   }
 
@@ -420,6 +438,10 @@ class _SessionScreenState extends State<SessionScreen> {
     );
   }
 }
+
+/// Location of the certificate pin file in the app's private data folder.
+String pinsFilePath(String appDataDir) =>
+    '$appDataDir${Platform.pathSeparator}certificate_pins.json';
 
 class _KeyButton extends StatelessWidget {
   const _KeyButton(this.label, this.onPressed);

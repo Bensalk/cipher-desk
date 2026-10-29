@@ -2,9 +2,9 @@
 
 A secure, open-source remote desktop (RDP) viewer for **Windows, Linux and Android**.
 
-> **Status: in development — Stages 1–4 done (plan, foundation, user interface,
-> connection engine).** Not ready for everyday use: saved passwords, clipboard and
-> saved profiles come in Stages 5–7.
+> **Status: in development — Stages 1–5 done (plan, foundation, user interface,
+> connection engine, saved passwords).** Not ready for everyday use: clipboard and
+> saved profiles come in Stages 6–7.
 > See [`docs/PROGRESS.md`](docs/PROGRESS.md) for what is done and what is next.
 
 ## Goals
@@ -35,7 +35,7 @@ and for Android the Android SDK + NDK with Java 17.
 ```sh
 sh scripts/install-hooks.sh           # enable the secret-scanning pre-commit hook
 cargo test --workspace                # Rust core tests
-. scripts/start-test-hosts.sh         # optional: local RDP test hosts (Linux)
+source scripts/start-test-hosts.sh    # optional: local RDP test hosts (Linux, bash)
 cargo test -p rdpv-core --test live_host -- --ignored --test-threads=1
 cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
 cd app

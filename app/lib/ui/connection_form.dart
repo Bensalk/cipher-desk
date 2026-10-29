@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../platform/password_vault.dart';
 import '../src/rust/api/form.dart';
 import '../state/profiles.dart';
 
@@ -76,7 +77,10 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
     setState(() => _problems = {for (final p in r.problems) p.field: p.message});
   }
 
-  void _save() {
+  bool _saving = false;
+
+  Future<void> _save() async {
+    if (_saving) return;
     final r = _check();
     setState(() {
       _submitted = true;
@@ -84,20 +88,46 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
     });
     if (!r.valid) return;
 
+    final id = widget.existing?.id ?? widget.store.newId();
+    var savePassword = _savePassword;
+    String? vaultMessage;
+    setState(() => _saving = true);
+    if (_savePassword && _password.text.isNotEmpty) {
+      final outcome = await PasswordVault.save(id, _password.text);
+      if (outcome != VaultOutcome.ok) {
+        // Never fall back to storing it anywhere else (I8).
+        savePassword = widget.existing?.savePassword ?? false;
+        vaultMessage = switch (outcome) {
+          VaultOutcome.locked => 'Password not saved: confirmation was cancelled.',
+          _ => 'Password not saved: this device has no secure password storage. '
+              'You can still connect by typing it.',
+        };
+      }
+    } else if (!_savePassword && (widget.existing?.savePassword ?? false)) {
+      await PasswordVault.delete(id);
+    }
+    if (!mounted) return;
+    setState(() => _saving = false);
+
     final profile = ConnectionProfile(
-      id: widget.existing?.id ?? widget.store.newId(),
+      id: id,
       name: _name.text.trim(),
       host: r.host ?? _host.text.trim(),
       port: r.port ?? defaultPort(),
       username: _username.text.trim(),
-      savePassword: _savePassword,
+      savePassword: savePassword,
       clipboardEnabled: _clipboard,
       lastUsed: widget.existing?.lastUsed,
     );
     widget.store.upsert(profile);
     _password.clear();
+    final messenger = ScaffoldMessenger.of(context);
     Navigator.of(context).pop(profile);
+    if (vaultMessage != null) {
+      messenger.showSnackBar(SnackBar(content: Text(vaultMessage)));
+    }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -227,7 +257,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   key: const Key('button-save'),
-                  onPressed: _save,
+                  onPressed: _saving ? null : _save,
                   icon: const Icon(Icons.save_outlined),
                   label: Text(editing ? 'Save changes' : 'Save connection'),
                 ),

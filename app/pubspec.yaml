@@ -13,6 +13,8 @@ dependencies:
     path: rust_builder
   flutter_rust_bridge: 2.13.0
   path_provider: ^2.1.5
+  # Windows Hello confirmation before a saved password is used (S5).
+  local_auth: ^2.3.0
 
 dev_dependencies:
   flutter_test:

@@ -29,7 +29,9 @@ Only the latest release receives security fixes until version 1.0.
   any certificate is never used (checked in CI by `scripts/check-policy.sh`).
 - **Passwords are stored only in the operating system's vault**
   (Windows Credential Manager, Linux Secret Service, Android Keystore),
-  never in files, logs or error messages.
+  never in files, logs or error messages. If no vault exists, the password is
+  not saved. Using a saved password needs Windows Hello on Windows, the
+  fingerprint/face/screen-lock prompt on Android, and an unlocked keyring on Linux.
 - **Logging is capped at `info` in release builds** and the authentication
   library's (`sspi`) logs are always disabled, because at debug level it
   records credential buffers.
@@ -45,6 +47,12 @@ Only the latest release receives security fixes until version 1.0.
   fingerprint shown by the app against the host.
 - Malware on your own device (for example an Android app with accessibility
   permission) can read the screen.
+- On Linux the keyring is usually unlocked when you log in, so saved passwords
+  can be used without a new prompt. Don't save passwords there if you want to be
+  asked every time.
+- Some password copies (inside the RDP library, and on Android inside the app's
+  UI layer) cannot be wiped from memory immediately; they are freed when no
+  longer used.
 
 ## Repository hygiene
 

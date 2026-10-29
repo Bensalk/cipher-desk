@@ -46,6 +46,11 @@ jobs:
       - name: Security policy checks
         shell: bash
         run: sh scripts/check-policy.sh
+      - name: Windows Credential Manager round trip
+        if: runner.os == 'Windows'
+        env:
+          RDPV_TEST_VAULT: available
+        run: cargo test -p rdpv-core --test live_vault real_vault -- --ignored
 
   live-host:
     name: Live RDP host tests (NLA, pinning, errors, input, logs)
@@ -63,13 +68,26 @@ jobs:
         run: |
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-            xvfb xterm freerdp3-shadow-x11 winpr3-utils xrdp xorgxrdp openssl
+            xvfb xterm freerdp3-shadow-x11 winpr3-utils xrdp xorgxrdp openssl \
+            gnome-keyring dbus-x11
       - name: Start test hosts (random password per run)
-        run: sh scripts/start-test-hosts.sh
-      - name: Live tests (debug)
-        run: cargo test -p rdpv-core --test live_host -- --ignored --test-threads=1
-      - name: Live tests (release)
-        run: cargo test --release -p rdpv-core --test live_host -- --ignored --test-threads=1
+        run: bash scripts/start-test-hosts.sh
+      - name: Live tests with an OS keyring (debug and release)
+        env:
+          RDPV_TEST_VAULT: available
+        run: |
+          dbus-run-session -- bash -c '
+            set -e
+            openssl rand -hex 16 | gnome-keyring-daemon --unlock --components=secrets > /dev/null
+            cargo test -p rdpv-core --test live_host -- --ignored --test-threads=1
+            cargo test -p rdpv-core --test live_vault real_vault -- --ignored
+            cargo test --release -p rdpv-core --test live_host -- --ignored --test-threads=1
+          '
+      - name: Vault refuses to save when no keyring exists (I8)
+        env:
+          RDPV_TEST_VAULT: missing
+          DBUS_SESSION_BUS_ADDRESS: unix:path=/nonexistent/bus
+        run: cargo test -p rdpv-core --test live_vault missing_vault -- --ignored
 
   flutter:
     name: Flutter app (${{ matrix.target }})

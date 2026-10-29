@@ -69,3 +69,8 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // System fingerprint / face / screen-lock prompt for the password vault (S5).
+    implementation("androidx.biometric:biometric:1.1.0")
+}

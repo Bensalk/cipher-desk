@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'package:path_provider/path_provider.dart';
+
+import '../platform/password_vault.dart';
 import '../src/rust/api/errors.dart';
+import '../src/rust/api/pins.dart';
 import '../state/profiles.dart';
 import '../state/settings.dart';
 import 'connection_form.dart';
@@ -40,17 +44,47 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _connect(ConnectionProfile p) async {
-    // Saved passwords arrive with the OS vault in Stage 5; until then, always ask.
-    final password = await showDialog<String>(
-      context: context,
-      builder: (_) => _PasswordDialog(profile: p),
-    );
-    if (password == null || !mounted) return;
+    String? password;
+    var useSaved = false;
+    String? notice;
+
+    if (p.savePassword) {
+      if (PasswordVault.readsIntoDart) {
+        // Android: the Keystore prompt confirms the user, then returns the password.
+        final (outcome, pw) = await PasswordVault.loadOnAndroid(p.id);
+        if (outcome == VaultOutcome.ok && pw != null) {
+          password = pw;
+        } else if (outcome != VaultOutcome.locked) {
+          notice = 'The saved password could not be read. Type it to connect.';
+        } else {
+          return; // The user cancelled the confirmation.
+        }
+      } else if (await PasswordVault.confirmUser('Confirm to use the saved password')) {
+        // Windows / Linux: Rust reads the vault itself; the password never enters Dart.
+        useSaved = true;
+      } else {
+        notice = 'Your identity could not be confirmed, so the saved password was not used.';
+      }
+    }
+
+    if (!useSaved && password == null) {
+      if (!mounted) return;
+      password = await showDialog<String>(
+        context: context,
+        builder: (_) => _PasswordDialog(profile: p, notice: notice),
+      );
+      if (password == null) return;
+    }
+    if (!mounted) return;
     widget.store.markUsed(p.id, DateTime.now());
     setState(() => _notice = null);
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => SessionScreen(profile: p, password: password),
+        builder: (_) => SessionScreen(
+          profile: p,
+          password: password,
+          useSavedPassword: useSaved,
+        ),
       ),
     );
   }
@@ -68,7 +102,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
-    if (ok == true) widget.store.remove(p.id);
+    if (ok != true) return;
+    widget.store.remove(p.id);
+    // Remove everything kept for this connection: saved password and trusted certificate.
+    await PasswordVault.delete(p.id);
+    final dir = await getApplicationSupportDirectory();
+    forgetCertificate(pinsPath: pinsFilePath(dir.path), host: p.host, port: p.port);
   }
 
   Widget _connections() {
@@ -262,9 +301,10 @@ class _EmptyState extends StatelessWidget {
 /// Asks for the password for one connection. The text is cleared when the
 /// dialog closes; it is never stored by the app (saving arrives in Stage 5).
 class _PasswordDialog extends StatefulWidget {
-  const _PasswordDialog({required this.profile});
+  const _PasswordDialog({required this.profile, this.notice});
 
   final ConnectionProfile profile;
+  final String? notice;
 
   @override
   State<_PasswordDialog> createState() => _PasswordDialogState();
@@ -294,6 +334,10 @@ class _PasswordDialogState extends State<_PasswordDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (widget.notice != null) ...[
+            Text(widget.notice!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            const SizedBox(height: 8),
+          ],
           Text('Username: ${widget.profile.username}'),
           const SizedBox(height: 12),
           TextField(
