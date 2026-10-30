@@ -115,6 +115,13 @@ void main() {
     await tester.pumpAndSettle();
     await typeVisible(tester, find.byKey(const Key('field-password')), _randomPassword());
     await tapVisible(tester, find.byKey(const Key('button-save')));
+    // Saving waits for the OS vault (and on Windows for Windows Hello), which
+    // answers outside Flutter's frames: wait for it rather than for one frame.
+    final until = DateTime.now().add(const Duration(seconds: 30));
+    while (store.profiles.isEmpty && DateTime.now().isBefore(until)) {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await tester.pump();
+    }
     await tester.pumpAndSettle();
 
     final p = store.profiles.single;
