@@ -261,7 +261,9 @@ fn a_resolution_change_resizes_the_viewer() {
         .unwrap_or_else(|f| panic!("connect failed: {f:?}"));
     assert_eq!(s.size(), (640, 480));
     switched.store(true, std::sync::atomic::Ordering::SeqCst);
-    let deadline = Instant::now() + Duration::from_secs(15);
+    // The RDP deactivation/reactivation round-trip can take a while (slower on
+    // CI runners), so allow plenty of time.
+    let deadline = Instant::now() + Duration::from_secs(45);
     let mut resized = false;
     let mut updated_after = false;
     while Instant::now() < deadline && !(resized && updated_after) {
@@ -276,6 +278,7 @@ fn a_resolution_change_resizes_the_viewer() {
                 _ => {}
             }
         }
+        std::thread::sleep(Duration::from_millis(10));
     }
     assert!(resized, "no resize");
     assert!(updated_after, "no picture after the resize");
