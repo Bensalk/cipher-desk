@@ -20,6 +20,8 @@ const host = String.fromEnvironment('RDPV_HOST');
 const port = int.fromEnvironment('RDPV_PORT', defaultValue: 3389);
 const user = String.fromEnvironment('RDPV_USER');
 const password = String.fromEnvironment('RDPV_PASSWORD');
+// CI sets this, so a missing host makes the test fail instead of being skipped.
+const requireLive = bool.fromEnvironment('RDPV_REQUIRE_LIVE');
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -35,7 +37,8 @@ void main() {
   }
 
   testWidgets('connects, checks the certificate, shows the desktop and disconnects',
-      skip: host.isEmpty || password.isEmpty, (t) async {
+      skip: !requireLive && (host.isEmpty || password.isEmpty), (t) async {
+    if (host.isEmpty || password.isEmpty) fail('RDPV_HOST and RDPV_PASSWORD must be set');
     final dir = await Directory.systemTemp.createTemp('cipher-desk-live-');
     addTearDown(() => dir.delete(recursive: true));
     final store = ProfileStore()

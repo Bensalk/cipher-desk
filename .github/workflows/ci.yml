@@ -246,7 +246,7 @@ jobs:
           flutter pub get
           umask 077
           jq -n --arg u "$RDPV_TEST_USER" --arg p "$RDPV_TEST_PASSWORD" \
-            '{RDPV_HOST: "10.0.2.2", RDPV_PORT: "3389", RDPV_USER: $u, RDPV_PASSWORD: $p}' > "$RUNNER_TEMP/live.json"
+            '{RDPV_HOST: "10.0.2.2", RDPV_PORT: "3389", RDPV_USER: $u, RDPV_PASSWORD: $p, RDPV_REQUIRE_LIVE: "true"}' > "$RUNNER_TEMP/live.json"
       - name: Tests on the emulator (Android 10, the oldest supported)
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
