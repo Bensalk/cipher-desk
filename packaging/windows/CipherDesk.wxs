@@ -24,9 +24,9 @@
     <Icon Id="AppIcon" SourceFile="$(var.RepoDir)\app\windows\runner\resources\app_icon.ico" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon" />
     <Property Id="ARPNOREPAIR" Value="1" />
-    <!-- Default to a per-user install (no administrator rights): with a dual-purpose
-         package, Windows then redirects Program Files to %LOCALAPPDATA%\Programs. -->
-    <Property Id="MSIINSTALLPERUSER" Value="1" />
+    <!-- Per-user install by default (no administrator rights): Scope="perUserOrMachine"
+         already sets MSIINSTALLPERUSER=1, so Windows redirects Program Files to
+         %LOCALAPPDATA%\Programs. (Setting it again here is an error in WiX v5.) -->
     <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
 
     <StandardDirectory Id="ProgramFiles6432Folder">
