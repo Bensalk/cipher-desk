@@ -147,7 +147,9 @@ jobs:
           WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
           WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
         run: |
-          $msi = ./packaging/windows/build-msi.ps1 -BundleDir app/build/windows/x64/runner/Release -Version "${{ needs.version.outputs.version }}" -OutDir dist
+          & "$env:ProgramFiles\Git\bin\bash.exe" scripts/ci-run.sh "MSI installer" pwsh -NoProfile -File packaging/windows/build-msi.ps1 -BundleDir app/build/windows/x64/runner/Release -Version "${{ needs.version.outputs.version }}" -OutDir dist
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $msi = (Get-ChildItem dist/*.msi | Select-Object -First 1).FullName
           ./packaging/windows/sign.ps1 $msi
       - name: Portable ZIP (SA-10)
         run: ./packaging/windows/build-portable.ps1 -BundleDir app/build/windows/x64/runner/Release -Version "${{ needs.version.outputs.version }}" -OutDir dist
