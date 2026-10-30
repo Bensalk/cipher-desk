@@ -3,7 +3,7 @@
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2023-0071"
-reason = "rsa Marvin timing attack (private-key operations). Test-only host; same review as the app (docs/PROGRESS.md KI-2)."
+reason = "rsa Marvin timing attack (private-key operations). Test-only host; same review as the app (docs/SECURITY_REVIEW.md)."
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0398"

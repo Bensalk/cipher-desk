@@ -57,5 +57,5 @@ files. It finds bracket and similar mistakes; it does not replace `flutter analy
 ## Definition of done (per stage)
 
 Implementation, relevant tests, error handling and acceptance criteria are
-checked; CI is green; results are recorded in `docs/PROGRESS.md`. Tests that
+checked; CI is green; results are written in the pull request. Tests that
 could not be run are reported as **not run**, never as passed.

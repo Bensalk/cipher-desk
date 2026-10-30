@@ -1,10 +1,10 @@
-# OSV-Scanner exceptions, each reviewed and explained (see docs/PROGRESS.md).
+# OSV-Scanner exceptions, each reviewed and explained (see docs/SECURITY_REVIEW.md).
 # OSV also reports GitHub advisories and "unmaintained" notices that cargo-deny
 # does not fail on; entries with ignoreUntil must be reviewed again by that date.
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2023-0071"
-reason = "rsa Marvin timing attack affects private-key operations; this client performs RSA public-key operations only (via IronRDP sspi/picky). See docs/PROGRESS.md KI-2."
+reason = "rsa Marvin timing attack affects private-key operations; this client performs RSA public-key operations only (via IronRDP sspi/picky). See docs/SECURITY_REVIEW.md."
 
 [[IgnoredVulns]]
 id = "GHSA-qwgh-2vcv-g2f7"

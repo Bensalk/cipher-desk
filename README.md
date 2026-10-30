@@ -33,7 +33,7 @@
 Cipher Desk connects to your own Windows computers over Remote Desktop, from a PC, a Linux machine or an Android phone or tablet. Made by **Bensal** with security first: it only makes protected connections, checks the computer's identity, and never stores a password anywhere except your device's own secure storage. New to Cipher Desk? Follow the [step-by-step guide](docs/HOW-TO-USE.md).
 
 > [!NOTE]
-> **v0.1.0 is a test release.** It passes all automated tests, including live connections to test computers, but it has not yet had an independent security review. Progress is recorded in [docs/PROGRESS.md](docs/PROGRESS.md).
+> **v0.1.0 is a test release.** It passes all automated tests, including live connections to test computers, but it has not yet had an independent security review. What was checked is listed in [docs/SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md).
 
 ## Key Features
 

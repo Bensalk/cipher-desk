@@ -1,7 +1,6 @@
 # Threat Model (STRIDE)
 
-Required by SA-2. Written at Stage 9 (it should have been written before Stage 4;
-see review finding R32 in `PROGRESS.md`) and checked against the code as it is now.
+Required by SA-2. Checked against the code as it is now.
 Every mitigation names the code or test that implements it. Anything not mitigated
 is listed under **Accepted risks**.
 
@@ -77,7 +76,7 @@ connection outcomes (no content, no passwords) for the user's own reference.
 |---|--------|-----------|----------|
 | I1 | Password in logs (SF-2: `sspi` logs it hex-encoded at debug level) | `sspi`/`picky` logs always off; release builds capped at info | Live **T7** (with a control proving the check works) and **L7** (reconnect and wrong-password paths) |
 | I2 | Password in files, exports, error messages or the command line | Only in the OS vault / Android Keystore; exports contain no passwords; error text is fixed; no CLI password flag | `vault.rs`, `PasswordVault.kt`, `profiles.rs` export tests, `status.rs` `every_error_has_safe_text` |
-| I3 | Password left in memory | Wiped on drop (`SecretString`, zeroize). Kept during a session to allow reconnecting (KI-31); copies inside libraries and, on Android, in Dart cannot be wiped at once (KI-13, KI-16) | `secret.rs`; accepted risk R-4 |
+| I3 | Password left in memory | Wiped on drop (`SecretString`, zeroize). Kept during a session to allow reconnecting; copies inside libraries and, on Android, in Dart cannot be wiped at once | `secret.rs`; accepted risk R-4 |
 | I4 | Screen visible to screenshots, screen recording, recent-apps (T3, T4) | Android `FLAG_SECURE` on by default | `MainActivity.kt` |
 | I5 | Computer name visible on the lock screen (T4) | The session notification is generic and private | `SessionService.kt` |
 | I6 | Clipboard leaks (T2 reads what you copy; T3 reads what the host copies) | Clipboard off by default per connection; text only; 1 MB limit; one-direction options; host text marked sensitive on Android; Android reads only in the foreground | `clipboard.rs`; live C1–C6 |
@@ -101,7 +100,7 @@ connection outcomes (no content, no passwords) for the user's own reference.
 | # | Threat | Mitigation | Evidence |
 |---|--------|-----------|----------|
 | E1 | Memory-safety bug exploited by T2 | Rust; `unsafe_code` forbidden in our crates (only the generated FFI module is allowed it) | `Cargo.toml` lints; Stage 9 unsafe audit |
-| E2 | T2 reaches local files or devices | No drive, printer, USB or smart-card channel exists in the app; audio is off; only the clipboard channel is added, and only when sharing is on; the device's own name is not sent; server redirection is refused | `session.rs` `connector_config`; KI-10 |
+| E2 | T2 reaches local files or devices | No drive, printer, USB or smart-card channel exists in the app; audio is off; only the clipboard channel is added, and only when sharing is on; the device's own name is not sent; server redirection is refused | `session.rs` `connector_config` |
 | E3 | T3 sends intents to the app | Only the launcher activity is exported; the session service is not; the notification uses an immutable `PendingIntent` | `AndroidManifest.xml`, `SessionService.kt` |
 
 ## 5. Accepted risks
@@ -111,7 +110,7 @@ connection outcomes (no content, no passwords) for the user's own reference.
 | R-1 | First connection trusts what the user approves | Inherent to trust-on-first-use; the dialog explains what to compare |
 | R-2 | A compromised remote computer sees everything typed and shared | Use the clipboard only with computers you trust |
 | R-3 | Same-user malware on the desktop can read the OS vault | Outside the app's control; don't save passwords on shared or untrusted computers |
-| R-4 | Some password copies stay in memory until freed | Library and platform limitations (KI-13, KI-16, KI-31) |
+| R-4 | Some password copies stay in memory until freed | Library and platform limitations (Dart strings, platform channels, the reconnect copy) |
 | R-5 | IronRDP is younger than FreeRDP | Fuzzing, pinned versions, advisory scanning, independent review before release (SA-5) |
 | R-6 | The app cannot make the remote computer secure | `docs/HOST_SETUP.md` (SA-4) |
 | R-7 | Android accessibility malware or a rooted phone can read the screen | Platform limitation |
@@ -120,5 +119,3 @@ connection outcomes (no content, no passwords) for the user's own reference.
 
 - **SA-5:** an independent security review before the first public release (not done by
   the author of the code).
-- Dart package versions are not yet locked (`pubspec.lock` cannot be generated without
-  Flutter here); commit it from the first CI run (KI-36).

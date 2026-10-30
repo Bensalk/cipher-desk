@@ -29,7 +29,7 @@ No critical or high-severity issue is open.
 | S2 | Certificate pinning, warning on change | ✅ | Live T1, T4, L2; unit tests in `pins.rs`, reconnect rules |
 | S3 | Drive/printer/USB/audio redirection off; clipboard opt-in | ✅ | `connector_config` (no such channels; audio off); live C3 |
 | S4 | Passwords only in the OS vault; wiped; redacted from logs | 🟡 | Linux vault live (T11, vault tests); live T7 and L7 (no password in logs, three encodings); Windows vault in CI; Android Keystore needs a device |
-| S5 | OS confirmation before a saved password is used | 🟡 | Windows Hello toggle with warning; Android BiometricPrompt; Linux keyring (KI-15). Needs devices |
+| S5 | OS confirmation before a saved password is used | 🟡 | Windows Hello toggle with warning; Android BiometricPrompt; Linux keyring (unlocked at login; it asks for its password when locked). Needs devices |
 | S6 | Clipboard limit, indicator, one direction, sensitive on Android | 🟡 | Live C1–C6 (engine); indicator and Android flag need Flutter/device |
 | S7 | Idle disconnect | 🟡 | Engine timer (bridge `drive`); setting saved; UI needs Flutter |
 | S8 | Signed releases, checksums, SBOM, `SECURITY.md` | 🟡 (Stage 10) | Release workflow: APK signature verified (never the debug key), Authenticode when a certificate is configured, `SHA256SUMS`, CycloneDX SBOM with local paths removed (SBOM tested here). Packages are built in CI only |
@@ -76,4 +76,4 @@ No critical or high-severity issue is open.
 | OSV-Scanner | CI only (could not be installed here) |
 | CodeQL (Rust, Actions) | CI only |
 | Licences | Rust: allow-list enforced by cargo-deny. Dart packages used: flutter_rust_bridge (MIT), path_provider, local_auth, file_selector (BSD-3-Clause); full list shown in the app's licence page. Android: androidx.biometric (Apache-2.0). Test/dev tools (not shipped): tree-sitter checker (MIT, Unlicense), libFuzzer (Apache-2.0 with LLVM exception) |
-| Supply chain | `Cargo.lock` with `--locked`; actions pinned to commits; **Dart packages not yet locked** (KI-36) |
+| Supply chain | `Cargo.lock` with `--locked`; actions pinned to commits; Dart packages locked in `app/pubspec.lock` (from the v0.1.0 build) |
