@@ -26,6 +26,10 @@ void main() {
   /// Brings a widget on screen. On a phone the form is taller than the screen and
   /// its list only builds what is near the visible part, so scroll until it exists.
   Future<void> reveal(WidgetTester tester, Finder f) async {
+    // Close the on-screen keyboard first (phones): while it opens or closes the
+    // list moves, and the widget can slip out of view again.
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
     for (final delta in [200.0, -200.0]) {
       if (f.evaluate().isNotEmpty) break;
       try {
