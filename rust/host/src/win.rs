@@ -252,3 +252,39 @@ impl InputSink for SendInputSink {
         }
     }
 }
+
+// -------- Host service: capture and input that follow the input desktop --------
+
+/// Screen capture for the Host **service** worker: before each grab it attaches
+/// the thread to the current input desktop, so it also shows the sign-in and
+/// lock screens. Falls back to a plain grab if the desktop can't be followed.
+#[derive(Default)]
+pub struct ServiceScreenCapture(ScreenCapture);
+
+impl FrameSource for ServiceScreenCapture {
+    fn size(&mut self) -> (u16, u16) {
+        let _ = crate::win_desktop::follow_input_desktop();
+        self.0.size()
+    }
+
+    fn capture(&mut self) -> anyhow::Result<Frame> {
+        // A desktop switch (login → desktop, UAC) is normal; keep going even if
+        // this attach momentarily fails.
+        if let Err(e) = crate::win_desktop::follow_input_desktop() {
+            tracing::debug!(error = %e, "could not follow the input desktop");
+        }
+        self.0.capture()
+    }
+}
+
+/// Input for the Host **service** worker: attaches to the current input desktop
+/// before each event, so typing and clicks reach the sign-in screen too.
+#[derive(Default)]
+pub struct ServiceSendInputSink(SendInputSink);
+
+impl InputSink for ServiceSendInputSink {
+    fn send(&mut self, input: Input) {
+        let _ = crate::win_desktop::follow_input_desktop();
+        self.0.send(input);
+    }
+}

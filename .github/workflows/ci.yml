@@ -38,9 +38,11 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       - name: Format
-        run: cargo fmt --all -- --check
+        shell: bash
+        run: bash scripts/ci-run.sh "Format" cargo fmt --all -- --check
       - name: Clippy (zero warnings)
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        shell: bash
+        run: bash scripts/ci-run.sh "Clippy" cargo clippy --workspace --all-targets -- -D warnings
       - name: Tests (debug)
         shell: bash
         run: bash scripts/ci-run.sh "Tests (debug)" cargo test --workspace

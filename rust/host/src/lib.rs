@@ -22,6 +22,8 @@ pub mod input;
 mod limiter;
 #[cfg(windows)]
 pub mod win;
+#[cfg(windows)]
+mod win_desktop;
 
 use std::net::{Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
