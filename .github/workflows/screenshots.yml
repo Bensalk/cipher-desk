@@ -4,12 +4,7 @@ name: Screenshots
 # phone, tablet and desktop sizes with app/integration_test/screenshots/. The PNGs are
 # pushed to the 'screenshots' branch and uploaded as an artifact, to copy into
 # docs/screenshots/.
-on:
-  workflow_dispatch:
-  pull_request:
-    paths:
-      - app/integration_test/screenshots/**
-      - .github/workflows/screenshots.yml
+on: workflow_dispatch
 
 permissions:
   contents: read
