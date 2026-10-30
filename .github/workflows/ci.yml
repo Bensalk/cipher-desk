@@ -204,3 +204,60 @@ jobs:
             app/pubspec.lock
           if-no-files-found: ignore
           retention-days: 7
+
+  android-emulator:
+    name: Android app on an emulator (UI tests and a live session)
+    needs: rust
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/powershell /usr/local/share/chromium
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: x86_64-linux-android
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          cache: true
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Start the test host (random password per run)
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb xterm freerdp3-shadow-x11 winpr3-utils openssl
+          bash scripts/start-test-hosts.sh
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: Get packages; test-host details in a private file (no password on a command line)
+        working-directory: app
+        run: |
+          flutter pub get
+          umask 077
+          jq -n --arg u "$RDPV_TEST_USER" --arg p "$RDPV_TEST_PASSWORD" \
+            '{RDPV_HOST: "10.0.2.2", RDPV_PORT: "3389", RDPV_USER: $u, RDPV_PASSWORD: $p, RDPV_REQUIRE_LIVE: "true"}' > "$RUNNER_TEMP/live.json"
+      - name: Tests on the emulator (Android 10, the oldest supported)
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 29
+          target: default
+          arch: x86_64
+          profile: pixel_4
+          emulator-boot-timeout: 900
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          working-directory: app
+          script: |
+            bash ../scripts/ci-run.sh "Android UI tests" timeout 1500 flutter test integration_test/hello_test.dart -d emulator-5554 --timeout 5m --reporter expanded
+            bash ../scripts/ci-run.sh "Android live session" timeout 1200 flutter test integration_test/live_session_test.dart -d emulator-5554 --timeout 6m --reporter expanded --dart-define-from-file="$RUNNER_TEMP/live.json"

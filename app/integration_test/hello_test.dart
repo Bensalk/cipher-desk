@@ -23,16 +23,42 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async => RustLib.init());
 
-  /// Scrolls a widget into view, then taps it (forms are taller than small screens).
-  Future<void> tapVisible(WidgetTester tester, Finder f) async {
+  /// Brings a widget on screen. On a phone the form is taller than the screen and
+  /// its list only builds what is near the visible part, so scroll until it exists.
+  Future<void> reveal(WidgetTester tester, Finder f) async {
+    // Close the on-screen keyboard first (phones): while it opens or closes the
+    // list moves, and the widget can slip out of view again.
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    for (final delta in [200.0, -200.0]) {
+      if (f.evaluate().isNotEmpty) break;
+      try {
+        await tester.scrollUntilVisible(f, delta,
+            scrollable: find.byType(Scrollable).first, maxScrolls: 30);
+      } on StateError {
+        // Not in this direction: try the other one.
+      }
+    }
     await tester.ensureVisible(f);
     await tester.pumpAndSettle();
+  }
+
+  /// Scrolls a widget into view, then taps it (forms are taller than small screens).
+  Future<void> tapVisible(WidgetTester tester, Finder f) async {
+    await reveal(tester, f);
     await tester.tap(f);
   }
 
   Future<void> typeVisible(WidgetTester tester, Finder f, String text) async {
-    await tester.ensureVisible(f);
+    await reveal(tester, f);
     await tester.enterText(f, text);
+  }
+
+  /// The error shown under a text field, wherever the field is scrolled to.
+  Future<String?> fieldError(WidgetTester tester, String key) async {
+    final f = find.byKey(Key(key));
+    await reveal(tester, f);
+    return tester.widget<TextField>(f).decoration?.errorText;
   }
 
   Future<ProfileStore> start(WidgetTester tester) async {
@@ -58,15 +84,15 @@ void main() {
     await typeVisible(tester, find.byKey(const Key('field-port')), '70000');
     await tapVisible(tester, find.byKey(const Key('button-save')));
     await tester.pumpAndSettle();
-    expect(find.textContaining('without rdp://'), findsOneWidget);
-    expect(find.textContaining('Port must be a number'), findsOneWidget);
-    // Only the username: no password is needed unless it is to be saved.
-    expect(find.text('This field is required.'), findsOneWidget);
+    expect(await fieldError(tester, 'field-host'), contains('without rdp://'));
+    expect(await fieldError(tester, 'field-port'), contains('Port must be a number'));
+    // The username is required; no password is needed unless it is to be saved.
+    expect(await fieldError(tester, 'field-username'), 'This field is required.');
     expect(find.byKey(const Key('field-password')), findsNothing);
     // Ticking "Save password" asks for the password to save.
     await tapVisible(tester, find.byKey(const Key('field-save-password')));
     await tester.pumpAndSettle();
-    expect(find.text('This field is required.'), findsNWidgets(2));
+    expect(await fieldError(tester, 'field-password'), 'This field is required.');
   });
 
   testWidgets('password is masked and can be revealed', (tester) async {
@@ -93,6 +119,13 @@ void main() {
     await tester.pumpAndSettle();
     await typeVisible(tester, find.byKey(const Key('field-password')), _randomPassword());
     await tapVisible(tester, find.byKey(const Key('button-save')));
+    // Saving waits for the OS vault (and on Windows for Windows Hello), which
+    // answers outside Flutter's frames: wait for it rather than for one frame.
+    final until = DateTime.now().add(const Duration(seconds: 30));
+    while (store.profiles.isEmpty && DateTime.now().isBefore(until)) {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await tester.pump();
+    }
     await tester.pumpAndSettle();
 
     final p = store.profiles.single;
@@ -141,7 +174,7 @@ void main() {
     await typeVisible(tester, find.byKey(const Key('field-mac')), 'not-a-mac');
     await tapVisible(tester, find.byKey(const Key('button-save')));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Enter a MAC address'), findsOneWidget);
+    expect(await fieldError(tester, 'field-mac'), contains('Enter a MAC address'));
   });
 
   test('connections and settings survive a restart, without passwords', () async {
