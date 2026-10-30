@@ -64,9 +64,16 @@ with a **Stop** button at the top of Cipher Desk.
   wrong passwords, new connections are refused for 15 minutes.
 - **Cipher Desk's own window is hidden** from the person viewing (it looks black or
   is left out), so they can never read the sharing password from it.
-- **What can't be controlled remotely:** the Windows lock screen, Ctrl+Alt+Del, and
-  "Do you want to allow this app…" (administrator) prompts. Windows protects these
-  from all sharing programs.
+- **What can't be controlled remotely:** the Windows sign-in and lock screen (so you
+  can't type the Windows password through Share screen), Ctrl+Alt+Del, and "Do you
+  want to allow this app…" (administrator) prompts. Windows protects these from
+  sharing programs that run as a normal user, as Cipher Desk does.
+- **Programs running as administrator** (for example Task Manager or an installer)
+  can be seen but not clicked, unless Cipher Desk itself is started with *Run as
+  administrator*.
+- **"Open Cipher Desk when I sign in"** starts it after you sign in to Windows, not
+  before. After a restart, someone must sign in at the computer first, or use
+  Private Remote Desktop (which asks for the Windows password).
 - **Clipboard sharing** is not available with Share screen.
 - **Main screen only:** with several monitors, the main one is shared.
 - **Stop sharing** at any time with the Stop button on the Share page or in the
