@@ -843,3 +843,12 @@ contain links to the development chat.
   named `rust_lib_cipher_desk`, like the library (CI and the live-test comment updated).
 - Found by the new Screenshots workflow, which prints build errors as annotations
   because job logs can't be downloaded from this environment.
+
+### 30 Oct 2026 — repository public; SF-2 reported
+
+- The repository was made public by the owner (unlimited CI minutes for public repos).
+- SF-2 (`sspi` logs the password at debug level) was reported privately to Devolutions at
+  security@devolutions.net, as their security policy asks. Cipher Desk is not affected
+  (sspi logging is always off). Update `sspi`/IronRDP once a fixed release appears.
+- All CI jobs pass on every platform; the release workflow builds the signed APK,
+  MSI (installed, run and removed on the runner), portable ZIP, .deb and AppImage.

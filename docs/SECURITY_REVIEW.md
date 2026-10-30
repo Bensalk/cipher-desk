@@ -59,7 +59,7 @@ No critical or high-severity issue is open.
 | Req | Finding | Status |
 |-----|---------|--------|
 | SF-1 | IronRDP's default accepts any certificate | ✅ own verifier with pinning; SA-6 check |
-| SF-2 | `sspi` logs the password (hex) at debug level | ✅ worked around (SA-7). Re-confirmed in sspi 0.23.0 and still present in 0.23.1 (latest): the `encrypt_message` debug span records the credentials buffer before encryption. **Private report drafted for the owner's approval; not sent and not stored in this repository** |
+| SF-2 | `sspi` logs the password (hex) at debug level | ✅ worked around (SA-7). Re-confirmed in sspi 0.23.0 and still present in 0.23.1 (latest): the `encrypt_message` debug span records the credentials buffer before encryption. **Reported privately to Devolutions (security@devolutions.net) on 30 Oct 2026; awaiting their reply.** |
 | SF-3 | No connect timeout | ✅ timeouts on every step; keepalive (Stage 8) |
 | SF-4 | Mid-session reactivation | ✅ handled (live T10) |
 | SF-5 | No Android clipboard backend | ✅ Kotlin bridge (device test pending) |
