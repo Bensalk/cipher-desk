@@ -35,9 +35,9 @@ function RefreshPath {
     $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
                 [Environment]::GetEnvironmentVariable("Path", "User")
 }
-function Winget($id, [string[]]$extra = @()) {
+function Install-Tool($id, [string[]]$extra = @()) {
     Write-Host "Installing $id (Windows may ask for permission)..."
-    winget install --id $id -e --accept-source-agreements --accept-package-agreements @extra
+    winget.exe install --id $id -e --accept-source-agreements --accept-package-agreements @extra
     if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne -1978335189) {
         # -1978335189 = already installed
         throw "winget could not install $id (exit $LASTEXITCODE)"
@@ -50,7 +50,7 @@ Step "Checking this PC"
 $free = (Get-PSDrive C).Free / 1GB
 Write-Host ("Free space on C: {0:N0} GB" -f $free)
 if ($free -lt 25) { throw "At least 25 GB free space on C: is needed." }
-if (-not (Have winget)) { throw "winget is missing. Install 'App Installer' from the Microsoft Store, then run this again." }
+if (-not (Have winget.exe)) { throw "winget is missing. Install 'App Installer' from the Microsoft Store, then run this again." }
 # Flutter needs Windows "Developer Mode" (symbolic links) to build apps with plugins.
 $devMode = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" -ErrorAction SilentlyContinue
 if (-not $devMode -or $devMode.AllowDevelopmentWithoutDevLicense -ne 1) {
@@ -66,15 +66,15 @@ if (-not (Test-Path $jks) -or -not (Test-Path $secrets)) {
 
 # ---------------------------------------------------------------- 1. tools
 Step "1/5 Installing tools (the longest part; Visual Studio tools take 20-40 minutes)"
-if (-not (Have git)) { Winget "Git.Git" }
+if (-not (Have git)) { Install-Tool "Git.Git" }
 $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 $hasVc = (Test-Path $vsWhere) -and (& $vsWhere -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath)
 if (-not $hasVc) {
-    Winget "Microsoft.VisualStudio.2022.BuildTools" @("--override",
+    Install-Tool "Microsoft.VisualStudio.2022.BuildTools" @("--override",
         "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended")
 }
-if (-not (Get-ChildItem "$env:ProgramFiles\Microsoft\jdk-17*" -ErrorAction SilentlyContinue)) { Winget "Microsoft.OpenJDK.17" }
-if (-not (Have rustup) -and -not (Test-Path "$HOME\.cargo\bin\rustup.exe")) { Winget "Rustlang.Rustup" }
+if (-not (Get-ChildItem "$env:ProgramFiles\Microsoft\jdk-17*" -ErrorAction SilentlyContinue)) { Install-Tool "Microsoft.OpenJDK.17" }
+if (-not (Have rustup) -and -not (Test-Path "$HOME\.cargo\bin\rustup.exe")) { Install-Tool "Rustlang.Rustup" }
 RefreshPath
 $env:Path = "$HOME\.cargo\bin;$env:Path"
 $env:JAVA_HOME = (Get-ChildItem "$env:ProgramFiles\Microsoft\jdk-17*" | Select-Object -First 1).FullName
