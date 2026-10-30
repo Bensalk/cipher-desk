@@ -25,8 +25,13 @@ class RemoteClipboard {
 
   /// Reads this device's clipboard text, or null if there is none.
   static Future<String?> readText() async {
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    final t = data?.text;
-    return (t == null || t.isEmpty) ? null : t;
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final t = data?.text;
+      return (t == null || t.isEmpty) ? null : t;
+    } on PlatformException {
+      // The clipboard can be briefly locked by another app (Windows): try next time.
+      return null;
+    }
   }
 }

@@ -1,8 +1,11 @@
 # Changelog
 
-No version has been released yet. Releases will be published on the [Releases page](https://github.com/Bensalk/cipher-desk/releases) once the independent security review is done (see [docs/RELEASING.md](docs/RELEASING.md)).
+Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
-## v0.1.0 (in development)
+## v0.1.0 (30 Oct 2026, test release)
+
+Not yet independently security-reviewed; see [docs/RELEASING.md](docs/RELEASING.md).
+
 
 - First version: a secure Remote Desktop (RDP) viewer for Windows, Linux and Android, with one shared Rust core built on IronRDP
 - Secure connections only: Network Level Authentication (NLA) and TLS 1.2 or 1.3; older, unprotected connections are refused
@@ -16,3 +19,7 @@ No version has been released yet. Releases will be published on the [Releases pa
 - Clear error messages that say what to do next, with a help page listing all of them
 - Light and dark themes; screenshots blocked on Android by default
 - Packages: Windows MSI and portable ZIP, Linux .deb and AppImage, Android APK
+- Ctrl, Alt and Shift on the key bar stay held until tapped again, for key combinations on touch screens
+- Phones and tablets get a landscape remote desktop (up to 1920×1080)
+- Asks before disconnecting when you press Back during a session
+- A password is only asked for in the connection form when you choose to save it

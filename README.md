@@ -8,7 +8,7 @@
 <h4 align="center">A secure, open-source Remote Desktop (RDP) viewer for Windows, Linux and Android.</h4>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/status-in%20development-FFC107?style=flat-square" alt="Status: in development">
+  <a href="https://github.com/Bensalk/cipher-desk/releases"><img src="https://img.shields.io/badge/release-v0.1.0%20test-FFC107?style=flat-square" alt="Release v0.1.0 (test)"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20Android%2010%2B-00796B?style=flat-square" alt="Windows, Linux, Android 10+">
   <img src="https://img.shields.io/badge/Rust-1.97-B7410E?style=flat-square&logo=rust&logoColor=white" alt="Rust">
   <img src="https://img.shields.io/badge/Flutter-stable-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter">
@@ -33,7 +33,7 @@
 Cipher Desk connects to your own Windows computers over Remote Desktop, from a PC, a Linux machine or an Android phone or tablet. Made by **Bensal** with security first: it only makes protected connections, checks the computer's identity, and never stores a password anywhere except your device's own secure storage. New to Cipher Desk? Follow the [step-by-step guide](docs/HOW-TO-USE.md).
 
 > [!NOTE]
-> Cipher Desk is **in development**. No version has been released yet: the first release follows an independent security review. Progress is recorded in [docs/PROGRESS.md](docs/PROGRESS.md).
+> **v0.1.0 is a test release.** It passes all automated tests, including live connections to test computers, but it has not yet had an independent security review. Progress is recorded in [docs/PROGRESS.md](docs/PROGRESS.md).
 
 ## Key Features
 
@@ -92,8 +92,19 @@ Cipher Desk connects to your own Windows computers over Remote Desktop, from a P
 
 ## Download
 
-- **No release yet.** The first release will be published on the [Releases page](https://github.com/Bensalk/cipher-desk/releases) after the security review. Release notes will be in [CHANGELOG.md](CHANGELOG.md).
-- Planned files: Windows 10/11 MSI and portable ZIP, Linux `.deb` and AppImage, Android 10+ APK, each with a SHA-256 checksum and a software bill of materials (SBOM).
+Latest: **v0.1.0 (test release)** – all files and checksums are on the [Releases page](https://github.com/Bensalk/cipher-desk/releases). Release notes are in [CHANGELOG.md](CHANGELOG.md).
+
+| System | Download | |
+|---|---|---|
+| **Android 10+** | [CipherDesk-0.1.0-android.apk](https://github.com/Bensalk/cipher-desk/releases/download/v0.1.0/CipherDesk-0.1.0-android.apk) | Allow installing from your browser or file manager when asked |
+| **Windows 10/11** (installer) | [CipherDesk-0.1.0-x64.msi](https://github.com/Bensalk/cipher-desk/releases/download/v0.1.0/CipherDesk-0.1.0-x64.msi) | Installs for your user only; no administrator rights needed |
+| **Windows** (portable) | [CipherDesk-0.1.0-windows-x64-portable.zip](https://github.com/Bensalk/cipher-desk/releases/download/v0.1.0/CipherDesk-0.1.0-windows-x64-portable.zip) | Unzip anywhere and run `cipher_desk.exe` |
+| **Debian / Ubuntu** | [cipher-desk_0.1.0_amd64.deb](https://github.com/Bensalk/cipher-desk/releases/download/v0.1.0/cipher-desk_0.1.0_amd64.deb) | `sudo apt install ./cipher-desk_0.1.0_amd64.deb` |
+| **Other Linux** | [Cipher_Desk-0.1.0-x86_64.AppImage](https://github.com/Bensalk/cipher-desk/releases/download/v0.1.0/Cipher_Desk-0.1.0-x86_64.AppImage) | Make it executable and run it |
+
+- Check a download with `SHA256SUMS` from the same release (`sha256sum -c SHA256SUMS`, or `Get-FileHash` on Windows).
+- The Windows files are not code-signed yet, so Windows SmartScreen may warn you: choose *More info → Run anyway* after checking the checksum.
+- Updates install over the existing app and keep your connections.
 
 ## Building
 
@@ -148,7 +159,7 @@ $ flutter run -d linux                       # or: -d windows, or an Android dev
   | Notifications / foreground service | Keeps a session open while you switch apps, and shows that a session is open |
 
   Windows and Linux need no special permissions; Windows Hello is used only to confirm a saved password.
-- **Only install from this repo's [Releases](https://github.com/Bensalk/cipher-desk/releases).** Each release will list the SHA-256 of every file and the Android signing certificate, so you can check your download.
+- **Only install from this repo's [Releases](https://github.com/Bensalk/cipher-desk/releases).** Each release lists the SHA-256 of every file and the Android signing certificate, so you can check your download. Android refuses updates signed with any other key.
 - How it was checked: [threat model](docs/THREAT_MODEL.md) and [security review](docs/SECURITY_REVIEW.md). Setting up the remote computer safely: [docs/HOST_SETUP.md](docs/HOST_SETUP.md).
 - Found a security problem? Report it privately, see [SECURITY.md](SECURITY.md).
 

@@ -812,10 +812,35 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     );
   }
 
+  /// Back button / back gesture while connected: ask first, because on phones
+  /// a stray swipe would otherwise end the session.
+  Future<void> _confirmLeave() async {
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Disconnect from ${widget.profile.displayName}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Stay connected')),
+          FilledButton(
+            key: const Key('button-leave-confirm'),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Disconnect'),
+          ),
+        ],
+      ),
+    );
+    if (leave == true && mounted) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final changed = _changedFingerprints;
-    return Scaffold(
+    return PopScope(
+      canPop: !_sessionOpen,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _confirmLeave();
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: Text(widget.profile.displayName),
         actions: [
@@ -895,6 +920,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
           if (!_ended && _state == RdpConnectionState.connected) _keysBar(),
         ],
       ),
+    ),
     );
   }
 }
