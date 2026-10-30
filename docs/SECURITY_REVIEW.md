@@ -37,13 +37,13 @@ No critical or high-severity issue is open.
 | S10 | Android `FLAG_SECURE` on by default | 🟡 | `MainActivity.kt`; needs a device |
 | S11 | Android: no backup/transfer; minimal permissions | ✅ (code) | `allowBackup=false`, extraction rules; permissions: network, foreground service (special use), notifications |
 | S12 | Signing key offline, separate from authentication | ✅ (code) | Signing only from environment or untracked `key.properties` (gitignored) |
-| S13 | Unattended: dedicated non-admin account; S5 and S7 on by default | ✅ | `docs/HOST_SETUP.md` §3; confirmation and 30-minute idle are the defaults |
+| S13 | Unattended: dedicated non-admin account; S5 and S7 on by default | ✅ | `docs/HOST_SETUP.md` §4; confirmation and 30-minute idle are the defaults |
 
 ### Added by the security review (SA-1 – SA-10)
 
 | Req | Requirement | Status | Evidence |
 |-----|-------------|--------|----------|
-| SA-1 | VPN with two-factor for outside access; no public 3389 | ✅ (documented) | `docs/HOST_SETUP.md` §6–7; `SECURITY.md` |
+| SA-1 | VPN with two-factor for outside access; no public 3389 | ✅ (documented) | `docs/HOST_SETUP.md` §7–8; `SECURITY.md` |
 | SA-2 | Written STRIDE threat model | ✅ | `docs/THREAT_MODEL.md` (late: R32) |
 | SA-3 | Fuzzing of what the server sends us, plus our parsers | ✅ | `rust/fuzz`: 6 targets, 10 minutes each here (≈1.05 billion inputs, no crashes) and weekly in CI |
 | SA-4 | Host-hardening checklist | ✅ | `docs/HOST_SETUP.md` |
