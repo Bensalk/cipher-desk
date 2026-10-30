@@ -84,11 +84,11 @@ jobs:
           EXPECTED: ${{ vars.APPIMAGETOOL_SHA256 || env.APPIMAGETOOL_SHA256_PINNED }}
           APPIMAGE_EXTRACT_AND_RUN: "1" # no FUSE on the runner
         run: |
-          curl -sSfL -o appimagetool "$APPIMAGETOOL_URL"
+          bash scripts/ci-run.sh "appimagetool download" curl -sSfL -o appimagetool "$APPIMAGETOOL_URL"
           echo "$EXPECTED  appimagetool" | sha256sum -c - || { echo "::error::appimagetool checksum mismatch"; exit 1; }
           chmod +x appimagetool
-          bash packaging/linux/build-appimage.sh app/build/linux/x64/release/bundle \
-            "${{ needs.version.outputs.version }}" dist "$PWD/appimagetool"
+          bash scripts/ci-run.sh "AppImage" bash packaging/linux/build-appimage.sh \
+            app/build/linux/x64/release/bundle "${{ needs.version.outputs.version }}" dist "$PWD/appimagetool"
       - name: Install, run and remove the .deb
         run: |
           sudo apt-get install -y ./dist/*.deb
