@@ -159,7 +159,9 @@ $ flutter run -d linux                       # or: -d windows, or an Android dev
   | Notifications / foreground service | Keeps a session open while you switch apps, and shows that a session is open |
 
   Windows and Linux need no special permissions; Windows Hello is used only to confirm a saved password.
-- **Only install from this repo's [Releases](https://github.com/Bensalk/cipher-desk/releases).** Each release lists the SHA-256 of every file and the Android signing certificate, so you can check your download. Android refuses updates signed with any other key.
+- **Only install from this repo's [Releases](https://github.com/Bensalk/cipher-desk/releases).** Each release lists the SHA-256 of every file and the Android signing certificate, so you can check your download. The official Android signing certificate SHA-256 is:
+  `B3:30:E4:86:BD:9A:5D:4C:D7:C3:1B:BF:72:54:E2:B3:09:DD:8C:05:23:81:07:42:79:E4:E9:3B:91:D4:14:CE`
+  Android refuses updates signed with any other key, so a fake APK can't replace the real app.
 - How it was checked: [threat model](docs/THREAT_MODEL.md) and [security review](docs/SECURITY_REVIEW.md). Setting up the remote computer safely: [docs/HOST_SETUP.md](docs/HOST_SETUP.md).
 - Found a security problem? Report it privately, see [SECURITY.md](SECURITY.md).
 
