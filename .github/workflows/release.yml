@@ -66,13 +66,13 @@ jobs:
       - name: Build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev file
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev file desktop-file-utils
       - name: Build release bundle (local paths removed, SA-9)
         working-directory: app
         run: |
           export RUSTFLAGS="--remap-path-prefix=$HOME=/home --remap-path-prefix=$HOME/.cargo=/cargo --remap-path-prefix=$GITHUB_WORKSPACE=/src"
           flutter pub get
-          flutter build linux --release
+          bash ../scripts/ci-run.sh "Linux release build" flutter build linux --release
       - name: No local paths in the binaries
         run: bash scripts/check-binaries.sh app/build/linux/x64/release/bundle
       - name: .deb package
@@ -84,11 +84,11 @@ jobs:
           EXPECTED: ${{ vars.APPIMAGETOOL_SHA256 || env.APPIMAGETOOL_SHA256_PINNED }}
           APPIMAGE_EXTRACT_AND_RUN: "1" # no FUSE on the runner
         run: |
-          curl -sSfL -o appimagetool "$APPIMAGETOOL_URL"
+          bash scripts/ci-run.sh "appimagetool download" curl -sSfL -o appimagetool "$APPIMAGETOOL_URL"
           echo "$EXPECTED  appimagetool" | sha256sum -c - || { echo "::error::appimagetool checksum mismatch"; exit 1; }
           chmod +x appimagetool
-          bash packaging/linux/build-appimage.sh app/build/linux/x64/release/bundle \
-            "${{ needs.version.outputs.version }}" dist "$PWD/appimagetool"
+          bash scripts/ci-run.sh "AppImage" bash packaging/linux/build-appimage.sh \
+            app/build/linux/x64/release/bundle "${{ needs.version.outputs.version }}" dist "$PWD/appimagetool"
       - name: Install, run and remove the .deb
         run: |
           sudo apt-get install -y ./dist/*.deb
@@ -126,10 +126,11 @@ jobs:
         run: |
           $env:RUSTFLAGS = "--remap-path-prefix=$env:USERPROFILE=C:\home --remap-path-prefix=$env:GITHUB_WORKSPACE=C:\src"
           flutter pub get
-          flutter build windows --release
+          & "$env:ProgramFiles\Git\bin\bash.exe" ../scripts/ci-run.sh "Windows release build" flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: No local paths in the binaries
         shell: bash
-        run: bash scripts/check-binaries.sh app/build/windows/x64/runner/Release
+        run: bash scripts/ci-run.sh "Local paths in Windows files" bash scripts/check-binaries.sh app/build/windows/x64/runner/Release
       - name: Sign the program (if a certificate is configured)
         env:
           WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
@@ -146,7 +147,9 @@ jobs:
           WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
           WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
         run: |
-          $msi = ./packaging/windows/build-msi.ps1 -BundleDir app/build/windows/x64/runner/Release -Version "${{ needs.version.outputs.version }}" -OutDir dist
+          & "$env:ProgramFiles\Git\bin\bash.exe" scripts/ci-run.sh "MSI installer" pwsh -NoProfile -File packaging/windows/build-msi.ps1 -BundleDir app/build/windows/x64/runner/Release -Version "${{ needs.version.outputs.version }}" -OutDir dist
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $msi = (Get-ChildItem dist/*.msi | Select-Object -First 1).FullName
           ./packaging/windows/sign.ps1 $msi
       - name: Portable ZIP (SA-10)
         run: ./packaging/windows/build-portable.ps1 -BundleDir app/build/windows/x64/runner/Release -Version "${{ needs.version.outputs.version }}" -OutDir dist
@@ -186,6 +189,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - name: Free disk space (three Android targets are built)
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/powershell /usr/local/share/chromium
+          df -h /
       - name: Release keystore from secrets (S12)
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -207,7 +215,7 @@ jobs:
         run: |
           export RUSTFLAGS="--remap-path-prefix=$HOME=/home --remap-path-prefix=$HOME/.cargo=/cargo --remap-path-prefix=$GITHUB_WORKSPACE=/src"
           flutter pub get
-          flutter build apk --release
+          bash ../scripts/ci-run.sh "Android release build" flutter build apk --release
           mkdir -p ../dist
           cp build/app/outputs/flutter-apk/app-release.apk "../dist/CipherDesk-${{ needs.version.outputs.version }}-android.apk"
           rm -f "$RUNNER_TEMP/release.jks"

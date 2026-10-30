@@ -4,7 +4,7 @@
 # Installs to /opt/cipher-desk with a launcher, app-menu entry and icons.
 # Uninstalling removes all of it. Saved passwords live in each user's keyring,
 # which a package cannot reach: users remove them in Settings first (see
-# docs/USER_GUIDE.md).
+# docs/HOW-TO-USE.md).
 set -euo pipefail
 BUNDLE=$(cd "$1" && pwd); VERSION=$2; OUT=$(mkdir -p "$3" && cd "$3" && pwd)
 HERE=$(cd "$(dirname "$0")" && pwd)

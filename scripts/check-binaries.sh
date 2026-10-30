@@ -6,7 +6,8 @@
 set -euo pipefail
 found=0
 pattern='(/home/[A-Za-z0-9._-]+/|/Users/[A-Za-z0-9._-]+/|[A-Za-z]:\\Users\\[^\\]+\\|/root/)'
-allowed='(/home/runner/|\\Users\\runneradmin\\)'
+# The CI runner's account (runneradmin) also appears in its short 8.3 form RUNNER~1.
+allowed='(/home/runner/|\\Users\\runneradmin\\|\\Users\\RUNNER~1\\)'
 while IFS= read -r -d '' f; do
   hits=$(grep -a -o -E "$pattern" "$f" 2>/dev/null | grep -v -E "$allowed" | sort -u | head -5 || true)
   if [ -n "$hits" ]; then

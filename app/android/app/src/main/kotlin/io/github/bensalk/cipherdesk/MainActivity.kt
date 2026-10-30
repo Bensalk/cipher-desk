@@ -76,6 +76,9 @@ class MainActivity : FlutterFragmentActivity() {
                         // Android refused (e.g. started from the background): the
                         // session still works while the app is open.
                         result.success(false)
+                    } catch (e: SecurityException) {
+                        // Same if the system does not allow this kind of service.
+                        result.success(false)
                     }
                 }
                 "stop" -> {

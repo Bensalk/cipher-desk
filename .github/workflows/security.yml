@@ -75,13 +75,26 @@ jobs:
           go install github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.7.0
           # No --config: each folder's own osv-scanner.toml applies (the app's at the
           # root; the test-only host and fuzzers have their own reviewed exceptions).
-          "$(go env GOPATH)/bin/osv-scanner" scan source --recursive .
+          set +e
+          "$(go env GOPATH)/bin/osv-scanner" scan source --recursive --format json --output osv.json .
+          status=$?
+          set -e
+          # Show each finding as an annotation (visible on the run page without the full log).
+          if [ -s osv.json ]; then
+            jq -r '.results[]? as $r | $r.packages[]? as $p | $p.vulnerabilities[]? |
+              "::error title=\(.id)::\($p.package.ecosystem) \($p.package.name) \($p.package.version) in \($r.source.path | sub("^/home/runner/work/[^/]+/[^/]+/"; ""))"' osv.json
+          fi
+          exit "$status"
 
   codeql:
     name: CodeQL (${{ matrix.language }})
+    # GitHub code scanning is only free for public repositories. While this
+    # repository is private, CodeQL is skipped; it starts once it is public.
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
       security-events: write
     strategy:
       fail-fast: false

@@ -20,6 +20,13 @@ if [ -n "${GITHUB_ACTIONS:-}" ]; then
   echo "::add-mask::$PASSWORD"
 fi
 
+# Installing the xrdp package starts it as a system service on port 3389, which
+# would take the port from the NLA host below (and fail every live test with
+# "secure connection not supported"). Stop it; it is started again on port 3390.
+if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files xrdp.service >/dev/null 2>&1; then
+  sudo systemctl stop xrdp xrdp-sesman >/dev/null 2>&1 || true
+fi
+
 # A virtual screen with something on it for the shadow server to share.
 Xvfb ":$DISPLAY_NUM" -screen 0 1280x800x24 >"$WORK/xvfb.log" 2>&1 &
 sleep 2
@@ -57,6 +64,16 @@ openssl req -x509 -newkey rsa:2048 -nodes -keyout "$WORK/clip-key.pem" -out "$WO
   RDPV_HOST_CERT="$WORK/clip-cert.pem" RDPV_HOST_KEY="$WORK/clip-key.pem" \
   RDPV_HOST_CLIP_TEXT="$CLIP_TEXT" RDPV_HOST_CLIP_OUT="$WORK/clip-received.txt" \
   setsid "$ROOT/tools/rdp-test-host/target/debug/rdp-test-host" >"$WORK/clip-host.log" 2>&1 &)
+
+# Check that the NLA host, not something else, owns port 3389.
+sleep 1
+if command -v ss >/dev/null 2>&1 && ! ss -ltnp 2>/dev/null | grep ':3389 ' | grep -q 'freerdp-shadow'; then
+  if sudo ss -ltnp 2>/dev/null | grep ':3389 ' | grep -qv 'freerdp-shadow'; then
+    echo "port 3389 is taken by another program:" >&2
+    sudo ss -ltnp | grep ':3389 ' >&2
+    exit 1
+  fi
+fi
 
 # Wait for the ports.
 for port in 3389 3391 ${NONLA_PORT}; do

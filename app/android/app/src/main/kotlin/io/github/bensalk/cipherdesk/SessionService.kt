@@ -61,7 +61,7 @@ class SessionService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         return Notification.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_stat_session)
             .setContentTitle("Remote desktop session active")
             .setContentText("Disconnects 5 minutes after you leave the app. Tap to return.")
             .setContentIntent(open)

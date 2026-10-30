@@ -1,5 +1,5 @@
 [package]
-name = "rdpv-bridge"
+name = "rust_lib_cipher_desk"
 description = "flutter_rust_bridge API layer between the Flutter UI and rdpv-core."
 version.workspace = true
 edition.workspace = true

@@ -1,4 +1,17 @@
-# Cipher Desk — User Guide
+# How to use Cipher Desk
+
+A step-by-step guide, from installing the app to your first secure connection. Back to the [README](../README.md).
+
+- [1. Install](#1-install)
+- [2. Add a computer](#2-add-a-computer)
+- [3. The first connection: check the certificate](#3-the-first-connection-check-the-certificate)
+- [4. During a session](#4-during-a-session)
+- [5. Settings](#5-settings)
+- [6. Portable copies](#6-portable-copies)
+- [7. Uninstall](#7-uninstall)
+- [8. Troubleshooting](#8-troubleshooting)
+
+---
 
 Before you start, set up the computer you want to connect to:
 [`HOST_SETUP.md`](HOST_SETUP.md). Only connect over your own network or a VPN.
@@ -25,10 +38,11 @@ may warn you; check the SHA-256 checksum first.
 the port (leave empty for 3389) and the username (`user`, `DOMAIN\user` or
 `user@domain`). Optional:
 
-- **Save password** — stored only in this device's secure storage (Windows Credential
-  Manager, the Linux keyring, the Android Keystore), never in the app's files.
-  Windows asks for Windows Hello and Android for your fingerprint/face/screen lock
-  before it is used.
+- **Save password** — tick it and type the password to keep it in this device's secure
+  storage (Windows Credential Manager, the Linux keyring, the Android Keystore), never
+  in the app's files. Windows asks for Windows Hello and Android for your
+  fingerprint/face/screen lock before it is used. Without it, you type the password
+  each time you connect.
 - **Share clipboard** — off by default. Anything you copy while connected can be read
   by the remote computer, and it can put text on this device. You can allow one
   direction only.
@@ -37,6 +51,10 @@ the port (leave empty for 3389) and the username (`user`, `DOMAIN\user` or
 
 **Check readiness** in the connection's menu tests whether the computer answers and
 whether everything is set up.
+
+| New connection | Connection menu | Check readiness |
+|:---:|:---:|:---:|
+| <img src="screenshots/phone-new-connection.png" width="230"> | <img src="screenshots/phone-connection-menu.png" width="230"> | <img src="screenshots/phone-readiness.png" width="230"> |
 
 ## 3. The first connection: check the certificate
 
@@ -50,13 +68,19 @@ but it can also mean someone is intercepting the connection. Only use **"I know 
 it changed — trust the new certificate"** after checking the new fingerprint on the
 computer itself.
 
+<p align="center"><img src="screenshots/desktop-certificate.png" width="640" alt="Check this computer's identity"></p>
+
 ## 4. During a session
 
 - **Keyboard and mouse** work as usual on a computer. The bar at the bottom has
-  Esc, Tab, Windows, **Ctrl+Alt+Del**, arrows, F1–F12 and **Type text**.
-- **Touch screens:** tap to click, long-press to right-click, drag to drag. Turn on
-  **trackpad mode** (hand icon) to move a pointer like on a laptop trackpad. Pinch to
-  zoom up to 4×; the zoom button shows the whole screen again.
+  **Ctrl, Alt and Shift** (they stay held until you tap them again, so you can do
+  Ctrl+C or Alt+Tab), Esc, Tab, Windows, **Ctrl+Alt+Del**, arrows, F1–F12 and **Type text**.
+- **Touch screens:** tap to click, long-press to right-click, drag to drag, and move
+  **two fingers up or down to scroll**. Turn on **trackpad mode** (hand icon) to move a
+  pointer like on a laptop trackpad. Pinch to zoom up to 4×; the zoom button shows the
+  whole screen again.
+- **Phones and tablets** get a landscape desktop (up to 1920×1080); turn the device
+  sideways for the biggest view.
 - **Clipboard** (if allowed): an icon in the title bar shows the direction. On Android,
   text you copy on the phone is sent when you return to the app or tap *Send clipboard*.
 - **Network drops:** the app reconnects by itself (up to 3 tries) to the same computer
@@ -64,6 +88,8 @@ computer itself.
 - **Idle:** sessions end after 30 minutes without input (change it in Settings).
 - **Android:** a notification shows while a session is open. If you leave the app for
   5 minutes, the session ends; tap **Reconnect** when you come back.
+
+<p align="center"><img src="screenshots/desktop-session.png" width="640" alt="A remote session with the key bar"></p>
 
 ## 5. Settings
 
@@ -74,6 +100,10 @@ connection history · export / import · what each error message means.
 
 **Export** contains names, addresses, ports and usernames, never passwords. Imported
 connections always start with clipboard sharing off.
+
+| Settings | About | Connection history |
+|:---:|:---:|:---:|
+| <img src="screenshots/phone-settings.png" width="230"> | <img src="screenshots/phone-settings-about.png" width="230"> | <img src="screenshots/phone-history.png" width="230"> |
 
 ## 6. Portable copies
 
@@ -107,6 +137,11 @@ reinstall finds them. To remove them too, delete the app's folder:
 
 Every error message says what to do next; *Settings → What error messages mean*
 lists them all. Common ones:
+
+| An error with advice | All error messages |
+|:---:|:---:|
+| <img src="screenshots/phone-wrong-password.png" width="230"> | <img src="screenshots/phone-error-help.png" width="230"> |
+
 
 - **Computer didn't respond** — it is off or asleep, you are not on the same network or
   VPN, or a firewall blocks port 3389.

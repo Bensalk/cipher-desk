@@ -18,6 +18,24 @@ import '../state/profiles.dart';
 import 'error_banner.dart';
 import 'status_chip.dart';
 
+/// The remote desktop size to ask for, in pixels (even numbers).
+///
+/// Computers: the size of this window, within 800×600 and 3840×2160.
+/// Phones and tablets: always landscape (a portrait Windows desktop is awkward to use,
+/// and the phone can be turned), at most 1920×1080 so text stays readable when zoomed.
+(int, int) desktopSizeFor(Size physical, {required bool phoneOrTablet}) {
+  var width = physical.width;
+  var height = physical.height;
+  double maxW = 3840, maxH = 2160;
+  if (phoneOrTablet) {
+    if (height > width) (width, height) = (height, width);
+    maxW = 1920;
+    maxH = 1080;
+  }
+  int even(double v, double lo, double hi) => (v.clamp(lo, hi) ~/ 2) * 2;
+  return (even(width, 800, maxW), even(height, 600, maxH));
+}
+
 /// Shows a remote desktop session: connection progress, the certificate
 /// prompt, the remote screen, keyboard/mouse/touch input (direct touch or
 /// trackpad mode, with pinch-zoom) and a small bar of special keys.
@@ -81,6 +99,11 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   // pinch: after a pinch, the finger that stays down must not click or drag.
   int _touches = 0;
   bool _pinched = false;
+  // Two fingers either zoom (pinch) or scroll (move together up or down); which
+  // one is decided by the first clear movement and kept until the fingers lift.
+  _TwoFinger _twoFinger = _TwoFinger.undecided;
+  double _scrollRest = 0; // finger movement not yet turned into wheel notches
+  double _pinchScaleAtStart = 1; // the gesture's scale when zooming began
 
   static const _touchKinds = {
     PointerDeviceKind.touch,
@@ -176,11 +199,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   Future<void> _start() async {
     final pinsPath = widget.pinsPath;
     if (!mounted) return;
-    final view = View.of(context);
-    final size = view.physicalSize;
-    // Ask for a desktop the size of this window, within sensible limits.
-    final w = (size.width.clamp(800, 3840) ~/ 2) * 2;
-    final h = (size.height.clamp(600, 2160) ~/ 2) * 2;
+    final (w, h) = desktopSizeFor(View.of(context).physicalSize, phoneOrTablet: _isAndroid);
     final stream = widget.useSavedPassword
         ? _session.startWithSavedPassword(
             connectionId: widget.profile.id,
@@ -251,8 +270,10 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
         }
       case UpdateKind.reconnecting:
         // The network dropped; Rust is reconnecting (F13). Input is ignored meanwhile.
+        // The new session starts with no keys held.
         _clipTimer?.cancel();
         setState(() {
+          _heldModifiers.clear();
           _state = RdpConnectionState.reconnecting;
           _statusLabel = u.label ?? RdpConnectionState.reconnecting.label;
         });
@@ -301,6 +322,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   }
 
   void _onEnded(ErrorInfo? error) {
+    _heldModifiers.clear();
     _clipTimer?.cancel();
     _backgroundTimer?.cancel();
     if (_serviceStarted) SessionService.stop();
@@ -391,6 +413,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
       final report = widget.onOutcome;
       final outcome = _wasConnected ? 'connected' : 'cancelled';
       if (report != null) Future.microtask(() => report(outcome));
+      _releaseModifiers();
       _session.disconnect();
     }
     _sub?.cancel();
@@ -465,12 +488,40 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
 
   void _onScaleUpdate(ScaleUpdateDetails d, Size box) {
     if (d.pointerCount >= 2) {
-      // Pinch: zoom and move the view; nothing is sent to the remote computer.
       _pinched = true;
       if (_dragging) _endDrag(box, d.localFocalPoint);
+      if (_twoFinger == _TwoFinger.undecided) {
+        _scrollRest += d.focalPointDelta.dy;
+        if ((d.scale - 1).abs() > 0.08) {
+          _twoFinger = _TwoFinger.zoom;
+          // Zoom from here, so the view does not jump.
+          _startZoom = _zoom;
+          _startFocal = d.localFocalPoint;
+          _startOrigin = _origin(box);
+          _pinchScaleAtStart = d.scale;
+        } else if (_scrollRest.abs() > 16) {
+          _twoFinger = _TwoFinger.scroll;
+          _scrollRest = 0;
+          return;
+        } else {
+          return;
+        }
+      }
+      if (_twoFinger == _TwoFinger.scroll) {
+        // Two-finger scroll: fingers up = page moves up, like scrolling on a phone.
+        _scrollRest += d.focalPointDelta.dy;
+        const step = 40.0; // finger movement per wheel notch
+        while (_scrollRest.abs() >= step) {
+          final up = _scrollRest > 0;
+          _session.wheel(vertical: true, delta: up ? 120 : -120);
+          _scrollRest += up ? -step : step;
+        }
+        return;
+      }
+      // Pinch: zoom and move the view; nothing is sent to the remote computer.
       final base = _baseScale(box);
       if (base <= 0) return;
-      final zoom = (_startZoom * d.scale).clamp(1.0, maxZoom);
+      final zoom = (_startZoom * d.scale / _pinchScaleAtStart).clamp(1.0, maxZoom);
       final s = base * zoom;
       // Keep the desktop point that was under the fingers under them.
       final remotePt = (_startFocal - _startOrigin) / (base * _startZoom);
@@ -511,7 +562,11 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   void _touchEnded(PointerEvent e) {
     if (!_touchKinds.contains(e.kind)) return;
     if (_touches > 0) _touches--;
-    if (_touches == 0) _pinched = false;
+    if (_touches == 0) {
+      _pinched = false;
+      _twoFinger = _TwoFinger.undecided;
+      _scrollRest = 0;
+    }
   }
 
   void _resetZoom() => setState(() {
@@ -557,6 +612,24 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     final down = e is KeyDownEvent || e is KeyRepeatEvent;
     _session.key(scancode: sc.code, extended: sc.extended, down: down);
     return KeyEventResult.handled;
+  }
+
+  /// Ctrl, Alt and Shift from the key bar stay held until tapped again, so key
+  /// combinations (Ctrl+C, Alt+Tab, Shift+F10) work on touch screens.
+  final Set<int> _heldModifiers = {};
+
+  void _toggleModifier(int code) {
+    final down = !_heldModifiers.contains(code);
+    setState(() => down ? _heldModifiers.add(code) : _heldModifiers.remove(code));
+    _session.key(scancode: code, extended: false, down: down);
+    _focus.requestFocus();
+  }
+
+  void _releaseModifiers() {
+    for (final code in _heldModifiers) {
+      _session.key(scancode: code, extended: false, down: false);
+    }
+    _heldModifiers.clear();
   }
 
   void _pressKey(int code, {bool extended = false}) {
@@ -729,6 +802,12 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Row(
           children: [
+            for (final (label, code) in const [('Ctrl', 0x1D), ('Alt', 0x38), ('Shift', 0x2A)])
+              _ModifierButton(
+                label,
+                held: _heldModifiers.contains(code),
+                onPressed: () => _toggleModifier(code),
+              ),
             _KeyButton('Esc', () => _pressKey(0x01)),
             _KeyButton('Tab', () => _pressKey(0x0F)),
             _KeyButton('Win', () => _pressKey(0x5B, extended: true)),
@@ -770,10 +849,35 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     );
   }
 
+  /// Back button / back gesture while connected: ask first, because on phones
+  /// a stray swipe would otherwise end the session.
+  Future<void> _confirmLeave() async {
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Disconnect from ${widget.profile.displayName}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Stay connected')),
+          FilledButton(
+            key: const Key('button-leave-confirm'),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Disconnect'),
+          ),
+        ],
+      ),
+    );
+    if (leave == true && mounted) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final changed = _changedFingerprints;
-    return Scaffold(
+    return PopScope(
+      canPop: !_sessionOpen,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _confirmLeave();
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: Text(widget.profile.displayName),
         actions: [
@@ -852,6 +956,30 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
           if (!_ended) Expanded(child: _remoteView()),
           if (!_ended && _state == RdpConnectionState.connected) _keysBar(),
         ],
+      ),
+    ),
+    );
+  }
+}
+
+enum _TwoFinger { undecided, zoom, scroll }
+
+class _ModifierButton extends StatelessWidget {
+  const _ModifierButton(this.label, {required this.held, required this.onPressed});
+
+  final String label;
+  final bool held;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: Tooltip(
+        message: held ? '$label is held: tap to release' : 'Hold $label for the next keys',
+        child: held
+            ? FilledButton(onPressed: onPressed, child: Text(label))
+            : OutlinedButton(onPressed: onPressed, child: Text(label)),
       ),
     );
   }
