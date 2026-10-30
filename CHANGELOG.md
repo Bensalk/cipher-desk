@@ -2,6 +2,17 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.2.0 (30 Oct 2026, test release)
+
+Not yet independently security-reviewed; see [docs/RELEASING.md](docs/RELEASING.md).
+
+- Three connection methods, chosen per connection, with a two-question helper: **Private Remote Desktop**, **Share screen** and **VNC** ([which one to use](docs/CONNECTION-METHODS.md))
+- **Share screen** (Windows): a new *Share screen* page lets your phone or another computer see and control this computer's screen while it stays visible here, on any Windows edition. Encrypted, with an identity code to check, a generated password kept in Windows' secure storage, and a 15-minute pause after 5 wrong passwords
+- Share screen options: start sharing when Cipher Desk opens, open Cipher Desk when you sign in to Windows, and a "Your screen is being shared" banner with Stop
+- **VNC**: connect to computers running a VNC program such as TightVNC, only on your own network or Tailscale, because VNC isn't encrypted
+- Windows: the Cipher Desk window is now hidden from screenshots and screen sharing (setting *Block screenshots*, on by default), and always while sharing
+- Step-by-step tutorials for each method: [Private Remote Desktop](docs/methods/PRIVATE-REMOTE-DESKTOP.md), [Share screen](docs/methods/SHARE-SCREEN.md), [VNC](docs/methods/VNC.md)
+
 ## v0.1.0 (30 Oct 2026, test release)
 
 Not yet independently security-reviewed; see [docs/RELEASING.md](docs/RELEASING.md).

@@ -171,7 +171,7 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.verified_user_outlined),
-                  title: const Text('Identity code'),
+                  title: const Text('Identity code (certificate fingerprint)'),
                   subtitle: Text(
                     s.fingerprint ?? 'Not available',
                     style: const TextStyle(fontFamily: 'monospace', fontSize: 12),

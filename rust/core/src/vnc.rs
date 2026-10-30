@@ -214,6 +214,7 @@ async fn network(
             asked_in_auth.store(true, std::sync::atomic::Ordering::SeqCst);
             Ok(secret)
         })
+        .add_encoding(VncEncoding::Tight)
         .add_encoding(VncEncoding::Zrle)
         .add_encoding(VncEncoding::CopyRect)
         .add_encoding(VncEncoding::Raw)
