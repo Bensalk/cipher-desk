@@ -8,9 +8,12 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 OUT=$(mkdir -p "$1" && cd "$1" && pwd)
 cd "$ROOT"
 cargo cyclonedx --format json --spec-version 1.5
-for crate in core bridge; do
-  src="rust/$crate/rdpv-$crate.cdx.json"
-  sed "s#file://$ROOT#file:///src#g" "$src" > "$OUT/sbom-rust-$crate.cdx.json"
+# One file per crate, named after the package (rust/core: rdpv-core,
+# rust/bridge: rust_lib_cipher_desk).
+for pair in core:rdpv-core bridge:rust_lib_cipher_desk; do
+  dir=${pair%%:*}; package=${pair#*:}
+  src="rust/$dir/$package.cdx.json"
+  sed "s#file://$ROOT#file:///src#g" "$src" > "$OUT/sbom-rust-$dir.cdx.json"
   rm "$src"
 done
 bash "$ROOT/scripts/check-binaries.sh" "$OUT"
