@@ -348,7 +348,11 @@ pub fn wake_on_lan(mac: String) -> WakeResult {
 /// network, this computer or Tailscale. Looks the name up, so it may take a moment.
 pub fn vnc_address_allowed(host: String) -> bool {
     use std::net::ToSocketAddrs as _;
-    match (host.trim(), 0u16).to_socket_addrs() {
+    let host = host.trim();
+    if host.is_empty() {
+        return false;
+    }
+    match (host, 0u16).to_socket_addrs() {
         Ok(addrs) => {
             let addrs: Vec<_> = addrs.collect();
             !addrs.is_empty()

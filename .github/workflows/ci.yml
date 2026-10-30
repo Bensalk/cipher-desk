@@ -42,9 +42,11 @@ jobs:
       - name: Clippy (zero warnings)
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Tests (debug)
-        run: cargo test --workspace
+        shell: bash
+        run: bash scripts/ci-run.sh "Tests (debug)" cargo test --workspace
       - name: Tests (release — checks release logging cap)
-        run: cargo test --workspace --release
+        shell: bash
+        run: bash scripts/ci-run.sh "Tests (release)" cargo test --workspace --release
       - name: Security policy checks
         shell: bash
         run: sh scripts/check-policy.sh
