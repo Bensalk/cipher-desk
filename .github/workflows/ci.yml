@@ -129,6 +129,13 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - name: Free disk space (the Android debug build needs it)
+        if: matrix.target == 'android'
+        working-directory: .
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/powershell /usr/local/share/chromium
+          df -h /
       - name: Linux build dependencies
         if: matrix.target == 'linux'
         working-directory: .
@@ -156,7 +163,7 @@ jobs:
         run: bash ../scripts/ci-run.sh "Linux build" flutter build linux --debug
       - name: Integration test (Linux, Rust ↔ Flutter)
         if: matrix.target == 'linux'
-        run: bash ../scripts/ci-run.sh "Linux integration test" xvfb-run -a flutter test integration_test -d linux
+        run: bash ../scripts/ci-run.sh "Linux integration test" xvfb-run -a -s "-screen 0 1920x1080x24" flutter test integration_test -d linux
       - name: Build Windows
         if: matrix.target == 'windows'
         shell: bash
@@ -167,7 +174,7 @@ jobs:
         run: bash ../scripts/ci-run.sh "Windows integration test" flutter test integration_test -d windows
       - name: Build Android APK
         if: matrix.target == 'android'
-        run: bash ../scripts/ci-run.sh "Android build" flutter build apk --debug
+        run: bash ../scripts/ci-run.sh "Android build" flutter build apk --debug --target-platform android-arm64
       - name: Android manifest security settings
         if: matrix.target == 'android'
         shell: bash
