@@ -95,6 +95,34 @@ void main() {
     expect(await fieldError(tester, 'field-password'), 'This field is required.');
   });
 
+  testWidgets('the method helper suggests a method and VNC needs no username', (tester) async {
+    await start(tester);
+    await tester.tap(find.byKey(const Key('button-new')));
+    await tester.pumpAndSettle();
+    // Private Remote Desktop is the default.
+    expect(find.byKey(const Key('field-username')), findsOneWidget);
+
+    // Someone must see the screen, and Cipher Desk can be installed: Share screen.
+    await tapVisible(tester, find.byKey(const Key('button-method-helper')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(of: find.byKey(const Key('helper-q1')), matching: find.text('Yes')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(of: find.byKey(const Key('helper-q2')), matching: find.text('Yes')));
+    await tester.pumpAndSettle();
+    expect(find.text('Use Share screen'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('helper-use')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Cipher Desk running on the computer'), findsOneWidget);
+
+    // VNC: no username field, no clipboard choice, port 5900.
+    await tapVisible(tester, find.byKey(const Key('method-vnc')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('field-username')), findsNothing);
+    expect(find.byKey(const Key('field-clipboard')), findsNothing);
+    final port = tester.widget<TextField>(find.byKey(const Key('field-port')));
+    expect(port.decoration?.hintText, '5900');
+  });
+
   testWidgets('password is masked and can be revealed', (tester) async {
     await start(tester);
     await tester.tap(find.byKey(const Key('button-new')));

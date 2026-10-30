@@ -74,7 +74,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
                   String get codegenVersion => '2.13.0';
 
                   @override
-                  int get rustContentHash => 1808095405;
+                  int get rustContentHash => -1592907736;
 
                   static const kDefaultExternalLibraryLoaderConfig = ExternalLibraryLoaderConfig(
                     stem: 'rust_lib_cipher_desk',
@@ -114,7 +114,7 @@ void crateApiSessionRdpSessionWheel({required RdpSession that , required bool ve
 
 List<ErrorInfo> crateApiErrorsAllConnectionErrors();
 
-FormCheckResult crateApiFormCheckConnectionForm({required String profileName , required String host , required String port , required String username , required String password , required bool hasSavedPassword });
+FormCheckResult crateApiFormCheckConnectionForm({required ConnectionMethod method , required String profileName , required String host , required String port , required String username , required String password , required bool hasSavedPassword });
 
 Future<bool> crateApiStoreCheckReachable({required String host , required int port , required int timeoutMs });
 
@@ -129,6 +129,8 @@ bool crateApiStoreConnectionsSave({required String path , required List<Connecti
 String crateApiInfoCoreSummary();
 
 int crateApiFormDefaultPort();
+
+int crateApiStoreDefaultPortFor({required ConnectionMethod method });
 
 bool crateApiPinsForgetCertificate({required String pinsPath , required String host , required int port });
 
@@ -568,10 +570,11 @@ sse_encode_i_16(delta, serializer);
         );
         
 
-@override FormCheckResult crateApiFormCheckConnectionForm({required String profileName , required String host , required String port , required String username , required String password , required bool hasSavedPassword })  { return handler.executeSync(SyncTask(
+@override FormCheckResult crateApiFormCheckConnectionForm({required ConnectionMethod method , required String profileName , required String host , required String port , required String username , required String password , required bool hasSavedPassword })  { return handler.executeSync(SyncTask(
             callFfi: () {
               
-            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(profileName, serializer);
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_connection_method(method, serializer);
+sse_encode_String(profileName, serializer);
 sse_encode_String(host, serializer);
 sse_encode_String(port, serializer);
 sse_encode_String(username, serializer);
@@ -587,14 +590,14 @@ sse_encode_bool(hasSavedPassword, serializer);
         )
         ,
             constMeta: kCrateApiFormCheckConnectionFormConstMeta,
-            argValues: [profileName, host, port, username, password, hasSavedPassword],
+            argValues: [method, profileName, host, port, username, password, hasSavedPassword],
             apiImpl: this,
         )); }
 
 
         TaskConstMeta get kCrateApiFormCheckConnectionFormConstMeta => const TaskConstMeta(
             debugName: "check_connection_form",
-            argNames: ["profileName", "host", "port", "username", "password", "hasSavedPassword"],
+            argNames: ["method", "profileName", "host", "port", "username", "password", "hasSavedPassword"],
         );
         
 
@@ -777,13 +780,38 @@ sse_encode_list_history_data(history, serializer);
         );
         
 
+@override int crateApiStoreDefaultPortFor({required ConnectionMethod method })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_connection_method(method, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_u_16,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiStoreDefaultPortForConstMeta,
+            argValues: [method],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiStoreDefaultPortForConstMeta => const TaskConstMeta(
+            debugName: "default_port_for",
+            argNames: ["method"],
+        );
+        
+
 @override bool crateApiPinsForgetCertificate({required String pinsPath , required String host , required int port })  { return handler.executeSync(SyncTask(
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(pinsPath, serializer);
 sse_encode_String(host, serializer);
 sse_encode_u_16(port, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 24)!;
             
             },
             codec: 
@@ -809,7 +837,7 @@ sse_encode_u_16(port, serializer);
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(pinsPath, serializer);
 sse_encode_String(endpoint, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 24)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25)!;
             
             },
             codec: 
@@ -834,7 +862,7 @@ sse_encode_String(endpoint, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
             
             },
             codec: 
@@ -859,7 +887,7 @@ sse_encode_String(endpoint, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27)!;
             
             },
             codec: 
@@ -884,7 +912,7 @@ sse_encode_String(endpoint, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(text, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28)!;
             
             },
             codec: 
@@ -909,7 +937,7 @@ sse_encode_String(endpoint, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29)!;
             
             },
             codec: 
@@ -934,7 +962,7 @@ sse_encode_String(endpoint, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
             
             },
             codec: 
@@ -959,7 +987,7 @@ sse_encode_String(endpoint, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(path, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 31)!;
             
             },
             codec: 
@@ -985,7 +1013,7 @@ sse_encode_String(endpoint, serializer);
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(path, serializer);
 sse_encode_box_autoadd_settings_data(data, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 31)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32)!;
             
             },
             codec: 
@@ -1010,7 +1038,7 @@ sse_encode_box_autoadd_settings_data(data, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(pinsPath, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 33)!;
             
             },
             codec: 
@@ -1035,7 +1063,7 @@ sse_encode_box_autoadd_settings_data(data, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(connectionId, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 33)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 34)!;
             
             },
             codec: 
@@ -1060,7 +1088,7 @@ sse_encode_box_autoadd_settings_data(data, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(connectionId, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 34)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 35)!;
             
             },
             codec: 
@@ -1086,7 +1114,7 @@ sse_encode_box_autoadd_settings_data(data, serializer);
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(connectionId, serializer);
 sse_encode_String(password, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 35)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 36)!;
             
             },
             codec: 
@@ -1111,7 +1139,7 @@ sse_encode_String(password, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(mac, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 36)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 37)!;
             
             },
             codec: 
@@ -1179,7 +1207,7 @@ return ClipboardMode.values[raw as int]; }
 
 @protected ConnectionData dco_decode_connection_data(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 final arr = raw as List<dynamic>;
-                if (arr.length != 9) throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+                if (arr.length != 10) throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
                 return ConnectionData(id: dco_decode_String(arr[0]),
 name: dco_decode_String(arr[1]),
 host: dco_decode_String(arr[2]),
@@ -1188,7 +1216,11 @@ username: dco_decode_String(arr[4]),
 savePassword: dco_decode_bool(arr[5]),
 clipboard: dco_decode_clipboard_mode(arr[6]),
 lastUsed: dco_decode_opt_box_autoadd_i_64(arr[7]),
-wakeMac: dco_decode_opt_String(arr[8]),); }
+wakeMac: dco_decode_opt_String(arr[8]),
+method: dco_decode_connection_method(arr[9]),); }
+
+@protected ConnectionMethod dco_decode_connection_method(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return ConnectionMethod.values[raw as int]; }
 
 @protected ErrorInfo dco_decode_error_info(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 final arr = raw as List<dynamic>;
@@ -1391,7 +1423,12 @@ var var_savePassword = sse_decode_bool(deserializer);
 var var_clipboard = sse_decode_clipboard_mode(deserializer);
 var var_lastUsed = sse_decode_opt_box_autoadd_i_64(deserializer);
 var var_wakeMac = sse_decode_opt_String(deserializer);
-return ConnectionData(id: var_id, name: var_name, host: var_host, port: var_port, username: var_username, savePassword: var_savePassword, clipboard: var_clipboard, lastUsed: var_lastUsed, wakeMac: var_wakeMac); }
+var var_method = sse_decode_connection_method(deserializer);
+return ConnectionData(id: var_id, name: var_name, host: var_host, port: var_port, username: var_username, savePassword: var_savePassword, clipboard: var_clipboard, lastUsed: var_lastUsed, wakeMac: var_wakeMac, method: var_method); }
+
+@protected ConnectionMethod sse_decode_connection_method(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+var inner = sse_decode_i_32(deserializer);
+        return ConnectionMethod.values[inner]; }
 
 @protected ErrorInfo sse_decode_error_info(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 var var_id = sse_decode_String(deserializer);
@@ -1643,7 +1680,11 @@ sse_encode_bool(self.savePassword, serializer);
 sse_encode_clipboard_mode(self.clipboard, serializer);
 sse_encode_opt_box_autoadd_i_64(self.lastUsed, serializer);
 sse_encode_opt_String(self.wakeMac, serializer);
+sse_encode_connection_method(self.method, serializer);
  }
+
+@protected void sse_encode_connection_method(ConnectionMethod self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_i_32(self.index, serializer); }
 
 @protected void sse_encode_error_info(ErrorInfo self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_String(self.id, serializer);

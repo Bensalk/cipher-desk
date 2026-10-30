@@ -34,6 +34,40 @@ pub enum ClipboardSetting {
     FromRemote,
 }
 
+/// How a connection is made. Older files have no method: they are Private Remote Desktop.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnectionMethod {
+    /// Windows Remote Desktop: the computer's own screen locks while you work (private).
+    #[default]
+    PrivateRemoteDesktop,
+    /// Cipher Desk Host on the computer: the same screen is shown at both ends.
+    ShareScreen,
+    /// A VNC server on the computer: the same screen at both ends; local network or VPN only.
+    Vnc,
+}
+
+impl ConnectionMethod {
+    /// Port used when the user leaves the port empty.
+    pub fn default_port(self) -> u16 {
+        match self {
+            Self::PrivateRemoteDesktop => input::DEFAULT_PORT,
+            Self::ShareScreen => SHARE_SCREEN_PORT,
+            Self::Vnc => VNC_PORT,
+        }
+    }
+
+    /// VNC signs in with a password only; the other methods need a username.
+    pub fn needs_username(self) -> bool {
+        !matches!(self, Self::Vnc)
+    }
+}
+
+/// Default port of Cipher Desk Host (Share screen).
+pub const SHARE_SCREEN_PORT: u16 = 3395;
+/// Default VNC port.
+pub const VNC_PORT: u16 = 5900;
+
 /// One saved connection. Contains no secrets.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Connection {
@@ -54,6 +88,8 @@ pub struct Connection {
     /// MAC address for Wake-on-LAN, e.g. "00:11:22:33:44:55".
     #[serde(default)]
     pub wake_mac: Option<String>,
+    #[serde(default)]
+    pub method: ConnectionMethod,
 }
 
 /// How a connection attempt ended (no details, no secrets).
@@ -102,7 +138,7 @@ pub fn is_valid(c: &Connection) -> bool {
     id_ok
         && input::validate_profile_name(&c.name).is_ok()
         && input::parse_endpoint(&c.host, &c.port.to_string()).is_ok()
-        && input::parse_username(&c.username).is_ok()
+        && username_ok(c.method, &c.username)
         && mac_ok
 }
 
@@ -192,6 +228,15 @@ pub fn save(
     fsutil::write_with_backup(path, &json)
 }
 
+/// The username is required for Remote Desktop and Share screen; VNC has none
+/// (an empty one is fine, a typed one must still be valid).
+fn username_ok(method: ConnectionMethod, username: &str) -> bool {
+    if !method.needs_username() && username.trim().is_empty() {
+        return true;
+    }
+    input::parse_username(username).is_ok()
+}
+
 // ---------------------------------------------------------------- export / import
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -205,6 +250,8 @@ pub struct ExportedConnection {
     pub clipboard: ClipboardSetting,
     #[serde(default)]
     pub wake_mac: Option<String>,
+    #[serde(default)]
+    pub method: ConnectionMethod,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -228,6 +275,7 @@ pub fn export(connections: &[Connection]) -> String {
                 username: c.username.clone(),
                 clipboard: c.clipboard,
                 wake_mac: c.wake_mac.clone(),
+                method: c.method,
             })
             .collect(),
     };
@@ -280,6 +328,7 @@ pub fn import(text: &str) -> Imported {
                 clipboard: e.clipboard,
                 last_used: None,
                 wake_mac: e.wake_mac.clone(),
+                method: e.method,
             })
         })
         .map(|mut e| {
@@ -310,6 +359,7 @@ mod tests {
             clipboard: ClipboardSetting::Both,
             last_used: Some(1_800_000_000),
             wake_mac: Some("00:11:22:33:44:55".into()),
+            method: ConnectionMethod::PrivateRemoteDesktop,
         }
     }
 
@@ -441,5 +491,65 @@ mod tests {
 
         assert!(import("{\"format\":\"other\",\"version\":1,\"connections\":[]}").not_an_export);
         assert!(import("garbage").not_an_export);
+    }
+
+    #[test]
+    fn files_without_a_method_are_private_remote_desktop() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let p = dir.path().join("connections.json");
+        // A v0.1.0 file: no "method" field.
+        let json = serde_json::json!({
+            "version": 1,
+            "connections": [{"id": "a1", "name": "Office", "host": "192.0.2.10",
+                             "port": 3389, "username": "alice"}]
+        });
+        std::fs::write(
+            &p,
+            serde_json::to_vec(&json).map_err(std::io::Error::other)?,
+        )?;
+        let l = load(&p)?;
+        assert_eq!(l.connections.len(), 1);
+        assert_eq!(
+            l.connections[0].method,
+            ConnectionMethod::PrivateRemoteDesktop
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn methods_round_trip_and_vnc_needs_no_username() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let p = dir.path().join("connections.json");
+        let mut share = conn("s1", "100.64.1.2");
+        share.method = ConnectionMethod::ShareScreen;
+        share.port = SHARE_SCREEN_PORT;
+        let mut vnc = conn("v1", "192.168.1.20");
+        vnc.method = ConnectionMethod::Vnc;
+        vnc.port = VNC_PORT;
+        vnc.username = String::new();
+        assert!(is_valid(&vnc));
+        // Remote Desktop and Share screen still need a username.
+        let mut no_user = share.clone();
+        no_user.username = String::new();
+        assert!(!is_valid(&no_user));
+
+        save(&p, &[share.clone(), vnc.clone()], &[])?;
+        let l = load(&p)?;
+        assert_eq!(l.connections, vec![share.clone(), vnc.clone()]);
+
+        let i = import(&export(&[share, vnc]));
+        let methods: Vec<_> = i.connections.iter().map(|c| c.method).collect();
+        assert_eq!(
+            methods,
+            [ConnectionMethod::ShareScreen, ConnectionMethod::Vnc]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn default_ports() {
+        assert_eq!(ConnectionMethod::PrivateRemoteDesktop.default_port(), 3389);
+        assert_eq!(ConnectionMethod::ShareScreen.default_port(), 3395);
+        assert_eq!(ConnectionMethod::Vnc.default_port(), 5900);
     }
 }

@@ -8,11 +8,14 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'session.dart';
 
 
-            // These functions are ignored because they are not marked as `pub`: `from_core`, `to_core`, `to_mode`, `to_setting`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+            // These functions are ignored because they are not marked as `pub`: `from_core`, `method_from_core`, `method_to_core`, `to_core`, `to_mode`, `to_setting`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 
-            LoadResult  connectionsLoad({required String path }) => RustLib.instance.api.crateApiStoreConnectionsLoad(path: path);
+            /// Port used when the port field is left empty, for each method.
+int  defaultPortFor({required ConnectionMethod method }) => RustLib.instance.api.crateApiStoreDefaultPortFor(method: method);
+
+LoadResult  connectionsLoad({required String path }) => RustLib.instance.api.crateApiStoreConnectionsLoad(path: path);
 
 /// Saves connections and history. Returns false if the file could not be written.
 bool  connectionsSave({required String path , required List<ConnectionData> connections , required List<HistoryData> history }) => RustLib.instance.api.crateApiStoreConnectionsSave(path: path, connections: connections, history: history);
@@ -68,15 +71,16 @@ final ClipboardMode clipboard;
 /// Unix seconds.
 final PlatformInt64? lastUsed;
 final String? wakeMac;
+final ConnectionMethod method;
 
-                const ConnectionData({required this.id ,required this.name ,required this.host ,required this.port ,required this.username ,required this.savePassword ,required this.clipboard ,this.lastUsed ,this.wakeMac ,});
+                const ConnectionData({required this.id ,required this.name ,required this.host ,required this.port ,required this.username ,required this.savePassword ,required this.clipboard ,this.lastUsed ,this.wakeMac ,required this.method ,});
 
 
 
 
 
         @override
-        int get hashCode => id.hashCode^name.hashCode^host.hashCode^port.hashCode^username.hashCode^savePassword.hashCode^clipboard.hashCode^lastUsed.hashCode^wakeMac.hashCode;
+        int get hashCode => id.hashCode^name.hashCode^host.hashCode^port.hashCode^username.hashCode^savePassword.hashCode^clipboard.hashCode^lastUsed.hashCode^wakeMac.hashCode^method.hashCode;
 
 
 
@@ -85,9 +89,21 @@ final String? wakeMac;
             identical(this, other) ||
             other is ConnectionData &&
                 runtimeType == other.runtimeType
-                && id == other.id&& name == other.name&& host == other.host&& port == other.port&& username == other.username&& savePassword == other.savePassword&& clipboard == other.clipboard&& lastUsed == other.lastUsed&& wakeMac == other.wakeMac;
+                && id == other.id&& name == other.name&& host == other.host&& port == other.port&& username == other.username&& savePassword == other.savePassword&& clipboard == other.clipboard&& lastUsed == other.lastUsed&& wakeMac == other.wakeMac&& method == other.method;
 
             }
+
+/// How a connection is made.
+enum ConnectionMethod {
+                    /// Windows Remote Desktop: the computer's own screen locks while you work.
+privateRemoteDesktop,
+/// Cipher Desk Host on the computer: the same screen at both ends.
+shareScreen,
+/// A VNC server on the computer: the same screen at both ends (local network or VPN only).
+vnc,
+                    ;
+                    
+                }
 
 class HistoryData  {
                 final String connectionId;

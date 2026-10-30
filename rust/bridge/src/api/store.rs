@@ -6,11 +6,46 @@ use std::path::Path;
 use std::time::Duration;
 
 use rdpv_core::pins::PinStore;
-use rdpv_core::profiles::{self, ClipboardSetting, Connection, HistoryEntry};
+use rdpv_core::profiles::{
+    self, ClipboardSetting, Connection, ConnectionMethod as CoreMethod, HistoryEntry,
+};
 use rdpv_core::settings::{self, Settings, Theme};
 use rdpv_core::wol;
 
 use crate::api::session::ClipboardMode;
+
+/// How a connection is made.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConnectionMethod {
+    /// Windows Remote Desktop: the computer's own screen locks while you work.
+    PrivateRemoteDesktop,
+    /// Cipher Desk Host on the computer: the same screen at both ends.
+    ShareScreen,
+    /// A VNC server on the computer: the same screen at both ends (local network or VPN only).
+    Vnc,
+}
+
+pub(crate) fn method_to_core(m: ConnectionMethod) -> CoreMethod {
+    match m {
+        ConnectionMethod::PrivateRemoteDesktop => CoreMethod::PrivateRemoteDesktop,
+        ConnectionMethod::ShareScreen => CoreMethod::ShareScreen,
+        ConnectionMethod::Vnc => CoreMethod::Vnc,
+    }
+}
+
+fn method_from_core(m: CoreMethod) -> ConnectionMethod {
+    match m {
+        CoreMethod::PrivateRemoteDesktop => ConnectionMethod::PrivateRemoteDesktop,
+        CoreMethod::ShareScreen => ConnectionMethod::ShareScreen,
+        CoreMethod::Vnc => ConnectionMethod::Vnc,
+    }
+}
+
+/// Port used when the port field is left empty, for each method.
+#[flutter_rust_bridge::frb(sync)]
+pub fn default_port_for(method: ConnectionMethod) -> u16 {
+    method_to_core(method).default_port()
+}
 
 /// A saved connection (no password).
 #[derive(Debug, Clone)]
@@ -25,6 +60,7 @@ pub struct ConnectionData {
     /// Unix seconds.
     pub last_used: Option<i64>,
     pub wake_mac: Option<String>,
+    pub method: ConnectionMethod,
 }
 
 #[derive(Debug, Clone)]
@@ -77,6 +113,7 @@ fn to_core(c: &ConnectionData) -> Connection {
         clipboard: to_setting(c.clipboard),
         last_used: c.last_used,
         wake_mac: c.wake_mac.clone(),
+        method: method_to_core(c.method),
     }
 }
 
@@ -91,6 +128,7 @@ fn from_core(c: Connection) -> ConnectionData {
         clipboard: to_mode(c.clipboard),
         last_used: c.last_used,
         wake_mac: c.wake_mac,
+        method: method_from_core(c.method),
     }
 }
 
@@ -175,6 +213,7 @@ pub fn connections_import(text: String) -> ImportResult {
                 clipboard: to_mode(e.clipboard),
                 last_used: None,
                 wake_mac: e.wake_mac,
+                method: method_from_core(e.method),
             })
             .collect(),
         skipped: u32::try_from(i.skipped).unwrap_or(u32::MAX),
@@ -329,6 +368,7 @@ mod tests {
             clipboard: ClipboardMode::FromRemoteOnly,
             last_used: Some(5),
             wake_mac: None,
+            method: ConnectionMethod::ShareScreen,
         }
     }
 

@@ -8,6 +8,7 @@ import '../state/persistence.dart';
 import '../state/profiles.dart';
 import '../state/settings.dart';
 import 'connection_form.dart';
+import 'connection_methods.dart';
 import 'error_banner.dart';
 import 'session_screen.dart';
 import 'settings_screen.dart';
@@ -83,6 +84,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _connect(ConnectionProfile p) async {
+    if (p.method == ConnectionMethod.vnc) {
+      _snack('VNC connections arrive in the next version of Cipher Desk.');
+      return;
+    }
     String? password;
     var useSaved = false;
     String? notice;
@@ -326,9 +331,12 @@ class _ProfileTile extends StatelessWidget {
     final details = [
       profile.endpoint,
       if (profile.username.isNotEmpty) profile.username,
+      profile.method.label,
     ].join(' · ');
     return ListTile(
-      leading: const CircleAvatar(child: Icon(Icons.desktop_windows_outlined)),
+      leading: CircleAvatar(
+        child: Tooltip(message: profile.method.label, child: Icon(profile.method.icon)),
+      ),
       title: Text(profile.displayName),
       subtitle: Text(details),
       onTap: onConnect,
@@ -449,7 +457,8 @@ class _ReadinessDialogState extends State<_ReadinessDialog> {
               pending: 'Checking the computer…'),
           _row(_trusted, 'Its certificate is trusted',
               'Not connected before: you will be asked to check its certificate'),
-          _row(p.username.isNotEmpty, 'Username: ${p.username}', 'No username set'),
+          if (p.method.needsUsername)
+            _row(p.username.isNotEmpty, 'Username: ${p.username}', 'No username set'),
           _row(p.savePassword, 'Password saved in this device\'s secure storage',
               'The password will be asked for when connecting'),
           if (p.wakeMac != null) _row(true, 'Wake-on-LAN set up', ''),
@@ -500,7 +509,7 @@ class _PasswordDialogState extends State<_PasswordDialog> {
             Text(widget.notice!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
             const SizedBox(height: 8),
           ],
-          Text('Username: ${widget.profile.username}'),
+          if (widget.profile.username.isNotEmpty) Text('Username: ${widget.profile.username}'),
           const SizedBox(height: 12),
           TextField(
             key: const Key('connect-password'),

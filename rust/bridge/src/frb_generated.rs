@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1808095405;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1592907736;
 
 // Section: executor
 
@@ -796,6 +796,7 @@ fn wire__crate__api__form__check_connection_form_impl(
             };
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_method = <crate::api::store::ConnectionMethod>::sse_decode(&mut deserializer);
             let api_profile_name = <String>::sse_decode(&mut deserializer);
             let api_host = <String>::sse_decode(&mut deserializer);
             let api_port = <String>::sse_decode(&mut deserializer);
@@ -805,6 +806,7 @@ fn wire__crate__api__form__check_connection_form_impl(
             deserializer.end();
             transform_result_sse::<_, ()>((move || {
                 let output_ok = Ok::<_, ()>(crate::api::form::check_connection_form(
+                    api_method,
                     api_profile_name,
                     api_host,
                     api_port,
@@ -1038,6 +1040,36 @@ fn wire__crate__api__form__default_port_impl(
             deserializer.end();
             transform_result_sse::<_, ()>((move || {
                 let output_ok = Ok::<_, ()>(crate::api::form::default_port())?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__store__default_port_for_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "default_port_for",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_method = <crate::api::store::ConnectionMethod>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::store::default_port_for(api_method))?;
                 std::result::Result::Ok(output_ok)
             })())
         },
@@ -1577,6 +1609,7 @@ impl SseDecode for crate::api::store::ConnectionData {
         let mut var_clipboard = <crate::api::session::ClipboardMode>::sse_decode(deserializer);
         let mut var_lastUsed = <Option<i64>>::sse_decode(deserializer);
         let mut var_wakeMac = <Option<String>>::sse_decode(deserializer);
+        let mut var_method = <crate::api::store::ConnectionMethod>::sse_decode(deserializer);
         return crate::api::store::ConnectionData {
             id: var_id,
             name: var_name,
@@ -1587,6 +1620,20 @@ impl SseDecode for crate::api::store::ConnectionData {
             clipboard: var_clipboard,
             last_used: var_lastUsed,
             wake_mac: var_wakeMac,
+            method: var_method,
+        };
+    }
+}
+
+impl SseDecode for crate::api::store::ConnectionMethod {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::store::ConnectionMethod::PrivateRemoteDesktop,
+            1 => crate::api::store::ConnectionMethod::ShareScreen,
+            2 => crate::api::store::ConnectionMethod::Vnc,
+            _ => unreachable!("Invalid variant for ConnectionMethod: {}", inner),
         };
     }
 }
@@ -2056,20 +2103,21 @@ fn pde_ffi_dispatcher_sync_impl(
         20 => wire__crate__api__store__connections_save_impl(ptr, rust_vec_len, data_len),
         21 => wire__crate__api__info__core_summary_impl(ptr, rust_vec_len, data_len),
         22 => wire__crate__api__form__default_port_impl(ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__pins__forget_certificate_impl(ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__store__forget_trusted_computer_impl(ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__info__hello_from_rust_impl(ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__store__idle_minute_choices_impl(ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__store__is_valid_mac_impl(ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__store__portable_data_dir_impl(ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__info__security_defaults_summary_impl(ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__store__settings_load_impl(ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__store__settings_save_impl(ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__store__trusted_computers_impl(ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__vault__vault_check_password_impl(ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__vault__vault_delete_password_impl(ptr, rust_vec_len, data_len),
-        35 => wire__crate__api__vault__vault_save_password_impl(ptr, rust_vec_len, data_len),
-        36 => wire__crate__api__store__wake_on_lan_impl(ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__store__default_port_for_impl(ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__pins__forget_certificate_impl(ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__store__forget_trusted_computer_impl(ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__info__hello_from_rust_impl(ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__store__idle_minute_choices_impl(ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__store__is_valid_mac_impl(ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__store__portable_data_dir_impl(ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__info__security_defaults_summary_impl(ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__store__settings_load_impl(ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__store__settings_save_impl(ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__store__trusted_computers_impl(ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__vault__vault_check_password_impl(ptr, rust_vec_len, data_len),
+        35 => wire__crate__api__vault__vault_delete_password_impl(ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__vault__vault_save_password_impl(ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__store__wake_on_lan_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2146,6 +2194,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::store::ConnectionData {
             self.clipboard.into_into_dart().into_dart(),
             self.last_used.into_into_dart().into_dart(),
             self.wake_mac.into_into_dart().into_dart(),
+            self.method.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2158,6 +2207,28 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::store::ConnectionData>
     for crate::api::store::ConnectionData
 {
     fn into_into_dart(self) -> crate::api::store::ConnectionData {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::store::ConnectionMethod {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::PrivateRemoteDesktop => 0.into_dart(),
+            Self::ShareScreen => 1.into_dart(),
+            Self::Vnc => 2.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::store::ConnectionMethod
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::store::ConnectionMethod>
+    for crate::api::store::ConnectionMethod
+{
+    fn into_into_dart(self) -> crate::api::store::ConnectionMethod {
         self
     }
 }
@@ -2536,6 +2607,24 @@ impl SseEncode for crate::api::store::ConnectionData {
         <crate::api::session::ClipboardMode>::sse_encode(self.clipboard, serializer);
         <Option<i64>>::sse_encode(self.last_used, serializer);
         <Option<String>>::sse_encode(self.wake_mac, serializer);
+        <crate::api::store::ConnectionMethod>::sse_encode(self.method, serializer);
+    }
+}
+
+impl SseEncode for crate::api::store::ConnectionMethod {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::store::ConnectionMethod::PrivateRemoteDesktop => 0,
+                crate::api::store::ConnectionMethod::ShareScreen => 1,
+                crate::api::store::ConnectionMethod::Vnc => 2,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
     }
 }
 

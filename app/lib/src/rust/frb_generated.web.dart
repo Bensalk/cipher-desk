@@ -62,6 +62,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_web.dart';
 
 @protected ConnectionData dco_decode_connection_data(dynamic raw);
 
+@protected ConnectionMethod dco_decode_connection_method(dynamic raw);
+
 @protected ErrorInfo dco_decode_error_info(dynamic raw);
 
 @protected FieldProblem dco_decode_field_problem(dynamic raw);
@@ -154,6 +156,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_web.dart';
 
 @protected ConnectionData sse_decode_connection_data(SseDeserializer deserializer);
 
+@protected ConnectionMethod sse_decode_connection_method(SseDeserializer deserializer);
+
 @protected ErrorInfo sse_decode_error_info(SseDeserializer deserializer);
 
 @protected FieldProblem sse_decode_field_problem(SseDeserializer deserializer);
@@ -245,6 +249,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_web.dart';
 @protected void sse_encode_clipboard_mode(ClipboardMode self, SseSerializer serializer);
 
 @protected void sse_encode_connection_data(ConnectionData self, SseSerializer serializer);
+
+@protected void sse_encode_connection_method(ConnectionMethod self, SseSerializer serializer);
 
 @protected void sse_encode_error_info(ErrorInfo self, SseSerializer serializer);
 
