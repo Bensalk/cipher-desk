@@ -16,11 +16,18 @@ server with NLA, for example `xrdp` configured for TLS and NLA, or FreeRDP's ser
 1. *Settings → System → Remote Desktop →* **On**.
 2. Keep **"Require devices to use Network Level Authentication"** ticked. The app
    refuses computers without NLA.
-3. Note the computer's **certificate fingerprint** so you can compare it with the
-   one the app shows on the first connection (*Advanced settings* in Remote Desktop
-   settings, or `certlm.msc` → *Remote Desktop* → the certificate's *Thumbprint* is
-   SHA-1; the app shows SHA-256, which you can see with
-   `Get-FileHash`-style tools or by connecting once on the local network you trust).
+3. Note the computer's **certificate fingerprint**, so you can compare it with the one
+   the app shows on the first connection. Open **PowerShell as administrator** on that
+   computer and paste:
+
+   ```powershell
+   $t = (Get-CimInstance -Namespace root/cimv2/TerminalServices -ClassName Win32_TSGeneralSetting -Filter "TerminalName='RDP-tcp'").SSLCertificateSHA1Hash
+   $c = Get-Item "Cert:\LocalMachine\Remote Desktop\$t"
+   [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($c.RawData)).Replace('-', ':')
+   ```
+
+   It prints the SHA-256 fingerprint in the same form as the app (`AB:12:…`). Write it
+   down or take a photo. It changes only if Windows creates a new certificate.
 
 ## 3. Use a separate account for remote access (S13)
 
