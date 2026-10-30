@@ -1,9 +1,9 @@
 // A real remote desktop session from the app, on any platform (CI runs it on an
 // Android emulator against the local test host). Skipped unless the host is given:
 //   flutter test integration_test/live_session_test.dart -d <device> \
-//     --dart-define=RDPV_HOST=10.0.2.2 --dart-define=RDPV_PORT=3389 \
-//     --dart-define=RDPV_USER=... --dart-define=RDPV_PASSWORD=...
-// The password is a random test-host password created for each CI run.
+//     --dart-define-from-file=<private JSON file with RDPV_HOST, RDPV_PORT, RDPV_USER, RDPV_PASSWORD>
+// A file, never a command line, carries the password (a random test-host password
+// created for each CI run).
 
 import 'dart:io';
 

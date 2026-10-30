@@ -226,6 +226,8 @@ jobs:
           apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
           apk=$(ls dist/*.apk)
           "$apksigner" verify --print-certs "$apk" | tee dist/android-signing-certificate.txt
+          # Public value, shown on the run page so it can be copied into the README.
+          echo "::notice title=Android signing certificate::$(grep -m1 'SHA-256' dist/android-signing-certificate.txt)"
           if grep -q "CN=Android Debug" dist/android-signing-certificate.txt && [ "$IS_TAG" = true ]; then
             echo "::error::APK is signed with the debug key"; exit 1
           fi
@@ -277,10 +279,14 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           {
-            echo "Draft created by the release workflow. Before publishing, check docs/RELEASING.md."
+            # What's new: this version's section of CHANGELOG.md.
+            awk -v v="## $TAG " 'index($0, v) == 1 {on=1; next} on && /^## / {exit} on' CHANGELOG.md
+            echo
+            echo "**Which file?** Android: the .apk. Windows: the .msi (installer) or the portable .zip."
+            echo "Debian/Ubuntu: the .deb. Other Linux: the .AppImage. Setup: [How to use](https://github.com/${{ github.repository }}/blob/main/docs/HOW-TO-USE.md)."
             echo
             echo "Verify downloads with: sha256sum -c SHA256SUMS"
             echo
             echo "Android signing certificate:"; echo '```'; cat release/android-signing-certificate.txt; echo '```'
           } > notes.md
-          gh release create "$TAG" --draft --verify-tag --title "Cipher Desk $TAG" --notes-file notes.md release/*
+          gh release create "$TAG" --draft --prerelease --verify-tag --title "Cipher Desk $TAG" --notes-file notes.md release/*
