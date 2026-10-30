@@ -66,7 +66,6 @@ fn main() {
 
 #[cfg(windows)]
 fn init_file_logging(which: &str) {
-    use std::io::Write as _;
     use std::sync::{Arc, Mutex};
 
     let Ok(dir) = config::data_dir() else { return };
@@ -83,10 +82,16 @@ fn init_file_logging(which: &str) {
     struct FileWriter(Arc<Mutex<std::fs::File>>);
     impl std::io::Write for FileWriter {
         fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            self.0.lock().map(|mut f| f.write(buf)).unwrap_or(Ok(0))
+            self.0
+                .lock()
+                .map(|mut f| std::io::Write::write(&mut *f, buf))
+                .unwrap_or(Ok(0))
         }
         fn flush(&mut self) -> std::io::Result<()> {
-            self.0.lock().map(|mut f| f.flush()).unwrap_or(Ok(()))
+            self.0
+                .lock()
+                .map(|mut f| std::io::Write::flush(&mut *f))
+                .unwrap_or(Ok(()))
         }
     }
 

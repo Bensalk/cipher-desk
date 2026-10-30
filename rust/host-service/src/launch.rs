@@ -125,7 +125,7 @@ pub fn spawn_worker(exe: &Path, session: u32) -> anyhow::Result<Worker> {
         // The interactive window station; the worker then follows the input desktop.
         let mut desktop: Vec<u16> = "winsta0\\default".encode_utf16().chain([0]).collect();
 
-        let mut si = STARTUPINFOW {
+        let si = STARTUPINFOW {
             cb: u32::try_from(core::mem::size_of::<STARTUPINFOW>()).unwrap_or(0),
             lpDesktop: PWSTR(desktop.as_mut_ptr()),
             ..Default::default()
