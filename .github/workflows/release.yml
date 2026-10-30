@@ -66,7 +66,7 @@ jobs:
       - name: Build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev file
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev file desktop-file-utils
       - name: Build release bundle (local paths removed, SA-9)
         working-directory: app
         run: |
