@@ -60,12 +60,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('without rdp://'), findsOneWidget);
     expect(find.textContaining('Port must be a number'), findsOneWidget);
-    expect(find.text('This field is required.'), findsNWidgets(2)); // username, password
+    // Only the username: no password is needed unless it is to be saved.
+    expect(find.text('This field is required.'), findsOneWidget);
+    expect(find.byKey(const Key('field-password')), findsNothing);
+    // Ticking "Save password" asks for the password to save.
+    await tapVisible(tester, find.byKey(const Key('field-save-password')));
+    await tester.pumpAndSettle();
+    expect(find.text('This field is required.'), findsNWidgets(2));
   });
 
   testWidgets('password is masked and can be revealed', (tester) async {
     await start(tester);
     await tester.tap(find.byKey(const Key('button-new')));
+    await tester.pumpAndSettle();
+    await tapVisible(tester, find.byKey(const Key('field-save-password')));
     await tester.pumpAndSettle();
     final field = find.byKey(const Key('field-password'));
     expect(tester.widget<TextField>(field).obscureText, isTrue);
@@ -81,8 +89,9 @@ void main() {
     await typeVisible(tester, find.byKey(const Key('field-name')), 'Office');
     await typeVisible(tester, find.byKey(const Key('field-host')), '192.0.2.10');
     await typeVisible(tester, find.byKey(const Key('field-username')), 'alice');
-    await typeVisible(tester, find.byKey(const Key('field-password')), _randomPassword());
     await tapVisible(tester, find.byKey(const Key('field-save-password')));
+    await tester.pumpAndSettle();
+    await typeVisible(tester, find.byKey(const Key('field-password')), _randomPassword());
     await tapVisible(tester, find.byKey(const Key('button-save')));
     await tester.pumpAndSettle();
 

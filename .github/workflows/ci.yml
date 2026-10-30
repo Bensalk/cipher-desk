@@ -163,7 +163,14 @@ jobs:
         run: bash ../scripts/ci-run.sh "Linux build" flutter build linux --debug
       - name: Integration test (Linux, Rust ↔ Flutter)
         if: matrix.target == 'linux'
-        run: bash ../scripts/ci-run.sh "Linux integration test" xvfb-run -a -s "-screen 0 1920x1080x24" flutter test integration_test -d linux
+        run: bash ../scripts/ci-run.sh "Linux integration test" xvfb-run -a -s "-screen 0 1920x1080x24" flutter test integration_test/hello_test.dart -d linux
+      - name: Start-up output of the Linux app (only when a step failed)
+        if: failure() && matrix.target == 'linux'
+        run: |
+          timeout 20 xvfb-run -a -s "-screen 0 1920x1080x24" build/linux/x64/debug/bundle/cipher_desk \
+            > startup.log 2>&1; echo "exit code: $?" >> startup.log
+          msg=$(tail -n 60 startup.log | cut -c1-300 | sed -e 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+          echo "::warning title=Linux app start-up output::$msg"
       - name: Build Windows
         if: matrix.target == 'windows'
         shell: bash
@@ -171,7 +178,7 @@ jobs:
       - name: Integration test (Windows, Rust ↔ Flutter)
         if: matrix.target == 'windows'
         shell: bash
-        run: bash ../scripts/ci-run.sh "Windows integration test" flutter test integration_test -d windows
+        run: bash ../scripts/ci-run.sh "Windows integration test" flutter test integration_test/hello_test.dart -d windows
       - name: Build Android APK
         if: matrix.target == 'android'
         run: bash ../scripts/ci-run.sh "Android build" flutter build apk --debug --target-platform android-arm64

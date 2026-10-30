@@ -76,8 +76,10 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
       port: _port.text,
       username: _username.text,
       password: _password.text,
-      // Editing a profile that already has a saved password: empty field keeps it.
-      hasSavedPassword: widget.existing?.savePassword ?? false,
+      // A password is only needed here when it is to be saved (otherwise it is
+      // asked for when connecting). Editing a profile that already has a saved
+      // password: an empty field keeps it.
+      hasSavedPassword: !_savePassword || (widget.existing?.savePassword ?? false),
     );
   }
 
@@ -226,7 +228,29 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                   textInputAction: TextInputAction.next,
                   onChanged: (_) => _revalidate(),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
+                CheckboxListTile(
+                  key: const Key('field-save-password'),
+                  contentPadding: EdgeInsets.zero,
+                  value: _savePassword,
+                  onChanged: (v) {
+                    setState(() {
+                      _savePassword = v ?? false;
+                      if (!_savePassword) _password.clear();
+                    });
+                    _revalidate();
+                  },
+                  title: const Text('Save password'),
+                  // Without it, the password is asked for each time you connect.
+                  subtitle: const Text(
+                    "Stored only in this device's secure password storage, never in the app's files. "
+                    "On Windows and Android you confirm it's you (Windows Hello, fingerprint, face or "
+                    'screen lock) before it is used. On Linux it is protected by your keyring, which '
+                    'is usually unlocked when you log in.',
+                  ),
+                ),
+                if (_savePassword) ...[
+                const SizedBox(height: 4),
                 TextField(
                   key: const Key('field-password'),
                   controller: _password,
@@ -239,7 +263,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                     labelText: 'Password',
                     helperText: editing && widget.existing!.savePassword
                         ? 'Leave empty to keep the saved password.'
-                        : null,
+                        : 'The password to save.',
                     errorText: _problems['password'],
                     suffixIcon: IconButton(
                       tooltip: _obscure ? 'Show password' : 'Hide password',
@@ -250,20 +274,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                   onChanged: (_) => _revalidate(),
                   onSubmitted: (_) => _save(),
                 ),
-                const SizedBox(height: 8),
-                CheckboxListTile(
-                  key: const Key('field-save-password'),
-                  contentPadding: EdgeInsets.zero,
-                  value: _savePassword,
-                  onChanged: (v) => setState(() => _savePassword = v ?? false),
-                  title: const Text('Save password'),
-                  subtitle: const Text(
-                    "Stored only in this device's secure password storage, never in the app's files. "
-                    "On Windows and Android you confirm it's you (Windows Hello, fingerprint, face or "
-                    'screen lock) before it is used. On Linux it is protected by your keyring, which '
-                    'is usually unlocked when you log in.',
-                  ),
-                ),
+                ],
                 if (widget.portable && _savePassword)
                   Padding(
                     key: const Key('portable-password-warning'),

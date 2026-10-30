@@ -38,10 +38,11 @@ may warn you; check the SHA-256 checksum first.
 the port (leave empty for 3389) and the username (`user`, `DOMAIN\user` or
 `user@domain`). Optional:
 
-- **Save password** — stored only in this device's secure storage (Windows Credential
-  Manager, the Linux keyring, the Android Keystore), never in the app's files.
-  Windows asks for Windows Hello and Android for your fingerprint/face/screen lock
-  before it is used.
+- **Save password** — tick it and type the password to keep it in this device's secure
+  storage (Windows Credential Manager, the Linux keyring, the Android Keystore), never
+  in the app's files. Windows asks for Windows Hello and Android for your
+  fingerprint/face/screen lock before it is used. Without it, you type the password
+  each time you connect.
 - **Share clipboard** — off by default. Anything you copy while connected can be read
   by the remote computer, and it can put text on this device. You can allow one
   direction only.
