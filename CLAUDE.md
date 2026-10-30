@@ -13,7 +13,7 @@ Secure, open-source Remote Desktop (RDP) viewer by Bensal for Windows, Linux and
 ├── packaging/                 ← .deb, AppImage, MSI (WiX v5), portable ZIP, signing
 ├── scripts/                   ← CI helpers, test hosts, policy checks, Windows build-on-this-pc.ps1
 ├── tools/                     ← test-only RDP host, icon generator, screenshot hero builder, syntax checker
-├── docs/                      ← HOW-TO-USE, HOST_SETUP, THREAT_MODEL, SECURITY_REVIEW, RELEASING, PROGRESS, screenshots
+├── docs/                      ← HOW-TO-USE, HOST_SETUP, THREAT_MODEL, SECURITY_REVIEW, RELEASING, screenshots
 ├── .github/workflows/         ← ci.yml, security.yml, release.yml, screenshots.yml
 ├── CHANGELOG.md, CONTRIBUTING.md, SECURITY.md, NOTICE, LICENSE (Apache-2.0)
 └── README.md

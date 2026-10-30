@@ -16,8 +16,8 @@
 ## Each release
 
 1. Update the version in **both** `app/pubspec.yaml` (`version: X.Y.Z+N`, raise `N` every
-   release for Android) and `Cargo.toml` (`version = "X.Y.Z"`). Note changes in
-   `docs/PROGRESS.md`.
+   release for Android) and `Cargo.toml` (`version = "X.Y.Z"`). Add the changes to
+   `CHANGELOG.md`.
 2. Make sure CI and the Security workflow are green on `main`.
 3. `git tag vX.Y.Z && git push origin vX.Y.Z`.
 4. The **Release** workflow builds and checks every package:

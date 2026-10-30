@@ -88,7 +88,7 @@ jobs:
           '
       - name: Reliability tests (reconnect, certificate on reconnect, memory; Stage 8)
         # L3 (silent network drop) needs root to change firewall rules; it is run
-        # locally and recorded in docs/PROGRESS.md.
+        # locally.
         run: bash scripts/ci-run.sh "Reliability tests" cargo test -p rust_lib_cipher_desk --lib live_ -- --ignored --test-threads=1 --skip live_l3
       - name: Vault refuses to save when no keyring exists (I8)
         env:

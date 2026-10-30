@@ -374,7 +374,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   }
 
   /// After a certificate change: the user has checked the new fingerprint on
-  /// the computer itself and wants to trust it (KI-11).
+  /// the computer itself and wants to trust it.
   Future<void> _retrust() async {
     final changed = _changedFingerprints;
     final ok = await showDialog<bool>(

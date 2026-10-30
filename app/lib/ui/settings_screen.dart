@@ -46,7 +46,7 @@ class SettingsScreen extends StatelessWidget {
       settings.confirmSavedPassword = true;
       return;
     }
-    // Turning it off: explain what that means first (KI-18).
+    // Turning it off: explain what that means first.
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(

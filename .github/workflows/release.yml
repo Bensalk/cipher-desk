@@ -36,6 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.v.outputs.version }}
+      skip: ${{ steps.v.outputs.skip }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -45,6 +46,7 @@ jobs:
         env:
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           app=$(sed -n 's/^version: *\([0-9.]*\).*/\1/p' app/pubspec.yaml)
           rust=$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -1)
@@ -53,10 +55,19 @@ jobs:
             echo "::error::tag $REF_NAME does not match version $app"; exit 1
           fi
           echo "version=$app" >> "$GITHUB_OUTPUT"
+          # Publishing a release made with "Run workflow" creates its tag; that tag
+          # push must not build everything again.
+          skip=false
+          if [ "$REF_TYPE" = tag ] && gh release view "$REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' 2>/dev/null | grep -qx false; then
+            echo "::notice::Release $REF_NAME is already published; nothing to build."
+            skip=true
+          fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
 
   linux:
     name: Linux (.deb, AppImage)
     needs: version
+    if: needs.version.outputs.skip != 'true'
     runs-on: ubuntu-22.04 # older base = runs on more distributions
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -101,7 +112,7 @@ jobs:
           test -f /usr/share/applications/cipher-desk.desktop
           sudo apt-get remove -y cipher-desk
           test ! -e /opt/cipher-desk
-      - name: Dart dependency list (for the SBOM; KI-36)
+      - name: Dart dependency list (for the SBOM)
         run: cp app/pubspec.lock dist/pubspec.lock
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
@@ -112,6 +123,7 @@ jobs:
   windows:
     name: Windows (MSI, portable ZIP)
     needs: version
+    if: needs.version.outputs.skip != 'true'
     runs-on: windows-latest
     defaults:
       run:
@@ -178,6 +190,7 @@ jobs:
   android:
     name: Android (signed APK)
     needs: version
+    if: needs.version.outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

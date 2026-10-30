@@ -16,7 +16,7 @@ ignore = [
   # never used: this client logs in with a password (CredSSP/NTLM/Kerberos), which
   # performs no RSA private-key operations.
   # Re-review when smart-card/certificate login is added or when a patched rsa ships.
-  { id = "RUSTSEC-2023-0071", reason = "Client performs RSA public-key ops only; no private keys. See docs/PROGRESS.md (KI-2)." },
+  { id = "RUSTSEC-2023-0071", reason = "Client performs RSA public-key ops only; no private keys. See docs/SECURITY_REVIEW.md." },
 ]
 
 [licenses]

@@ -178,7 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     if (ok != true) return;
     // The trusted certificate belongs to the computer, so keep it while another
-    // connection still uses the same computer and port (KI-17).
+    // connection still uses the same computer and port.
     final shared = widget.store.endpointSharedWithOthers(p);
     widget.store.remove(p.id);
     // Remove everything kept for this connection: saved password and trusted certificate.
