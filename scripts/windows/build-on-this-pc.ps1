@@ -122,7 +122,14 @@ Write-Host "Accepting the Android SDK licences and installing the SDK parts..."
 & $sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"; Check "Android SDK"
 flutter config --android-sdk $sdk --jdk-dir $env:JAVA_HOME --no-analytics | Out-Null
 flutter --disable-analytics | Out-Null
-flutter precache --android --windows; Check "Flutter download of build files"
+# Large downloads from Google: try up to 3 times if the network drops.
+foreach ($try in 1..3) {
+    flutter precache --android --windows
+    if ($LASTEXITCODE -eq 0) { break }
+    Write-Host "Download interrupted; trying again in 10 seconds ($try of 3)..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 10
+}
+Check "Flutter download of build files"
 
 # ---------------------------------------------------------------- 3. code
 Step "3/5 Downloading the Cipher Desk code (sign in to GitHub if a window opens)"
