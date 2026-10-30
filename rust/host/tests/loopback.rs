@@ -197,8 +197,10 @@ fn viewer_sees_the_shared_screen_and_controls_it() {
 fn wrong_passwords_lock_the_host_for_a_while() {
     let r = start();
     let pin = Some(r.fingerprint.clone());
+    // Generated, so no fixed password is in the code.
+    let wrong = format!("{}x", r.password);
     for _ in 0..5 {
-        match connect(params(r.port, "not-the-password", pin.clone())) {
+        match connect(params(r.port, &wrong, pin.clone())) {
             Err(f) => assert_eq!(f.error(), ConnectionError::WrongCredentials),
             Ok(_) => panic!("a wrong password was accepted"),
         }

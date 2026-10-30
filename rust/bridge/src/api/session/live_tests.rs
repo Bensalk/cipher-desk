@@ -155,6 +155,7 @@ fn start_logged(addr: SocketAddr, h: &Host, capture: Option<Capture>) -> io::Res
         pins_path: pins.path().join("pins.json").to_string_lossy().into_owned(),
         clipboard: ClipboardMode::Off,
         idle_minutes: 0,
+        vnc: false,
     };
     let password = SecretString::new(h.password.clone());
     let (ctx, crx) = mpsc::channel();
@@ -571,5 +572,47 @@ impl Drop for Firewall {
                 .args(&rule)
                 .status();
         }
+    }
+}
+
+/// The VNC method through the same session loop the app uses: connected,
+/// screen size, pictures, then a clean end. Needs RDPV_VNC_PORT and
+/// RDPV_VNC_PASSWORD (CI runs x11vnc).
+#[test]
+#[ignore = "needs a VNC server"]
+fn live_vnc_session_streams_the_screen() -> TestResult {
+    let (Some(port), Some(password)) = (env("RDPV_VNC_PORT"), env("RDPV_VNC_PASSWORD")) else {
+        return Err("set RDPV_VNC_PORT and RDPV_VNC_PASSWORD".into());
+    };
+    let port: u16 = port.parse().map_err(|_| "bad RDPV_VNC_PORT".to_owned())?;
+    let target = Target::vnc("127.0.0.1".into(), port, 0);
+    let (ctx, crx) = mpsc::channel();
+    let (utx, urx) = mpsc::channel::<SessionUpdate>();
+    thread::spawn(move || {
+        let send = |u: SessionUpdate| utx.send(u).is_ok();
+        run(&target, SecretString::new(password), &send, &crx);
+    });
+    let live = Live {
+        commands: ctx,
+        updates: urx,
+        _pins: tempfile::tempdir().map_err(|e| e.to_string())?,
+    };
+    let size = live.wait_for("size", Duration::from_secs(15), |u| {
+        u.kind == UpdateKind::Resized
+    })?;
+    if size.width < 640 || size.height < 480 {
+        return Err(format!("size {}x{}", size.width, size.height));
+    }
+    live.connected(Duration::from_secs(5))?;
+    let frame = live.wait_for("picture", Duration::from_secs(10), |u| {
+        u.kind == UpdateKind::Frame
+    })?;
+    if frame.rgba.is_empty() {
+        return Err("empty picture".into());
+    }
+    live.disconnect(None);
+    match live.ended(Duration::from_secs(5))? {
+        None => Ok(()),
+        Some(e) => Err(format!("ended with {e}")),
     }
 }

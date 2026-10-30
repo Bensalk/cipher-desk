@@ -14,7 +14,9 @@ import '../session/scancodes.dart';
 import '../src/rust/api/errors.dart';
 import '../src/rust/api/pins.dart';
 import '../src/rust/api/session.dart';
+import '../src/rust/api/store.dart' show ConnectionMethod;
 import '../state/profiles.dart';
+import 'connection_methods.dart';
 import 'error_banner.dart';
 import 'status_chip.dart';
 
@@ -127,8 +129,9 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   Timer? _clipTimer;
   String? _lastLocalClip;
   bool get _sendsClipboard =>
-      widget.profile.clipboardMode == ClipboardMode.both ||
-      widget.profile.clipboardMode == ClipboardMode.toRemoteOnly;
+      widget.profile.method.supportsClipboard &&
+      (widget.profile.clipboardMode == ClipboardMode.both ||
+      widget.profile.clipboardMode == ClipboardMode.toRemoteOnly);
   static bool get _isAndroid => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
   @override
@@ -200,7 +203,25 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     final pinsPath = widget.pinsPath;
     if (!mounted) return;
     final (w, h) = desktopSizeFor(View.of(context).physicalSize, phoneOrTablet: _isAndroid);
-    final stream = widget.useSavedPassword
+    // Share screen has no clipboard either (only Private Remote Desktop does).
+    final clipboard =
+        widget.profile.method.supportsClipboard ? widget.profile.clipboardMode : ClipboardMode.off;
+    final vnc = widget.profile.method == ConnectionMethod.vnc;
+    final stream = vnc
+        ? (widget.useSavedPassword
+            ? _session.startVncWithSavedPassword(
+                connectionId: widget.profile.id,
+                host: widget.profile.host,
+                port: widget.profile.port,
+                idleMinutes: widget.idleMinutes,
+              )
+            : _session.startVnc(
+                host: widget.profile.host,
+                port: widget.profile.port,
+                password: widget.password ?? '',
+                idleMinutes: widget.idleMinutes,
+              ))
+        : widget.useSavedPassword
         ? _session.startWithSavedPassword(
             connectionId: widget.profile.id,
             host: widget.profile.host,
@@ -209,7 +230,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
             width: w,
             height: h,
             pinsPath: pinsPath,
-            clipboardDirection: widget.profile.clipboardMode,
+            clipboardDirection: clipboard,
             idleMinutes: widget.idleMinutes,
           )
         : _session.start(
@@ -220,7 +241,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
             width: w,
             height: h,
             pinsPath: pinsPath,
-            clipboardDirection: widget.profile.clipboardMode,
+            clipboardDirection: clipboard,
             idleMinutes: widget.idleMinutes,
           );
     _sub = stream.listen(_onUpdate, onError: (_) => _onEnded(null));

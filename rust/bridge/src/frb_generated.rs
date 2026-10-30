@@ -41,7 +41,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1758370250;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 326357962;
 
 // Section: executor
 
@@ -557,6 +557,138 @@ fn wire__crate__api__session__RdpSession_start_impl(
                             api_height,
                             api_pins_path,
                             api_clipboard_direction,
+                            api_idle_minutes,
+                            api_sink,
+                        );
+                    })?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__session__RdpSession_start_vnc_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "RdpSession_start_vnc",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RdpSession>,
+            >>::sse_decode(&mut deserializer);
+            let api_host = <String>::sse_decode(&mut deserializer);
+            let api_port = <u16>::sse_decode(&mut deserializer);
+            let api_password = <String>::sse_decode(&mut deserializer);
+            let api_idle_minutes = <u32>::sse_decode(&mut deserializer);
+            let api_sink = <StreamSink<
+                crate::api::session::SessionUpdate,
+                flutter_rust_bridge::for_generated::SseCodec,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_that_guard = api_that_guard.unwrap();
+                    let output_ok = Ok::<_, ()>({
+                        crate::api::session::RdpSession::start_vnc(
+                            &*api_that_guard,
+                            api_host,
+                            api_port,
+                            api_password,
+                            api_idle_minutes,
+                            api_sink,
+                        );
+                    })?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__session__RdpSession_start_vnc_with_saved_password_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "RdpSession_start_vnc_with_saved_password",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RdpSession>,
+            >>::sse_decode(&mut deserializer);
+            let api_connection_id = <String>::sse_decode(&mut deserializer);
+            let api_host = <String>::sse_decode(&mut deserializer);
+            let api_port = <u16>::sse_decode(&mut deserializer);
+            let api_idle_minutes = <u32>::sse_decode(&mut deserializer);
+            let api_sink = <StreamSink<
+                crate::api::session::SessionUpdate,
+                flutter_rust_bridge::for_generated::SseCodec,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_that_guard = api_that_guard.unwrap();
+                    let output_ok = Ok::<_, ()>({
+                        crate::api::session::RdpSession::start_vnc_with_saved_password(
+                            &*api_that_guard,
+                            api_connection_id,
+                            api_host,
+                            api_port,
                             api_idle_minutes,
                             api_sink,
                         );
@@ -2412,14 +2544,23 @@ fn pde_ffi_dispatcher_primary_impl(
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
         10 => wire__crate__api__session__RdpSession_start_impl(port, ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__session__RdpSession_start_with_saved_password_impl(
+        11 => {
+            wire__crate__api__session__RdpSession_start_vnc_impl(port, ptr, rust_vec_len, data_len)
+        }
+        12 => wire__crate__api__session__RdpSession_start_vnc_with_saved_password_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        15 => wire__crate__api__host__ShareHost_start_impl(port, ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__store__check_reachable_impl(port, ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__session__RdpSession_start_with_saved_password_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        17 => wire__crate__api__host__ShareHost_start_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__store__check_reachable_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2453,38 +2594,38 @@ fn pde_ffi_dispatcher_sync_impl(
             rust_vec_len,
             data_len,
         ),
-        12 => wire__crate__api__session__RdpSession_type_text_impl(ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__session__RdpSession_wheel_impl(ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__host__ShareHost_create_impl(ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__host__ShareHost_stop_impl(ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__errors__all_connection_errors_impl(ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__form__check_connection_form_impl(ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__store__connections_export_impl(ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__store__connections_import_impl(ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__store__connections_load_impl(ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__store__connections_save_impl(ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__info__core_summary_impl(ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__form__default_port_impl(ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__store__default_port_for_impl(ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__pins__forget_certificate_impl(ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__store__forget_trusted_computer_impl(ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__info__hello_from_rust_impl(ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__host__host_fingerprint_impl(ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__host__host_has_password_impl(ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__host__host_new_password_impl(ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__host__host_reveal_password_impl(ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__host__host_supported_impl(ptr, rust_vec_len, data_len),
-        35 => wire__crate__api__store__idle_minute_choices_impl(ptr, rust_vec_len, data_len),
-        36 => wire__crate__api__store__is_valid_mac_impl(ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__store__portable_data_dir_impl(ptr, rust_vec_len, data_len),
-        38 => wire__crate__api__info__security_defaults_summary_impl(ptr, rust_vec_len, data_len),
-        39 => wire__crate__api__store__settings_load_impl(ptr, rust_vec_len, data_len),
-        40 => wire__crate__api__store__settings_save_impl(ptr, rust_vec_len, data_len),
-        41 => wire__crate__api__store__trusted_computers_impl(ptr, rust_vec_len, data_len),
-        42 => wire__crate__api__vault__vault_check_password_impl(ptr, rust_vec_len, data_len),
-        43 => wire__crate__api__vault__vault_delete_password_impl(ptr, rust_vec_len, data_len),
-        44 => wire__crate__api__vault__vault_save_password_impl(ptr, rust_vec_len, data_len),
-        45 => wire__crate__api__store__wake_on_lan_impl(ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__session__RdpSession_type_text_impl(ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__session__RdpSession_wheel_impl(ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__host__ShareHost_create_impl(ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__host__ShareHost_stop_impl(ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__errors__all_connection_errors_impl(ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__form__check_connection_form_impl(ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__store__connections_export_impl(ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__store__connections_import_impl(ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__store__connections_load_impl(ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__store__connections_save_impl(ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__info__core_summary_impl(ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__form__default_port_impl(ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__store__default_port_for_impl(ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__pins__forget_certificate_impl(ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__store__forget_trusted_computer_impl(ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__info__hello_from_rust_impl(ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__host__host_fingerprint_impl(ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__host__host_has_password_impl(ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__host__host_new_password_impl(ptr, rust_vec_len, data_len),
+        35 => wire__crate__api__host__host_reveal_password_impl(ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__host__host_supported_impl(ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__store__idle_minute_choices_impl(ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__store__is_valid_mac_impl(ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__store__portable_data_dir_impl(ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__info__security_defaults_summary_impl(ptr, rust_vec_len, data_len),
+        41 => wire__crate__api__store__settings_load_impl(ptr, rust_vec_len, data_len),
+        42 => wire__crate__api__store__settings_save_impl(ptr, rust_vec_len, data_len),
+        43 => wire__crate__api__store__trusted_computers_impl(ptr, rust_vec_len, data_len),
+        44 => wire__crate__api__vault__vault_check_password_impl(ptr, rust_vec_len, data_len),
+        45 => wire__crate__api__vault__vault_delete_password_impl(ptr, rust_vec_len, data_len),
+        46 => wire__crate__api__vault__vault_save_password_impl(ptr, rust_vec_len, data_len),
+        47 => wire__crate__api__store__wake_on_lan_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

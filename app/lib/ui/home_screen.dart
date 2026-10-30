@@ -97,10 +97,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _connect(ConnectionProfile p) async {
-    if (p.method == ConnectionMethod.vnc) {
-      _snack('VNC connections arrive in the next version of Cipher Desk.');
-      return;
-    }
     String? password;
     var useSaved = false;
     String? notice;

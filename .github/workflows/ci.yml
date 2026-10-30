@@ -71,7 +71,7 @@ jobs:
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
             xvfb xterm freerdp3-shadow-x11 winpr3-utils xrdp xorgxrdp openssl \
-            gnome-keyring dbus-x11
+            gnome-keyring dbus-x11 x11vnc
       - name: Start test hosts (random password per run)
         run: bash scripts/start-test-hosts.sh
       - name: Live tests with an OS keyring (debug and release)
@@ -85,6 +85,7 @@ jobs:
             bash scripts/ci-run.sh "live_vault" cargo test -p rdpv-core --test live_vault real_vault -- --ignored
             bash scripts/ci-run.sh "live_clipboard" cargo test -p rdpv-core --test live_clipboard -- --ignored --test-threads=1
             bash scripts/ci-run.sh "live_host (release)" cargo test --release -p rdpv-core --test live_host -- --ignored --test-threads=1
+            bash scripts/ci-run.sh "live_vnc" cargo test -p rdpv-core --test live_vnc -- --ignored --test-threads=1
           '
       - name: Reliability tests (reconnect, certificate on reconnect, memory; Stage 8)
         # L3 (silent network drop) needs root to change firewall rules; it is run
