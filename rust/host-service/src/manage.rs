@@ -12,6 +12,33 @@ use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
 
 use crate::service::{DISPLAY_NAME, SERVICE_NAME};
 
+/// Collects `KEY=value` lines, prints them (for a person) and writes them to
+/// `last-result.txt` in the service folder. The app reads that file, because
+/// a command run with an elevation prompt cannot send its output back directly.
+#[derive(Default)]
+struct Report {
+    lines: Vec<String>,
+}
+
+impl Report {
+    fn set(&mut self, key: &str, value: &str) {
+        self.lines.push(format!("{key}={value}"));
+    }
+
+    /// Writes the result file and prints the lines, then any closing note.
+    fn finish(self, note: &str) {
+        if let Ok(dir) = crate::config::data_dir() {
+            let _ = std::fs::write(dir.join("last-result.txt"), self.lines.join("\n"));
+        }
+        for line in &self.lines {
+            println!("{line}");
+        }
+        if !note.is_empty() {
+            println!("\n{note}");
+        }
+    }
+}
+
 fn manager(access: ServiceManagerAccess) -> anyhow::Result<ServiceManager> {
     ServiceManager::local_computer(None::<&str>, access)
         .map_err(|e| anyhow::anyhow!("open the service manager (need administrator): {e}"))
@@ -55,13 +82,16 @@ pub fn install() -> anyhow::Result<()> {
 
     start()?;
 
-    println!("INSTALLED=1");
-    println!("USERNAME={username}");
-    println!("PORT={port}");
-    println!("FINGERPRINT={fingerprint}");
-    println!("PASSWORD={}", password.expose());
-    println!("\nSign-in screen sharing is on. On the other device, connect with method");
-    println!("\"Share screen\" using the username, port and password above.");
+    let mut r = Report::default();
+    r.set("INSTALLED", "1");
+    r.set("USERNAME", &username);
+    r.set("PORT", &port.to_string());
+    r.set("FINGERPRINT", &fingerprint);
+    r.set("PASSWORD", password.expose());
+    r.finish(
+        "Sign-in screen sharing is on. On the other device, connect with method \
+         \"Share screen\" using the username, port and password above.",
+    );
     Ok(())
 }
 
@@ -87,8 +117,10 @@ pub fn uninstall(purge: bool) -> anyhow::Result<()> {
             let _ = std::fs::remove_file(dir.join("password.bin"));
         }
     }
-    println!("REMOVED=1");
-    println!("Sign-in screen sharing has been turned off and the service removed.");
+    let mut r = Report::default();
+    r.set("REMOVED", "1");
+    r.set("INSTALLED", "0");
+    r.finish("Sign-in screen sharing has been turned off and the service removed.");
     Ok(())
 }
 
@@ -119,7 +151,9 @@ pub fn stop() -> anyhow::Result<()> {
     ) {
         let _ = service.stop();
     }
-    println!("STOPPED=1");
+    let mut r = Report::default();
+    r.set("STOPPED", "1");
+    r.finish("");
     Ok(())
 }
 
@@ -127,39 +161,45 @@ pub fn stop() -> anyhow::Result<()> {
 pub fn status() -> anyhow::Result<()> {
     let mgr = manager(ServiceManagerAccess::CONNECT)?;
     let installed = mgr.open_service(SERVICE_NAME, ServiceAccess::QUERY_STATUS);
+    let mut r = Report::default();
     match installed {
         Ok(service) => {
             let running = service
                 .query_status()
                 .map(|s| s.current_state == ServiceState::Running)
                 .unwrap_or(false);
-            println!("INSTALLED=1");
-            println!("RUNNING={}", u8::from(running));
+            r.set("INSTALLED", "1");
+            r.set("RUNNING", &u8::from(running).to_string());
             let (username, port) = crate::config::load_settings();
-            println!("USERNAME={username}");
-            println!("PORT={port}");
+            r.set("USERNAME", &username);
+            r.set("PORT", &port.to_string());
             if let Ok(fp) = rdpv_host::fingerprint(&crate::config::data_dir()?) {
-                println!("FINGERPRINT={fp}");
+                r.set("FINGERPRINT", &fp);
             }
         }
-        Err(_) => println!("INSTALLED=0"),
+        Err(_) => r.set("INSTALLED", "0"),
     }
+    r.finish("");
     Ok(())
 }
 
-/// Replaces the service's sharing password and prints the new one.
+/// Replaces the service's sharing password and reports the new one.
 pub fn new_password() -> anyhow::Result<()> {
     let password = rdpv_host::generate_password()?;
     crate::config::save_password(&password)?;
-    println!("PASSWORD={}", password.expose());
+    let mut r = Report::default();
+    r.set("PASSWORD", password.expose());
+    r.finish("");
     Ok(())
 }
 
-/// Prints the current sharing password (the app shows it when asked).
+/// Reports the current sharing password (the app shows it when asked).
 pub fn show_password() -> anyhow::Result<()> {
+    let mut r = Report::default();
     match crate::config::load_password()? {
-        Some(p) => println!("PASSWORD={}", p.expose()),
-        None => println!("PASSWORD="),
+        Some(p) => r.set("PASSWORD", p.expose()),
+        None => r.set("PASSWORD", ""),
     }
+    r.finish("");
     Ok(())
 }

@@ -145,6 +145,12 @@ jobs:
           flutter pub get
           & "$env:ProgramFiles\Git\bin\bash.exe" ../scripts/ci-run.sh "Windows release build" flutter build windows --release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build the Host service (sign-in screen sharing) and add it to the bundle
+        run: |
+          $env:RUSTFLAGS = "--remap-path-prefix=$env:USERPROFILE=C:\home --remap-path-prefix=$env:GITHUB_WORKSPACE=C:\src"
+          & "$env:ProgramFiles\Git\bin\bash.exe" scripts/ci-run.sh "Host service build" cargo build --release -p cipher-desk-host-service
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item target/release/cipher-desk-host-service.exe app/build/windows/x64/runner/Release/ -Force
       - name: No local paths in the binaries
         shell: bash
         run: bash scripts/ci-run.sh "Local paths in Windows files" bash scripts/check-binaries.sh app/build/windows/x64/runner/Release
