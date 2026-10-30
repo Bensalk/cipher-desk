@@ -23,8 +23,8 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     MOUSEEVENTF_WHEEL, MOUSEINPUT, MOUSE_EVENT_FLAGS, VIRTUAL_KEY,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    DrawIconEx, GetCursorInfo, GetSystemMetrics, CURSORINFO, CURSOR_SHOWING, DI_NORMAL,
-    SM_CXSCREEN, SM_CYSCREEN,
+    DrawIconEx, GetCursorInfo, GetIconInfo, GetSystemMetrics, CURSORINFO, CURSOR_SHOWING,
+    DI_NORMAL, ICONINFO, SM_CXSCREEN, SM_CYSCREEN,
 };
 
 use crate::frames::{Frame, FrameSource};
@@ -127,10 +127,27 @@ unsafe fn draw_cursor(dc: HDC) {
     // handle comes from Windows and is only drawn, not destroyed.
     unsafe {
         if GetCursorInfo(&mut ci).is_ok() && ci.flags == CURSOR_SHOWING {
+            // The pointer's tip (hotspot) is at the position, not its corner.
+            let mut info = ICONINFO::default();
+            let (hx, hy) = if GetIconInfo(ci.hCursor.into(), &mut info).is_ok() {
+                // GetIconInfo makes copies of the pointer's bitmaps; free them.
+                if !info.hbmMask.is_invalid() {
+                    let _ = DeleteObject(info.hbmMask.into());
+                }
+                if !info.hbmColor.is_invalid() {
+                    let _ = DeleteObject(info.hbmColor.into());
+                }
+                (
+                    i32::try_from(info.xHotspot).unwrap_or(0),
+                    i32::try_from(info.yHotspot).unwrap_or(0),
+                )
+            } else {
+                (0, 0)
+            };
             let _ = DrawIconEx(
                 dc,
-                ci.ptScreenPos.x,
-                ci.ptScreenPos.y,
+                ci.ptScreenPos.x - hx,
+                ci.ptScreenPos.y - hy,
                 ci.hCursor.into(),
                 0,
                 0,

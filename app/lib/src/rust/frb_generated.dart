@@ -75,7 +75,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
                   String get codegenVersion => '2.13.0';
 
                   @override
-                  int get rustContentHash => 326357962;
+                  int get rustContentHash => 122281489;
 
                   static const kDefaultExternalLibraryLoaderConfig = ExternalLibraryLoaderConfig(
                     stem: 'rust_lib_cipher_desk',
@@ -178,6 +178,8 @@ VaultResult crateApiVaultVaultCheckPassword({required String connectionId });
 VaultResult crateApiVaultVaultDeletePassword({required String connectionId });
 
 VaultResult crateApiVaultVaultSavePassword({required String connectionId , required String password });
+
+Future<bool> crateApiStoreVncAddressAllowed({required String host });
 
 WakeResult crateApiStoreWakeOnLan({required String mac });
 
@@ -1438,11 +1440,36 @@ sse_encode_String(password, serializer);
         );
         
 
+@override Future<bool> crateApiStoreVncAddressAllowed({required String host })  { return handler.executeNormal(NormalTask(
+            callFfi: (port_) {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(host, serializer);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 47, port: port_);
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiStoreVncAddressAllowedConstMeta,
+            argValues: [host],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiStoreVncAddressAllowedConstMeta => const TaskConstMeta(
+            debugName: "vnc_address_allowed",
+            argNames: ["host"],
+        );
+        
+
 @override WakeResult crateApiStoreWakeOnLan({required String mac })  { return handler.executeSync(SyncTask(
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(mac, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 47)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 48)!;
             
             },
             codec: 

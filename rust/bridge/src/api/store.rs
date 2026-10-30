@@ -344,6 +344,22 @@ pub fn wake_on_lan(mac: String) -> WakeResult {
     }
 }
 
+/// Whether VNC may be used with this host: all its addresses are on the own
+/// network, this computer or Tailscale. Looks the name up, so it may take a moment.
+pub fn vnc_address_allowed(host: String) -> bool {
+    use std::net::ToSocketAddrs as _;
+    match (host.trim(), 0u16).to_socket_addrs() {
+        Ok(addrs) => {
+            let addrs: Vec<_> = addrs.collect();
+            !addrs.is_empty()
+                && addrs
+                    .iter()
+                    .all(|a| rdpv_core::vnc::is_private_address(a.ip()))
+        }
+        Err(_) => false,
+    }
+}
+
 /// Whether the computer accepts connections on its RDP port (sends no data).
 pub fn check_reachable(host: String, port: u16, timeout_ms: u32) -> bool {
     wol::reachable(
@@ -356,6 +372,14 @@ pub fn check_reachable(host: String, port: u16, timeout_ms: u32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn vnc_addresses_must_be_private() {
+        assert!(vnc_address_allowed("127.0.0.1".into()));
+        assert!(vnc_address_allowed("100.115.0.9".into()));
+        assert!(!vnc_address_allowed("192.0.2.1".into()));
+        assert!(!vnc_address_allowed(String::new()));
+    }
 
     fn sample() -> ConnectionData {
         ConnectionData {

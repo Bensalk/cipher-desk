@@ -804,7 +804,14 @@ fn drive(
     // Changed screen area not yet sent, and when pixels were last sent: at most
     // ~30 updates a second, so a busy screen (video, scrolling) cannot queue up
     // more pixels than the UI can draw, which would make the session lag.
-    let mut dirty: Option<Region> = None;
+    // The whole picture first: what arrived while connecting (VNC) or after
+    // a reconnect has not been sent yet.
+    let mut dirty: Option<Region> = (w > 0 && h > 0).then(|| Region {
+        left: 0,
+        top: 0,
+        right: w - 1,
+        bottom: h - 1,
+    });
     let mut last_frame = std::time::Instant::now()
         .checked_sub(FRAME_INTERVAL)
         .unwrap_or_else(std::time::Instant::now);

@@ -48,6 +48,10 @@ bool  isValidMac({required String text }) => RustLib.instance.api.crateApiStoreI
 /// Sends a Wake-on-LAN packet on the local network.
 WakeResult  wakeOnLan({required String mac }) => RustLib.instance.api.crateApiStoreWakeOnLan(mac: mac);
 
+/// Whether VNC may be used with this host: all its addresses are on the own
+/// network, this computer or Tailscale. Looks the name up, so it may take a moment.
+Future<bool>  vncAddressAllowed({required String host }) => RustLib.instance.api.crateApiStoreVncAddressAllowed(host: host);
+
 /// Whether the computer accepts connections on its RDP port (sends no data).
 Future<bool>  checkReachable({required String host , required int port , required int timeoutMs }) => RustLib.instance.api.crateApiStoreCheckReachable(host: host, port: port, timeoutMs: timeoutMs);
 

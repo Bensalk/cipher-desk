@@ -255,11 +255,12 @@ impl<S: FrameSource + Send + 'static> RdpServerDisplay for ScreenDisplay<S> {
         });
         let (tx, rx) = tokio::sync::mpsc::channel::<DisplayUpdate>(16);
         let source = Arc::clone(&self.source);
+        let size = self.size().await;
         // Capture on a plain thread: screen capture is blocking work. It ends by
         // itself when the session ends (the receiver is dropped).
         std::thread::Builder::new()
             .name("cipher-desk-capture".into())
-            .spawn(move || capture_loop(&source, &tx))
+            .spawn(move || capture_loop(&source, &tx, size))
             .context("capture thread")?;
         Ok(Box::new(Updates { rx }))
     }
@@ -268,6 +269,7 @@ impl<S: FrameSource + Send + 'static> RdpServerDisplay for ScreenDisplay<S> {
 fn capture_loop<S: FrameSource + Send>(
     source: &Mutex<S>,
     tx: &tokio::sync::mpsc::Sender<DisplayUpdate>,
+    mut size: DesktopSize,
 ) {
     let mut differ = frames::Differ::default();
     loop {
@@ -280,6 +282,17 @@ fn capture_loop<S: FrameSource + Send>(
         };
         match frame {
             Ok(frame) => {
+                // The screen resolution changed: the viewer is told the new size
+                // first, then gets the whole new picture.
+                if (frame.width, frame.height) != (size.width, size.height) {
+                    size = DesktopSize {
+                        width: frame.width,
+                        height: frame.height,
+                    };
+                    if tx.blocking_send(DisplayUpdate::Resize(size)).is_err() {
+                        return;
+                    }
+                }
                 for update in differ.changes(frame) {
                     if tx.blocking_send(DisplayUpdate::Bitmap(update)).is_err() {
                         return;

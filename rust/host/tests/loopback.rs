@@ -59,6 +59,10 @@ struct Running {
 }
 
 fn start() -> Running {
+    start_with(SyntheticSource::new(640, 480))
+}
+
+fn start_with<S: rdpv_host::FrameSource + Send + 'static>(source: S) -> Running {
     let dir = tempfile::tempdir().expect("temp dir");
     let port = free_port();
     let password = test_password();
@@ -72,7 +76,7 @@ fn start() -> Running {
             data_dir: dir.path().to_path_buf(),
         },
         "127.0.0.1".parse().expect("ip"),
-        SyntheticSource::new(640, 480),
+        source,
         RecordingSink(Arc::clone(&inputs)),
         tx,
     )
@@ -217,4 +221,64 @@ fn wrong_passwords_lock_the_host_for_a_while() {
     }
     // Even the right password is refused while locked.
     assert!(connect(params(r.port, &r.password, pin)).is_err());
+}
+
+/// A picture whose size changes when the test says so (a resolution change).
+struct Resizable {
+    small: SyntheticSource,
+    big: SyntheticSource,
+    switched: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl rdpv_host::FrameSource for Resizable {
+    fn size(&mut self) -> (u16, u16) {
+        self.current().size()
+    }
+    fn capture(&mut self) -> anyhow::Result<rdpv_host::Frame> {
+        self.current().capture()
+    }
+}
+
+impl Resizable {
+    fn current(&mut self) -> &mut SyntheticSource {
+        if self.switched.load(std::sync::atomic::Ordering::SeqCst) {
+            &mut self.big
+        } else {
+            &mut self.small
+        }
+    }
+}
+
+#[test]
+fn a_resolution_change_resizes_the_viewer() {
+    let switched = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let r = start_with(Resizable {
+        small: SyntheticSource::new(640, 480),
+        big: SyntheticSource::new(800, 600),
+        switched: Arc::clone(&switched),
+    });
+    let mut s = connect(params(r.port, &r.password, Some(r.fingerprint.clone())))
+        .unwrap_or_else(|f| panic!("connect failed: {f:?}"));
+    assert_eq!(s.size(), (640, 480));
+    switched.store(true, std::sync::atomic::Ordering::SeqCst);
+    let deadline = Instant::now() + Duration::from_secs(15);
+    let mut resized = false;
+    let mut updated_after = false;
+    while Instant::now() < deadline && !(resized && updated_after) {
+        for e in s.poll() {
+            match e {
+                SessionEvent::Resized { width, height } => {
+                    assert_eq!((width, height), (800, 600));
+                    resized = true;
+                }
+                SessionEvent::Updated(_) if resized => updated_after = true,
+                SessionEvent::Ended(err) => panic!("session ended: {err:?}"),
+                _ => {}
+            }
+        }
+    }
+    assert!(resized, "no resize");
+    assert!(updated_after, "no picture after the resize");
+    assert_eq!(s.size(), (800, 600));
+    s.disconnect();
 }

@@ -437,6 +437,7 @@ class _ReadinessDialog extends StatefulWidget {
 
 class _ReadinessDialogState extends State<_ReadinessDialog> {
   bool? _reachable;
+  bool? _vncAllowed;
   late final bool _trusted;
 
   @override
@@ -447,6 +448,11 @@ class _ReadinessDialogState extends State<_ReadinessDialog> {
     checkReachable(host: p.host, port: p.port, timeoutMs: 5000).then((ok) {
       if (mounted) setState(() => _reachable = ok);
     });
+    if (p.method == ConnectionMethod.vnc) {
+      vncAddressAllowed(host: p.host).then((ok) {
+        if (mounted) setState(() => _vncAllowed = ok);
+      });
+    }
   }
 
   Widget _row(bool? ok, String good, String bad, {String? pending}) {
@@ -471,10 +477,19 @@ class _ReadinessDialogState extends State<_ReadinessDialog> {
         children: [
           _row(_reachable, 'The computer answers on port ${p.port}',
               'The computer does not answer on port ${p.port}. Check that it is on, awake, '
-                  'and that you are on the same network or VPN.',
+                  '${switch (p.method) {
+                    ConnectionMethod.shareScreen => 'that "Start sharing" is on in Cipher Desk there, ',
+                    ConnectionMethod.vnc => 'that its VNC program is running, ',
+                    ConnectionMethod.privateRemoteDesktop => '',
+                  }}and that you are on the same network or VPN.',
               pending: 'Checking the computer…'),
-          _row(_trusted, 'Its certificate is trusted',
-              'Not connected before: you will be asked to check its certificate'),
+          if (p.method == ConnectionMethod.vnc)
+            _row(_vncAllowed, 'The address is on your own network or Tailscale',
+                'VNC works only on your own network or Tailscale (100.x.x.x). Use one of those addresses.',
+                pending: 'Checking the address…')
+          else
+            _row(_trusted, 'Its certificate is trusted',
+                'Not connected before: you will be asked to check its certificate'),
           if (p.method.needsUsername)
             _row(p.username.isNotEmpty, 'Username: ${p.username}', 'No username set'),
           _row(p.savePassword, 'Password saved in this device\'s secure storage',
