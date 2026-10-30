@@ -195,6 +195,32 @@ void main() {
     expect(find.text('Created by Bensal'), findsOneWidget);
   });
 
+  testWidgets('Share screen starts and stops on Windows', (tester) async {
+    await start(tester);
+    await tester.tap(find.text('Share screen').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Sharing is off'), findsOneWidget);
+    // A strong password is made on first use and shown only on request.
+    final shown = find.byKey(const Key('share-password-show'));
+    await reveal(tester, shown);
+    await tester.tap(shown);
+    await tester.pumpAndSettle();
+    expect(find.textContaining(RegExp(r'^\w{4}-\w{4}-\w{4}-\w{4}$')), findsOneWidget);
+    await tester.tap(shown);
+    await tester.pumpAndSettle();
+
+    final startButton = find.byKey(const Key('share-start'));
+    await reveal(tester, startButton);
+    await tester.tap(startButton);
+    for (var i = 0; i < 50 && find.text('Sharing is on: waiting for a viewer').evaluate().isEmpty; i++) {
+      await tester.pump(const Duration(milliseconds: 200));
+    }
+    expect(find.text('Sharing is on: waiting for a viewer'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('share-stop')));
+    await tester.pumpAndSettle();
+    expect(find.text('Sharing is off'), findsOneWidget);
+  }, skip: !Platform.isWindows);
+
   testWidgets('a bad Wake-on-LAN address is reported', (tester) async {
     await start(tester);
     await tester.tap(find.byKey(const Key('button-new')));

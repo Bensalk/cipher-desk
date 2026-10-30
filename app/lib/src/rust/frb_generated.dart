@@ -5,6 +5,7 @@
 
 import 'api/errors.dart';
 import 'api/form.dart';
+import 'api/host.dart';
 import 'api/info.dart';
 import 'api/pins.dart';
 import 'api/session.dart';
@@ -74,7 +75,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
                   String get codegenVersion => '2.13.0';
 
                   @override
-                  int get rustContentHash => -1592907736;
+                  int get rustContentHash => -1758370250;
 
                   static const kDefaultExternalLibraryLoaderConfig = ExternalLibraryLoaderConfig(
                     stem: 'rust_lib_cipher_desk',
@@ -112,6 +113,12 @@ void crateApiSessionRdpSessionTypeText({required RdpSession that , required Stri
 
 void crateApiSessionRdpSessionWheel({required RdpSession that , required bool vertical , required int delta });
 
+ShareHost crateApiHostShareHostCreate();
+
+Stream<HostUpdate> crateApiHostShareHostStart({required ShareHost that , required int port , required String username , required String dataDir });
+
+void crateApiHostShareHostStop({required ShareHost that });
+
 List<ErrorInfo> crateApiErrorsAllConnectionErrors();
 
 FormCheckResult crateApiFormCheckConnectionForm({required ConnectionMethod method , required String profileName , required String host , required String port , required String username , required String password , required bool hasSavedPassword });
@@ -137,6 +144,16 @@ bool crateApiPinsForgetCertificate({required String pinsPath , required String h
 bool crateApiStoreForgetTrustedComputer({required String pinsPath , required String endpoint });
 
 String crateApiInfoHelloFromRust();
+
+String? crateApiHostHostFingerprint({required String dataDir });
+
+VaultResult crateApiHostHostHasPassword();
+
+VaultResult crateApiHostHostNewPassword();
+
+String? crateApiHostHostRevealPassword();
+
+bool crateApiHostHostSupported();
 
 Uint32List crateApiStoreIdleMinuteChoices();
 
@@ -165,6 +182,12 @@ RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_RdpSession
 RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_RdpSession;
 
 CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_RdpSessionPtr;
+
+RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_ShareHost;
+
+RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_ShareHost;
+
+CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_ShareHostPtr;
 
 
                 }
@@ -545,11 +568,94 @@ sse_encode_i_16(delta, serializer);
         );
         
 
-@override List<ErrorInfo> crateApiErrorsAllConnectionErrors()  { return handler.executeSync(SyncTask(
+@override ShareHost crateApiHostShareHostCreate()  { return handler.executeSync(SyncTask(
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
             return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiHostShareHostCreateConstMeta,
+            argValues: [],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiHostShareHostCreateConstMeta => const TaskConstMeta(
+            debugName: "ShareHost_create",
+            argNames: [],
+        );
+        
+
+@override Stream<HostUpdate> crateApiHostShareHostStart({required ShareHost that , required int port , required String username , required String dataDir })  { 
+            final sink = RustStreamSink<HostUpdate>();
+            unawaited(handler.executeNormal(NormalTask(
+            callFfi: (port_) {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(that, serializer);
+sse_encode_u_16(port, serializer);
+sse_encode_String(username, serializer);
+sse_encode_String(dataDir, serializer);
+sse_encode_StreamSink_host_update_Sse(sink, serializer);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15, port: port_);
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiHostShareHostStartConstMeta,
+            argValues: [that, port, username, dataDir, sink],
+            apiImpl: this,
+        )));
+            return sink.stream;
+             }
+
+
+        TaskConstMeta get kCrateApiHostShareHostStartConstMeta => const TaskConstMeta(
+            debugName: "ShareHost_start",
+            argNames: ["that", "port", "username", "dataDir", "sink"],
+        );
+        
+
+@override void crateApiHostShareHostStop({required ShareHost that })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(that, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiHostShareHostStopConstMeta,
+            argValues: [that],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiHostShareHostStopConstMeta => const TaskConstMeta(
+            debugName: "ShareHost_stop",
+            argNames: ["that"],
+        );
+        
+
+@override List<ErrorInfo> crateApiErrorsAllConnectionErrors()  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17)!;
             
             },
             codec: 
@@ -580,7 +686,7 @@ sse_encode_String(port, serializer);
 sse_encode_String(username, serializer);
 sse_encode_String(password, serializer);
 sse_encode_bool(hasSavedPassword, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18)!;
             
             },
             codec: 
@@ -607,7 +713,7 @@ sse_encode_bool(hasSavedPassword, serializer);
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(host, serializer);
 sse_encode_u_16(port, serializer);
 sse_encode_u_32(timeoutMs, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19, port: port_);
             
             },
             codec: 
@@ -632,7 +738,7 @@ sse_encode_u_32(timeoutMs, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_list_connection_data(connections, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20)!;
             
             },
             codec: 
@@ -657,7 +763,7 @@ sse_encode_u_32(timeoutMs, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(text, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
             
             },
             codec: 
@@ -682,7 +788,7 @@ sse_encode_u_32(timeoutMs, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(path, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 22)!;
             
             },
             codec: 
@@ -709,7 +815,7 @@ sse_encode_u_32(timeoutMs, serializer);
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(path, serializer);
 sse_encode_list_connection_data(connections, serializer);
 sse_encode_list_history_data(history, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23)!;
             
             },
             codec: 
@@ -734,7 +840,7 @@ sse_encode_list_history_data(history, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 24)!;
             
             },
             codec: 
@@ -759,7 +865,7 @@ sse_encode_list_history_data(history, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 22)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25)!;
             
             },
             codec: 
@@ -784,7 +890,7 @@ sse_encode_list_history_data(history, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_connection_method(method, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
             
             },
             codec: 
@@ -811,7 +917,7 @@ sse_encode_list_history_data(history, serializer);
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(pinsPath, serializer);
 sse_encode_String(host, serializer);
 sse_encode_u_16(port, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 24)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27)!;
             
             },
             codec: 
@@ -837,7 +943,7 @@ sse_encode_u_16(port, serializer);
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(pinsPath, serializer);
 sse_encode_String(endpoint, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28)!;
             
             },
             codec: 
@@ -862,7 +968,7 @@ sse_encode_String(endpoint, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29)!;
             
             },
             codec: 
@@ -883,11 +989,136 @@ sse_encode_String(endpoint, serializer);
         );
         
 
+@override String? crateApiHostHostFingerprint({required String dataDir })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(dataDir, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_opt_String,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiHostHostFingerprintConstMeta,
+            argValues: [dataDir],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiHostHostFingerprintConstMeta => const TaskConstMeta(
+            debugName: "host_fingerprint",
+            argNames: ["dataDir"],
+        );
+        
+
+@override VaultResult crateApiHostHostHasPassword()  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 31)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_vault_result,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiHostHostHasPasswordConstMeta,
+            argValues: [],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiHostHostHasPasswordConstMeta => const TaskConstMeta(
+            debugName: "host_has_password",
+            argNames: [],
+        );
+        
+
+@override VaultResult crateApiHostHostNewPassword()  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_vault_result,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiHostHostNewPasswordConstMeta,
+            argValues: [],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiHostHostNewPasswordConstMeta => const TaskConstMeta(
+            debugName: "host_new_password",
+            argNames: [],
+        );
+        
+
+@override String? crateApiHostHostRevealPassword()  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 33)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_opt_String,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiHostHostRevealPasswordConstMeta,
+            argValues: [],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiHostHostRevealPasswordConstMeta => const TaskConstMeta(
+            debugName: "host_reveal_password",
+            argNames: [],
+        );
+        
+
+@override bool crateApiHostHostSupported()  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 34)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiHostHostSupportedConstMeta,
+            argValues: [],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiHostHostSupportedConstMeta => const TaskConstMeta(
+            debugName: "host_supported",
+            argNames: [],
+        );
+        
+
 @override Uint32List crateApiStoreIdleMinuteChoices()  { return handler.executeSync(SyncTask(
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 35)!;
             
             },
             codec: 
@@ -912,7 +1143,7 @@ sse_encode_String(endpoint, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(text, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 36)!;
             
             },
             codec: 
@@ -937,7 +1168,7 @@ sse_encode_String(endpoint, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 37)!;
             
             },
             codec: 
@@ -962,7 +1193,7 @@ sse_encode_String(endpoint, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 38)!;
             
             },
             codec: 
@@ -987,7 +1218,7 @@ sse_encode_String(endpoint, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(path, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 31)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 39)!;
             
             },
             codec: 
@@ -1013,7 +1244,7 @@ sse_encode_String(endpoint, serializer);
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(path, serializer);
 sse_encode_box_autoadd_settings_data(data, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 40)!;
             
             },
             codec: 
@@ -1038,7 +1269,7 @@ sse_encode_box_autoadd_settings_data(data, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(pinsPath, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 33)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 41)!;
             
             },
             codec: 
@@ -1063,7 +1294,7 @@ sse_encode_box_autoadd_settings_data(data, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(connectionId, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 34)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 42)!;
             
             },
             codec: 
@@ -1088,7 +1319,7 @@ sse_encode_box_autoadd_settings_data(data, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(connectionId, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 35)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 43)!;
             
             },
             codec: 
@@ -1114,7 +1345,7 @@ sse_encode_box_autoadd_settings_data(data, serializer);
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(connectionId, serializer);
 sse_encode_String(password, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 36)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 44)!;
             
             },
             codec: 
@@ -1139,7 +1370,7 @@ sse_encode_String(password, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(mac, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 37)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 45)!;
             
             },
             codec: 
@@ -1164,6 +1395,10 @@ RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_RdpSession
 
 RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_RdpSession => wire.rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession;
 
+RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_ShareHost => wire.rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost;
+
+RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_ShareHost => wire.rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost;
+
 
 
                   @protected AnyhowException dco_decode_AnyhowException(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -1172,11 +1407,23 @@ return AnyhowException(raw as String); }
 @protected RdpSession dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return RdpSessionImpl.frbInternalDcoDecode(raw as List<dynamic>); }
 
+@protected ShareHost dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return ShareHostImpl.frbInternalDcoDecode(raw as List<dynamic>); }
+
 @protected RdpSession dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return RdpSessionImpl.frbInternalDcoDecode(raw as List<dynamic>); }
 
+@protected ShareHost dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return ShareHostImpl.frbInternalDcoDecode(raw as List<dynamic>); }
+
 @protected RdpSession dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return RdpSessionImpl.frbInternalDcoDecode(raw as List<dynamic>); }
+
+@protected ShareHost dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return ShareHostImpl.frbInternalDcoDecode(raw as List<dynamic>); }
+
+@protected RustStreamSink<HostUpdate> dco_decode_StreamSink_host_update_Sse(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+throw UnimplementedError(); }
 
 @protected RustStreamSink<SessionUpdate> dco_decode_StreamSink_session_update_Sse(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 throw UnimplementedError(); }
@@ -1252,6 +1499,17 @@ final arr = raw as List<dynamic>;
                 return HistoryData(connectionId: dco_decode_String(arr[0]),
 time: dco_decode_i_64(arr[1]),
 outcome: dco_decode_String(arr[2]),); }
+
+@protected HostUpdate dco_decode_host_update(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+final arr = raw as List<dynamic>;
+                if (arr.length != 4) throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+                return HostUpdate(kind: dco_decode_host_update_kind(arr[0]),
+port: dco_decode_u_16(arr[1]),
+minutes: dco_decode_u_64(arr[2]),
+message: dco_decode_opt_String(arr[3]),); }
+
+@protected HostUpdateKind dco_decode_host_update_kind(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return HostUpdateKind.values[raw as int]; }
 
 @protected int dco_decode_i_16(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw as int; }
@@ -1352,6 +1610,9 @@ return raw as int; }
 @protected int dco_decode_u_32(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw as int; }
 
+@protected BigInt dco_decode_u_64(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
+return dcoDecodeU64(raw); }
+
 @protected int dco_decode_u_8(dynamic raw){ // Codec=Dco (DartCObject based), see doc to use other codecs
 return raw as int; }
 
@@ -1377,11 +1638,23 @@ var inner = sse_decode_String(deserializer);
 @protected RdpSession sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 return RdpSessionImpl.frbInternalSseDecode(sse_decode_usize(deserializer), sse_decode_i_32(deserializer)); }
 
+@protected ShareHost sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+return ShareHostImpl.frbInternalSseDecode(sse_decode_usize(deserializer), sse_decode_i_32(deserializer)); }
+
 @protected RdpSession sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 return RdpSessionImpl.frbInternalSseDecode(sse_decode_usize(deserializer), sse_decode_i_32(deserializer)); }
 
+@protected ShareHost sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+return ShareHostImpl.frbInternalSseDecode(sse_decode_usize(deserializer), sse_decode_i_32(deserializer)); }
+
 @protected RdpSession sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 return RdpSessionImpl.frbInternalSseDecode(sse_decode_usize(deserializer), sse_decode_i_32(deserializer)); }
+
+@protected ShareHost sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+return ShareHostImpl.frbInternalSseDecode(sse_decode_usize(deserializer), sse_decode_i_32(deserializer)); }
+
+@protected RustStreamSink<HostUpdate> sse_decode_StreamSink_host_update_Sse(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+throw UnimplementedError('Unreachable ()'); }
 
 @protected RustStreamSink<SessionUpdate> sse_decode_StreamSink_session_update_Sse(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 throw UnimplementedError('Unreachable ()'); }
@@ -1456,6 +1729,17 @@ var var_connectionId = sse_decode_String(deserializer);
 var var_time = sse_decode_i_64(deserializer);
 var var_outcome = sse_decode_String(deserializer);
 return HistoryData(connectionId: var_connectionId, time: var_time, outcome: var_outcome); }
+
+@protected HostUpdate sse_decode_host_update(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+var var_kind = sse_decode_host_update_kind(deserializer);
+var var_port = sse_decode_u_16(deserializer);
+var var_minutes = sse_decode_u_64(deserializer);
+var var_message = sse_decode_opt_String(deserializer);
+return HostUpdate(kind: var_kind, port: var_port, minutes: var_minutes, message: var_message); }
+
+@protected HostUpdateKind sse_decode_host_update_kind(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+var inner = sse_decode_i_32(deserializer);
+        return HostUpdateKind.values[inner]; }
 
 @protected int sse_decode_i_16(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 return deserializer.buffer.getInt16(); }
@@ -1607,6 +1891,9 @@ return deserializer.buffer.getUint16(); }
 @protected int sse_decode_u_32(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 return deserializer.buffer.getUint32(); }
 
+@protected BigInt sse_decode_u_64(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+return deserializer.buffer.getBigUint64(); }
+
 @protected int sse_decode_u_8(SseDeserializer deserializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 return deserializer.buffer.getUint8(); }
 
@@ -1634,11 +1921,26 @@ sse_encode_String(self.message, serializer); }
 @protected void sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(RdpSession self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_usize((self as RdpSessionImpl).frbInternalSseEncode(move: true), serializer); }
 
+@protected void sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(ShareHost self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_usize((self as ShareHostImpl).frbInternalSseEncode(move: true), serializer); }
+
 @protected void sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(RdpSession self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_usize((self as RdpSessionImpl).frbInternalSseEncode(move: false), serializer); }
 
+@protected void sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(ShareHost self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_usize((self as ShareHostImpl).frbInternalSseEncode(move: false), serializer); }
+
 @protected void sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(RdpSession self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_usize((self as RdpSessionImpl).frbInternalSseEncode(move: null), serializer); }
+
+@protected void sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(ShareHost self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_usize((self as ShareHostImpl).frbInternalSseEncode(move: null), serializer); }
+
+@protected void sse_encode_StreamSink_host_update_Sse(RustStreamSink<HostUpdate> self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_String(self.setupAndSerialize(codec: SseCodec(
+            decodeSuccessData: sse_decode_host_update,
+            decodeErrorData: sse_decode_AnyhowException,
+        )), serializer); }
 
 @protected void sse_encode_StreamSink_session_update_Sse(RustStreamSink<SessionUpdate> self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 sse_encode_String(self.setupAndSerialize(codec: SseCodec(
@@ -1712,6 +2014,16 @@ sse_encode_String(self.connectionId, serializer);
 sse_encode_i_64(self.time, serializer);
 sse_encode_String(self.outcome, serializer);
  }
+
+@protected void sse_encode_host_update(HostUpdate self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_host_update_kind(self.kind, serializer);
+sse_encode_u_16(self.port, serializer);
+sse_encode_u_64(self.minutes, serializer);
+sse_encode_opt_String(self.message, serializer);
+ }
+
+@protected void sse_encode_host_update_kind(HostUpdateKind self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+sse_encode_i_32(self.index, serializer); }
 
 @protected void sse_encode_i_16(int self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 serializer.buffer.putInt16(self); }
@@ -1835,6 +2147,9 @@ serializer.buffer.putUint16(self); }
 @protected void sse_encode_u_32(int self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 serializer.buffer.putUint32(self); }
 
+@protected void sse_encode_u_64(BigInt self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
+serializer.buffer.putBigUint64(self); }
+
 @protected void sse_encode_u_8(int self, SseSerializer serializer){ // Codec=Sse (Serialization based), see doc to use other codecs
 serializer.buffer.putUint8(self); }
 
@@ -1925,6 +2240,31 @@ sse_encode_i_32(self.index, serializer); }
 
 /// Scrolls; one notch is 120, positive scrolls up.
  void  wheel({required bool vertical , required int delta })=>RustLib.instance.api.crateApiSessionRdpSessionWheel(that: this, vertical: vertical, delta: delta);
+
+
+            }
+            @sealed class ShareHostImpl extends RustOpaque implements ShareHost {
+                // Not to be used by end users
+                ShareHostImpl.frbInternalDcoDecode(List<dynamic> wire):
+                    super.frbInternalDcoDecode(wire, _kStaticData);
+
+                // Not to be used by end users
+                ShareHostImpl.frbInternalSseDecode(BigInt ptr, int externalSizeOnNative):
+                    super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
+
+                static final _kStaticData = RustArcStaticData(
+                    rustArcIncrementStrongCount: RustLib.instance.api.rust_arc_increment_strong_count_ShareHost,
+                    rustArcDecrementStrongCount: RustLib.instance.api.rust_arc_decrement_strong_count_ShareHost,
+                    rustArcDecrementStrongCountPtr: RustLib.instance.api.rust_arc_decrement_strong_count_ShareHostPtr,
+                );
+
+                /// Starts sharing with the saved password. `data_dir` is the app's private
+/// data folder (the Host certificate is kept there).
+ Stream<HostUpdate>  start({required int port , required String username , required String dataDir })=>RustLib.instance.api.crateApiHostShareHostStart(that: this, port: port, username: username, dataDir: dataDir);
+
+
+/// Stops sharing and disconnects the viewer.
+ void  stop()=>RustLib.instance.api.crateApiHostShareHostStop(that: this, );
 
 
             }

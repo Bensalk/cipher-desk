@@ -7,11 +7,13 @@ import '../src/rust/api/store.dart';
 import '../state/persistence.dart';
 import '../state/profiles.dart';
 import '../state/settings.dart';
+import '../state/share.dart';
 import 'connection_form.dart';
 import 'connection_methods.dart';
 import 'error_banner.dart';
 import 'session_screen.dart';
 import 'settings_screen.dart';
+import 'share_screen.dart';
 import 'status_chip.dart';
 
 /// Main window: saved connections with search, and quick actions.
@@ -47,9 +49,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<AppPaths> _appPaths() async => _paths ??= widget.paths ?? await AppPaths.resolve();
 
+  /// "Share this screen" (Windows only); keeps running on every page.
+  late final ShareController? _share =
+      ShareController.supported ? ShareController(_appPaths) : null;
+
+  @override
+  void dispose() {
+    _share?.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
+    _share?.load();
     final notice = widget.startupNotice;
     if (notice != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -252,18 +265,27 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 720;
-    final body = _tab == 0
-        ? _connections()
-        : SettingsScreen(
-            settings: widget.settings,
-            store: widget.store,
-            paths: _appPaths,
-            portableDir: (widget.paths?.portable ?? false) ? widget.paths!.dir : null,
-          );
-    final destinations = const [
+    final share = _share;
+    final settingsPage = SettingsScreen(
+      settings: widget.settings,
+      store: widget.store,
+      paths: _appPaths,
+      portableDir: (widget.paths?.portable ?? false) ? widget.paths!.dir : null,
+    );
+    final pages = <Widget>[
+      _connections(),
+      if (share != null) ShareScreenPage(share: share),
+      settingsPage,
+    ];
+    final destinations = [
       (Icons.computer_outlined, Icons.computer, 'Connections'),
+      if (share != null) (Icons.screen_share_outlined, Icons.screen_share, 'Share screen'),
       (Icons.settings_outlined, Icons.settings, 'Settings'),
     ];
+    final page = pages[_tab.clamp(0, pages.length - 1)];
+    final body = share == null
+        ? page
+        : Column(children: [SharingBanner(share: share), Expanded(child: page)]);
     return Scaffold(
       appBar: AppBar(title: const Text('Cipher Desk')),
       floatingActionButton: _tab == 0

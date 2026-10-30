@@ -16,6 +16,10 @@ rdpv-core = { path = "../core" }
 flutter_rust_bridge = "=2.13.0"
 tracing.workspace = true
 
+# Share screen (Cipher Desk Host) is Windows-only.
+[target.'cfg(windows)'.dependencies]
+rdpv-host = { path = "../host" }
+
 # Same rules as the workspace, except `unsafe_code` is "deny" instead of "forbid"
 # so the generated FFI module alone can opt out (see src/lib.rs).
 [dev-dependencies]

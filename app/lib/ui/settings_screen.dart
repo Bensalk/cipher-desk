@@ -172,7 +172,7 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           const _Header('Privacy & security'),
-          if (isAndroid)
+          if (isAndroid || _isWindows)
             SwitchListTile(
               key: const Key('setting-block-screenshots'),
               value: settings.blockScreenshots,
@@ -181,9 +181,9 @@ class SettingsScreen extends StatelessWidget {
                 SecureWindow.setEnabled(v);
               },
               title: const Text('Block screenshots'),
-              subtitle: const Text(
-                'Hides the remote screen from screenshots, screen recording and the recent-apps view.',
-              ),
+              subtitle: Text(isAndroid
+                  ? 'Hides the remote screen from screenshots, screen recording and the recent-apps view.'
+                  : 'Hides the Cipher Desk window from screenshots, screen recording and screen sharing.'),
             ),
           SwitchListTile(
             key: const Key('setting-clipboard-default'),
