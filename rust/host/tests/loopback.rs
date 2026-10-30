@@ -283,7 +283,11 @@ fn a_resolution_change_resizes_the_viewer() {
         std::thread::sleep(Duration::from_millis(10));
     }
     assert!(resized, "the viewer was not told the new size");
-    assert_eq!(s.size(), (800, 600), "the viewer did not adopt the new size");
+    assert_eq!(
+        s.size(),
+        (800, 600),
+        "the viewer did not adopt the new size"
+    );
     // The session is still healthy after the resize.
     assert!(!s.is_ended(), "session ended after the resize");
     s.disconnect();
