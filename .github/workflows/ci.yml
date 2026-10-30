@@ -79,15 +79,15 @@ jobs:
           dbus-run-session -- bash -c '
             set -e
             openssl rand -hex 16 | gnome-keyring-daemon --unlock --components=secrets > /dev/null
-            cargo test -p rdpv-core --test live_host -- --ignored --test-threads=1
-            cargo test -p rdpv-core --test live_vault real_vault -- --ignored
-            cargo test -p rdpv-core --test live_clipboard -- --ignored --test-threads=1
-            cargo test --release -p rdpv-core --test live_host -- --ignored --test-threads=1
+            bash scripts/ci-run.sh "live_host (debug)" cargo test -p rdpv-core --test live_host -- --ignored --test-threads=1
+            bash scripts/ci-run.sh "live_vault" cargo test -p rdpv-core --test live_vault real_vault -- --ignored
+            bash scripts/ci-run.sh "live_clipboard" cargo test -p rdpv-core --test live_clipboard -- --ignored --test-threads=1
+            bash scripts/ci-run.sh "live_host (release)" cargo test --release -p rdpv-core --test live_host -- --ignored --test-threads=1
           '
       - name: Reliability tests (reconnect, certificate on reconnect, memory; Stage 8)
         # L3 (silent network drop) needs root to change firewall rules; it is run
         # locally and recorded in docs/PROGRESS.md.
-        run: cargo test -p rust_lib_cipher_desk --lib live_ -- --ignored --test-threads=1 --skip live_l3
+        run: bash scripts/ci-run.sh "Reliability tests" cargo test -p rust_lib_cipher_desk --lib live_ -- --ignored --test-threads=1 --skip live_l3
       - name: Vault refuses to save when no keyring exists (I8)
         env:
           RDPV_TEST_VAULT: missing
@@ -148,24 +148,26 @@ jobs:
             exit 1; }
       - run: flutter pub get
       - name: Analyze
-        run: flutter analyze --no-fatal-infos
+        run: bash ../scripts/ci-run.sh "flutter analyze" flutter analyze --no-fatal-infos
       - name: Unit tests
-        run: flutter test
+        run: bash ../scripts/ci-run.sh "Flutter unit tests" flutter test
       - name: Build Linux
         if: matrix.target == 'linux'
-        run: flutter build linux --debug
+        run: bash ../scripts/ci-run.sh "Linux build" flutter build linux --debug
       - name: Integration test (Linux, Rust ↔ Flutter)
         if: matrix.target == 'linux'
-        run: xvfb-run -a flutter test integration_test -d linux
+        run: bash ../scripts/ci-run.sh "Linux integration test" xvfb-run -a flutter test integration_test -d linux
       - name: Build Windows
         if: matrix.target == 'windows'
-        run: flutter build windows --debug
+        shell: bash
+        run: bash ../scripts/ci-run.sh "Windows build" flutter build windows --debug
       - name: Integration test (Windows, Rust ↔ Flutter)
         if: matrix.target == 'windows'
-        run: flutter test integration_test -d windows
+        shell: bash
+        run: bash ../scripts/ci-run.sh "Windows integration test" flutter test integration_test -d windows
       - name: Build Android APK
         if: matrix.target == 'android'
-        run: flutter build apk --debug
+        run: bash ../scripts/ci-run.sh "Android build" flutter build apk --debug
       - name: Android manifest security settings
         if: matrix.target == 'android'
         shell: bash
