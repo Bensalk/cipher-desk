@@ -73,7 +73,35 @@ with a **Stop** button at the top of Cipher Desk.
   administrator*.
 - **"Open Cipher Desk when I sign in"** starts it after you sign in to Windows, not
   before. After a restart, someone must sign in at the computer first, or use
-  Private Remote Desktop (which asks for the Windows password).
+  Private Remote Desktop (which asks for the Windows password) — unless you turn on
+  **sign-in screen access** below.
+
+## Signing in from home (the sign-in screen)
+
+Normally Share screen can only show the screen once someone is already signed in.
+To sign in to the computer from another device — at the Windows **sign-in or lock
+screen** — turn on **sign-in screen access** on the Share screen page.
+
+1. On the computer, Share screen page → **Turn on sign-in screen access**.
+2. Approve the one-time **Windows administrator** prompt. This installs a small
+   background service ("Cipher Desk Host") that starts with Windows.
+3. The page then shows the username, port and a **separate password** for sign-in
+   screen sharing. Use those on the other device (method **Share screen**).
+
+With this on, you can connect to the computer even at the lock screen or just
+after it restarts, type the Windows password, and keep working with the screen
+shared. To turn it off, use **Turn off sign-in screen access** on the same page
+(also a one-time admin prompt).
+
+Notes:
+- It needs administrator approval **once** to install and once to remove, because a
+  background service is a system-wide change. Day to day it needs nothing.
+- Its password is kept encrypted on that computer and is different from the ordinary
+  Share screen password.
+- Programs running as administrator still can't be clicked unless Cipher Desk itself
+  was started as administrator; everything else, including the sign-in screen, works.
+- Turn it off from the app **before uninstalling Cipher Desk** (a normal uninstall
+  can't remove a system service).
 - **Clipboard sharing** is not available with Share screen.
 - **Main screen only:** with several monitors, the main one is shared.
 - **Stop sharing** at any time with the Stop button on the Share page or in the

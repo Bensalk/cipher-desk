@@ -10,6 +10,7 @@ should I use?** in the form and answer two questions.
 | **Screen at the computer** | Locked while you work | Stays on, people there see everything | Stays on, people there see everything |
 | **The computer needs** | Windows Pro, Enterprise or Education | Cipher Desk (Windows 10/11, any edition) | A VNC program (e.g. TightVNC) |
 | **Sign-in** | Windows username + password | Username + password from the Share page | VNC password (max. 8 characters) |
+| **Reach the sign-in screen** | Yes | Only with sign-in screen access turned on (a background service) | No |
 | **Encryption** | Yes (TLS) | Yes (TLS) | No, so only on your own network or Tailscale |
 | **Identity check** | Certificate fingerprint | Identity code | None (use Tailscale) |
 | **Clipboard** | Yes (if you allow it) | No | No |

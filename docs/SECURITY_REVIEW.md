@@ -54,6 +54,25 @@ No critical or high-severity issue is open.
 | SA-9 | No secrets or personal data in the source | ✅ | gitleaks on every commit and full history (clean); noreply identity; `.gitignore`; path remapping (rule order fixed in Stage 10, R41), checked by `scripts/check-binaries.sh` on every release file and the SBOM |
 | SA-10 | Portable mode rules | 🟡 (Stage 10) | `portable.rs` (unit tests): data next to the app only with `portable.txt` (Windows ZIP) or a `.data` folder (AppImage); passwords never there; warning when saving one; a pin mismatch still blocks. App UI needs Flutter |
 
+### Share screen and the sign-in-screen service (H1–H5, V1–V2)
+
+Added when the three connection methods and the Host service were built. Covered in
+`docs/THREAT_MODEL.md` §5a. The service is Windows-only and the most sensitive part
+of the app.
+
+| Req | Requirement | Status | Evidence |
+|-----|-------------|--------|----------|
+| H1 | Share screen uses NLA + a pinned certificate, with a wrong-password lockout | ✅ | `rust/host` (`limiter.rs`, `identity.rs`); loopback test (sign-in, pinning, lockout) |
+| H2 | The sharing password is strong and not in the clear | ✅ | Generated from the OS RNG; in-session: OS vault; service: DPAPI machine scope under ProgramData |
+| H3 | The viewer can't read the password off the shared screen | ✅ | The Cipher Desk window is excluded from capture while sharing (`flutter_window.cpp`) |
+| H4 | The service needs admin only to install/remove, runs least-privilege otherwise | 🟡 | Installed/removed with a one-time UAC prompt; runs as LocalSystem (needed for the Winlogon desktop). **Needs on-device testing and the SA-5 review before release** |
+| H5 | The user is in control: opt-in, visible, removable | ✅ (code) | Off by default; a banner shows while viewing; turned on/off from the Share screen page |
+| V1 | VNC only on the own network or Tailscale (it isn't encrypted) | ✅ | `rust/core/src/vnc.rs` `is_private_address`; unit tests; refused before connecting |
+| V2 | VNC has no server identity | 🟡 | Accepted; documented; Tailscale authenticates the device (R8) |
+
+The sign-in-screen service (H4) is **not yet tested on real Windows** and **must have
+the SA-5 independent review** before it ships in a release.
+
 ### Findings from the Stage 1 spike (SF-1 – SF-6)
 
 | Req | Finding | Status |
