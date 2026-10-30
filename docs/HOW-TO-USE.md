@@ -73,10 +73,14 @@ computer itself.
 ## 4. During a session
 
 - **Keyboard and mouse** work as usual on a computer. The bar at the bottom has
-  Esc, Tab, Windows, **Ctrl+Alt+Del**, arrows, F1–F12 and **Type text**.
-- **Touch screens:** tap to click, long-press to right-click, drag to drag. Turn on
-  **trackpad mode** (hand icon) to move a pointer like on a laptop trackpad. Pinch to
-  zoom up to 4×; the zoom button shows the whole screen again.
+  **Ctrl, Alt and Shift** (they stay held until you tap them again, so you can do
+  Ctrl+C or Alt+Tab), Esc, Tab, Windows, **Ctrl+Alt+Del**, arrows, F1–F12 and **Type text**.
+- **Touch screens:** tap to click, long-press to right-click, drag to drag, and move
+  **two fingers up or down to scroll**. Turn on **trackpad mode** (hand icon) to move a
+  pointer like on a laptop trackpad. Pinch to zoom up to 4×; the zoom button shows the
+  whole screen again.
+- **Phones and tablets** get a landscape desktop (up to 1920×1080); turn the device
+  sideways for the biggest view.
 - **Clipboard** (if allowed): an icon in the title bar shows the direction. On Android,
   text you copy on the phone is sent when you return to the app or tap *Send clipboard*.
 - **Network drops:** the app reconnects by itself (up to 3 tries) to the same computer

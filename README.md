@@ -41,7 +41,7 @@ Cipher Desk connects to your own Windows computers over Remote Desktop, from a P
 - **Certificate check and pinning** – the first time, you compare the computer's fingerprint before anything is sent. If it ever changes, the connection is blocked before your password leaves the device.
 - **Saved passwords, safely** – optional, and only in Windows Credential Manager, the Linux keyring or the Android Keystore, confirmed with Windows Hello or your screen lock. Never in the app's files, exports or logs.
 - **Clipboard sharing** – two-way text clipboard, off by default; allow it per connection, in one direction or both.
-- **Works on touch screens** – tap to click, long-press to right-click, trackpad mode, pinch to zoom up to 4×, and a key bar with Ctrl+Alt+Del, Windows key, Esc, Tab, arrows, F1–F12 and *Type text*.
+- **Works on touch screens** – tap to click, long-press to right-click, two-finger scroll, trackpad mode, pinch to zoom up to 4×, and a key bar with Ctrl, Alt and Shift that stay held (for Ctrl+C or Alt+Tab), Ctrl+Alt+Del, Windows key, Esc, Tab, arrows, F1–F12 and *Type text*.
 - **Saved connections** – search, Wake-on-LAN, a *Check readiness* test, connection history, and export / import without passwords.
 - **Reliable** – reconnects by itself after a network drop (same computer, same certificate) and never retries a wrong password, so accounts don't get locked.
 - **Clear errors** – every message says what happened and what to do next; *Settings → What error messages mean* lists them all.

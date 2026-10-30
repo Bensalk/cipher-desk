@@ -99,6 +99,11 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   // pinch: after a pinch, the finger that stays down must not click or drag.
   int _touches = 0;
   bool _pinched = false;
+  // Two fingers either zoom (pinch) or scroll (move together up or down); which
+  // one is decided by the first clear movement and kept until the fingers lift.
+  _TwoFinger _twoFinger = _TwoFinger.undecided;
+  double _scrollRest = 0; // finger movement not yet turned into wheel notches
+  double _pinchScaleAtStart = 1; // the gesture's scale when zooming began
 
   static const _touchKinds = {
     PointerDeviceKind.touch,
@@ -483,12 +488,40 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
 
   void _onScaleUpdate(ScaleUpdateDetails d, Size box) {
     if (d.pointerCount >= 2) {
-      // Pinch: zoom and move the view; nothing is sent to the remote computer.
       _pinched = true;
       if (_dragging) _endDrag(box, d.localFocalPoint);
+      if (_twoFinger == _TwoFinger.undecided) {
+        _scrollRest += d.focalPointDelta.dy;
+        if ((d.scale - 1).abs() > 0.08) {
+          _twoFinger = _TwoFinger.zoom;
+          // Zoom from here, so the view does not jump.
+          _startZoom = _zoom;
+          _startFocal = d.localFocalPoint;
+          _startOrigin = _origin(box);
+          _pinchScaleAtStart = d.scale;
+        } else if (_scrollRest.abs() > 16) {
+          _twoFinger = _TwoFinger.scroll;
+          _scrollRest = 0;
+          return;
+        } else {
+          return;
+        }
+      }
+      if (_twoFinger == _TwoFinger.scroll) {
+        // Two-finger scroll: fingers up = page moves up, like scrolling on a phone.
+        _scrollRest += d.focalPointDelta.dy;
+        const step = 40.0; // finger movement per wheel notch
+        while (_scrollRest.abs() >= step) {
+          final up = _scrollRest > 0;
+          _session.wheel(vertical: true, delta: up ? 120 : -120);
+          _scrollRest += up ? -step : step;
+        }
+        return;
+      }
+      // Pinch: zoom and move the view; nothing is sent to the remote computer.
       final base = _baseScale(box);
       if (base <= 0) return;
-      final zoom = (_startZoom * d.scale).clamp(1.0, maxZoom);
+      final zoom = (_startZoom * d.scale / _pinchScaleAtStart).clamp(1.0, maxZoom);
       final s = base * zoom;
       // Keep the desktop point that was under the fingers under them.
       final remotePt = (_startFocal - _startOrigin) / (base * _startZoom);
@@ -529,7 +562,11 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   void _touchEnded(PointerEvent e) {
     if (!_touchKinds.contains(e.kind)) return;
     if (_touches > 0) _touches--;
-    if (_touches == 0) _pinched = false;
+    if (_touches == 0) {
+      _pinched = false;
+      _twoFinger = _TwoFinger.undecided;
+      _scrollRest = 0;
+    }
   }
 
   void _resetZoom() => setState(() {
@@ -924,6 +961,8 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     );
   }
 }
+
+enum _TwoFinger { undecided, zoom, scroll }
 
 class _ModifierButton extends StatelessWidget {
   const _ModifierButton(this.label, {required this.held, required this.onPressed});

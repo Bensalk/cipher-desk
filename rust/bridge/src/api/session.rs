@@ -656,6 +656,13 @@ fn drive(
         return Drive::UiGone;
     }
     let mut last_input = std::time::Instant::now();
+    // Changed screen area not yet sent, and when pixels were last sent: at most
+    // ~30 updates a second, so a busy screen (video, scrolling) cannot queue up
+    // more pixels than the UI can draw, which would make the session lag.
+    let mut dirty: Option<Region> = None;
+    let mut last_frame = std::time::Instant::now()
+        .checked_sub(FRAME_INTERVAL)
+        .unwrap_or_else(std::time::Instant::now);
     // A session error: network drops may be reconnected, the rest end it.
     let ended = |err: ConnectionError| {
         if err.auto_reconnect_allowed() {
@@ -700,7 +707,6 @@ fn drive(
             return Drive::Ended(Some(ConnectionError::IdleTimeout));
         }
 
-        let mut dirty: Option<Region> = None;
         for ev in s.poll() {
             match ev {
                 SessionEvent::Updated(r) => dirty = Some(union(dirty, r)),
@@ -728,16 +734,22 @@ fn drive(
             }
         }
         // The rectangle sent to the UI is the one the pixels were copied from.
-        if let Some(r) = dirty.and_then(|r| s.clamped(r)) {
-            let update = SessionUpdate::frame(r, s.region_pixels(r));
-            // The UI went away: end the session.
-            if !send(update) {
-                s.disconnect();
-                return Drive::UiGone;
+        if dirty.is_some() && last_frame.elapsed() >= FRAME_INTERVAL {
+            if let Some(r) = dirty.take().and_then(|r| s.clamped(r)) {
+                last_frame = std::time::Instant::now();
+                let update = SessionUpdate::frame(r, s.region_pixels(r));
+                // The UI went away: end the session.
+                if !send(update) {
+                    s.disconnect();
+                    return Drive::UiGone;
+                }
             }
         }
     }
 }
+
+/// Shortest time between two screen updates sent to the UI (about 30 per second).
+const FRAME_INTERVAL: Duration = Duration::from_millis(33);
 
 fn union(a: Option<Region>, b: Region) -> Region {
     match a {
