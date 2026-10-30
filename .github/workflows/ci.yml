@@ -209,7 +209,7 @@ jobs:
     name: Android app on an emulator (UI tests and a live session)
     needs: rust
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -259,5 +259,5 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           working-directory: app
           script: |
-            bash ../scripts/ci-run.sh "Android UI tests" flutter test integration_test/hello_test.dart -d emulator-5554
-            bash ../scripts/ci-run.sh "Android live session" flutter test integration_test/live_session_test.dart -d emulator-5554 --dart-define-from-file="$RUNNER_TEMP/live.json"
+            bash ../scripts/ci-run.sh "Android UI tests" timeout 1500 flutter test integration_test/hello_test.dart -d emulator-5554 --timeout 5m --reporter expanded
+            bash ../scripts/ci-run.sh "Android live session" timeout 1200 flutter test integration_test/live_session_test.dart -d emulator-5554 --timeout 6m --reporter expanded --dart-define-from-file="$RUNNER_TEMP/live.json"
