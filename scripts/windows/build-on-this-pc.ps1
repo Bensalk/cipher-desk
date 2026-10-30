@@ -83,8 +83,14 @@ git config --global core.longpaths true
 
 Write-Host "Rust toolchain and Android targets..."
 # The build tool (Cargokit) uses the "stable" toolchain.
-rustup toolchain install stable --profile minimal; Check "rustup"
-rustup target add --toolchain stable aarch64-linux-android armv7-linux-androideabi x86_64-linux-android; Check "rustup targets"
+# --no-self-update: a rustup update in the middle of the run confuses the next command.
+rustup toolchain install stable --profile minimal --no-self-update; Check "rustup"
+foreach ($try in 1..2) {
+    rustup target add --toolchain stable aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+    if ($LASTEXITCODE -eq 0) { break }
+    Start-Sleep -Seconds 3
+}
+Check "rustup targets"
 
 # ---------------------------------------------------------------- 2. Flutter + Android SDK
 Step "2/5 Flutter and the Android SDK"
