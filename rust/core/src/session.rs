@@ -789,7 +789,16 @@ fn connector_config(
         device_scale_factor: None,
         monitor_extended_layout: None,
         relative_mouse_input: false,
-        bitmap: None,
+        // Ask for RemoteFX: the host then sends compact, whole-frame updates
+        // instead of large plain bitmaps, which is far smoother (the viewer's
+        // active stage decodes RemoteFX). Falls back to bitmaps if the host
+        // does not offer it.
+        bitmap: Some(ironrdp_connector::BitmapConfig {
+            lossy_compression: true,
+            color_depth: 32,
+            codecs: ironrdp_pdu::rdp::capability_sets::client_codecs_capabilities(&["remotefx"])
+                .unwrap_or_else(|_| ironrdp_pdu::rdp::capability_sets::BitmapCodecs(Vec::new())),
+        }),
         client_build: 0,
         // Privacy: a fixed name, so the device's own name is not sent to the host.
         client_name: "rdpv".to_owned(),

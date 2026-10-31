@@ -40,13 +40,16 @@ pub enum ConnectionError {
     VaultUnavailable,
     /// Android: the app stayed in the background longer than the grace period.
     AppInBackground,
+    /// VNC was asked to connect to an address outside the user's own network
+    /// or Tailscale. VNC is not encrypted, so it is refused. Nothing was sent.
+    VncNotPrivate,
     /// Anything not covered above.
     Unexpected,
 }
 
 impl ConnectionError {
     /// Every variant, for tests and the UI's help screen.
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 18] = [
         Self::WrongCredentials,
         Self::AccountProblem,
         Self::HostRefused,
@@ -63,6 +66,7 @@ impl ConnectionError {
         Self::IdleTimeout,
         Self::VaultUnavailable,
         Self::AppInBackground,
+        Self::VncNotPrivate,
         Self::Unexpected,
     ];
 
@@ -85,6 +89,7 @@ impl ConnectionError {
             Self::IdleTimeout => "Disconnected after inactivity",
             Self::VaultUnavailable => "Saved password couldn't be used",
             Self::AppInBackground => "Disconnected while in the background",
+            Self::VncNotPrivate => "VNC works only on your own network",
             Self::Unexpected => "Something went wrong",
         }
     }
@@ -108,6 +113,7 @@ impl ConnectionError {
             Self::IdleTimeout => "The session was idle for too long. Reconnect when you need it.",
             Self::VaultUnavailable => "The saved password couldn't be read from this device's secure password storage (it may be locked, missing or unavailable). Type the password to connect, or edit the connection to save it again.",
             Self::AppInBackground => "To save battery and keep the connection secure, a session ends 5 minutes after you leave the app. Reconnect to continue.",
+            Self::VncNotPrivate => "VNC is not encrypted, so Cipher Desk uses it only with addresses on your own network or Tailscale (100.x.x.x). Nothing was sent. Use Tailscale to reach this computer from elsewhere.",
             Self::Unexpected => "Try again. If it keeps happening, restart the app.",
         }
     }
@@ -149,6 +155,7 @@ impl ConnectionError {
                 | Self::SecurityNotSupported
                 | Self::RemoteDesktopUnavailable
                 | Self::VaultUnavailable
+                | Self::VncNotPrivate
         )
     }
 
@@ -156,7 +163,10 @@ impl ConnectionError {
     pub const fn is_security_warning(self) -> bool {
         matches!(
             self,
-            Self::CertificateChanged | Self::CertificateUnknown | Self::SecurityNotSupported
+            Self::CertificateChanged
+                | Self::CertificateUnknown
+                | Self::SecurityNotSupported
+                | Self::VncNotPrivate
         )
     }
 }
@@ -459,6 +469,7 @@ mod tests {
             (E::IdleTimeout, false, true, false),
             (E::VaultUnavailable, false, false, false),
             (E::AppInBackground, false, true, false),
+            (E::VncNotPrivate, false, false, true),
             (E::Unexpected, false, true, false),
         ];
         assert_eq!(

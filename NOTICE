@@ -5,6 +5,8 @@ This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 
 This product depends on third-party open-source components, including:
 - IronRDP (https://github.com/Devolutions/IronRDP) — MIT OR Apache-2.0
+  rust/third_party/ironrdp-server is a lightly changed copy of ironrdp-server 0.13.0
+  (Copyright Devolutions Inc.); its licence files are in that folder.
 - Flutter (https://flutter.dev) — BSD-3-Clause
 - flutter_rust_bridge (https://github.com/fzyzcjy/flutter_rust_bridge) — MIT
 

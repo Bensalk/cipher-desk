@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 
 import '../src/rust/api/session.dart' show ClipboardMode;
+import '../src/rust/api/store.dart' show ConnectionMethod;
 
 /// A saved connection. Deliberately has **no password field**: passwords are
 /// only ever stored in the operating system's vault (Stage 5).
@@ -18,6 +19,7 @@ class ConnectionProfile {
     this.clipboardMode = ClipboardMode.off,
     this.lastUsed,
     this.wakeMac,
+    this.method = ConnectionMethod.privateRemoteDesktop,
   });
 
   final String id;
@@ -38,6 +40,9 @@ class ConnectionProfile {
   /// MAC address for Wake-on-LAN (F11), or null.
   final String? wakeMac;
 
+  /// Private Remote Desktop, Share screen or VNC.
+  final ConnectionMethod method;
+
   /// "host:port", bracketing IPv6 addresses.
   String get endpoint => host.contains(':') ? '[$host]:$port' : '$host:$port';
 
@@ -55,6 +60,7 @@ class ConnectionProfile {
     DateTime? lastUsed,
     String? wakeMac,
     bool clearWakeMac = false,
+    ConnectionMethod? method,
   }) {
     return ConnectionProfile(
       id: id ?? this.id,
@@ -66,6 +72,7 @@ class ConnectionProfile {
       clipboardMode: clipboardMode ?? this.clipboardMode,
       lastUsed: lastUsed ?? this.lastUsed,
       wakeMac: clearWakeMac ? null : (wakeMac ?? this.wakeMac),
+      method: method ?? this.method,
     );
   }
 }

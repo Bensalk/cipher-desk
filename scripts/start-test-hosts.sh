@@ -2,7 +2,8 @@
 # Starts local RDP test hosts for the live integration tests (rust/core/tests/live_*.rs):
 #   - FreeRDP shadow server on port 3389 with NLA required (positive tests),
 #   - xrdp on port 3390, which does not support NLA (must be refused),
-#   - the test-only clipboard host (tools/rdp-test-host) on port 3391, NLA + clipboard.
+#   - the test-only clipboard host (tools/rdp-test-host) on port 3391, NLA + clipboard,
+#   - x11vnc on port 5900 (VNC password), if installed.
 # A random password is generated for every run; it is never written to the repository.
 #
 # Usage:   source scripts/start-test-hosts.sh   (bash, Linux; needs: Xvfb xterm freerdp3-shadow-x11
@@ -65,6 +66,19 @@ openssl req -x509 -newkey rsa:2048 -nodes -keyout "$WORK/clip-key.pem" -out "$WO
   RDPV_HOST_CLIP_TEXT="$CLIP_TEXT" RDPV_HOST_CLIP_OUT="$WORK/clip-received.txt" \
   setsid "$ROOT/tools/rdp-test-host/target/debug/rdp-test-host" >"$WORK/clip-host.log" 2>&1 &)
 
+# VNC host (x11vnc) sharing the same virtual screen, local connections only.
+VNC_PORT=""
+VNC_PASSWORD=$(openssl rand -hex 4)
+if command -v x11vnc >/dev/null 2>&1; then
+  if [ -n "${GITHUB_ACTIONS:-}" ]; then
+    echo "::add-mask::$VNC_PASSWORD"
+  fi
+  x11vnc -storepasswd "$VNC_PASSWORD" "$WORK/vncpass" >/dev/null 2>&1
+  (DISPLAY=":$DISPLAY_NUM" setsid x11vnc -display ":$DISPLAY_NUM" -rfbauth "$WORK/vncpass" \
+    -rfbport 5900 -localhost -forever -shared -quiet >"$WORK/x11vnc.log" 2>&1 &)
+  VNC_PORT=5900
+fi
+
 # Check that the NLA host, not something else, owns port 3389.
 sleep 1
 if command -v ss >/dev/null 2>&1 && ! ss -ltnp 2>/dev/null | grep ':3389 ' | grep -q 'freerdp-shadow'; then
@@ -76,7 +90,7 @@ if command -v ss >/dev/null 2>&1 && ! ss -ltnp 2>/dev/null | grep ':3389 ' | gre
 fi
 
 # Wait for the ports.
-for port in 3389 3391 ${NONLA_PORT}; do
+for port in 3389 3391 ${NONLA_PORT} ${VNC_PORT}; do
   i=0
   until (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; do
     i=$((i + 1))
@@ -98,6 +112,10 @@ if [ -n "${GITHUB_ENV:-}" ]; then
     echo "RDPV_CLIP_PASSWORD=$CLIP_PASSWORD"
     echo "RDPV_CLIP_HOST_TEXT=$CLIP_TEXT"
     echo "RDPV_CLIP_OUT=$WORK/clip-received.txt"
+    if [ -n "$VNC_PORT" ]; then
+      echo "RDPV_VNC_PORT=$VNC_PORT"
+      echo "RDPV_VNC_PASSWORD=$VNC_PASSWORD"
+    fi
   } >>"$GITHUB_ENV"
 else
   export RDPV_TEST_HOST=127.0.0.1 RDPV_TEST_PORT=3389 RDPV_TEST_USER="$USER_NAME"
@@ -106,5 +124,6 @@ else
   export RDPV_CLIP_HOST=127.0.0.1 RDPV_CLIP_PORT=3391 RDPV_CLIP_USER=rdpvclip
   export RDPV_CLIP_PASSWORD="$CLIP_PASSWORD" RDPV_CLIP_HOST_TEXT="$CLIP_TEXT"
   export RDPV_CLIP_OUT="$WORK/clip-received.txt"
+  if [ -n "$VNC_PORT" ]; then export RDPV_VNC_PORT="$VNC_PORT" RDPV_VNC_PASSWORD="$VNC_PASSWORD"; fi
 fi
-echo "Test hosts ready (NLA on 3389, clipboard on 3391${NONLA_PORT:+, no-NLA on $NONLA_PORT})."
+echo "Test hosts ready (NLA on 3389, clipboard on 3391${NONLA_PORT:+, no-NLA on $NONLA_PORT}${VNC_PORT:+, VNC on $VNC_PORT})."

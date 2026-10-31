@@ -8,8 +8,8 @@ import 'errors.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 
-            // These functions are ignored because they are not marked as `pub`: `approval`, `changed`, `drive`, `ended`, `frame`, `new`, `pause`, `pending_disconnect`, `policy`, `reconnect`, `reconnecting`, `remote_clipboard`, `resized`, `run`, `send`, `spawn`, `status`, `union`, `wait_for_approval`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Command`, `Drive`, `Reconnect`, `Target`
+            // These functions are ignored because they are not marked as `pub`: `approval`, `changed`, `clamped`, `disconnect`, `drive`, `ended`, `frame`, `keep_running`, `new`, `offer_local_clipboard`, `pause`, `pending_disconnect`, `policy`, `poll`, `reconnect`, `reconnecting`, `region_pixels`, `remote_clipboard`, `resized`, `run`, `send_input`, `send`, `size`, `spawn`, `status`, `union`, `vnc`, `wait_for_approval`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Command`, `Drive`, `Reconnect`, `Remote`, `Target`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`
 
 
@@ -63,6 +63,15 @@ static RdpSession  create()=>RustLib.instance.api.crateApiSessionRdpSessionCreat
 /// `pins_path` is the certificate pin file in the app's private data folder.
 /// Can be called once per handle.
  Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required int idleMinutes });
+
+
+/// Connects with the VNC method (no username; no clipboard or certificate).
+/// Only addresses on the own network or Tailscale are allowed.
+ Stream<SessionUpdate>  startVnc({required String host , required int port , required String password , required int idleMinutes });
+
+
+/// Like [`RdpSession::start_vnc`], with the password saved in the OS vault.
+ Stream<SessionUpdate>  startVncWithSavedPassword({required String connectionId , required String host , required int port , required int idleMinutes });
 
 
 /// Like [`RdpSession::start`], but reads the saved password from the OS

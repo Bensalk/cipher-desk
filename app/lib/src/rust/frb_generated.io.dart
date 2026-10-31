@@ -5,6 +5,7 @@
 
 import 'api/errors.dart';
 import 'api/form.dart';
+import 'api/host.dart';
 import 'api/info.dart';
 import 'api/pins.dart';
 import 'api/session.dart';
@@ -29,15 +30,25 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
                   CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_RdpSessionPtr => wire._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSessionPtr;
 
+CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_ShareHostPtr => wire._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHostPtr;
+
 
 
                   @protected AnyhowException dco_decode_AnyhowException(dynamic raw);
 
 @protected RdpSession dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(dynamic raw);
 
+@protected ShareHost dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(dynamic raw);
+
 @protected RdpSession dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(dynamic raw);
 
+@protected ShareHost dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(dynamic raw);
+
 @protected RdpSession dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(dynamic raw);
+
+@protected ShareHost dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(dynamic raw);
+
+@protected RustStreamSink<HostUpdate> dco_decode_StreamSink_host_update_Sse(dynamic raw);
 
 @protected RustStreamSink<SessionUpdate> dco_decode_StreamSink_session_update_Sse(dynamic raw);
 
@@ -59,6 +70,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
 @protected ConnectionData dco_decode_connection_data(dynamic raw);
 
+@protected ConnectionMethod dco_decode_connection_method(dynamic raw);
+
 @protected ErrorInfo dco_decode_error_info(dynamic raw);
 
 @protected FieldProblem dco_decode_field_problem(dynamic raw);
@@ -66,6 +79,10 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 @protected FormCheckResult dco_decode_form_check_result(dynamic raw);
 
 @protected HistoryData dco_decode_history_data(dynamic raw);
+
+@protected HostUpdate dco_decode_host_update(dynamic raw);
+
+@protected HostUpdateKind dco_decode_host_update_kind(dynamic raw);
 
 @protected int dco_decode_i_16(dynamic raw);
 
@@ -111,6 +128,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
 @protected int dco_decode_u_32(dynamic raw);
 
+@protected BigInt dco_decode_u_64(dynamic raw);
+
 @protected int dco_decode_u_8(dynamic raw);
 
 @protected void dco_decode_unit(dynamic raw);
@@ -127,9 +146,17 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
 @protected RdpSession sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(SseDeserializer deserializer);
 
+@protected ShareHost sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(SseDeserializer deserializer);
+
 @protected RdpSession sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(SseDeserializer deserializer);
 
+@protected ShareHost sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(SseDeserializer deserializer);
+
 @protected RdpSession sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(SseDeserializer deserializer);
+
+@protected ShareHost sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(SseDeserializer deserializer);
+
+@protected RustStreamSink<HostUpdate> sse_decode_StreamSink_host_update_Sse(SseDeserializer deserializer);
 
 @protected RustStreamSink<SessionUpdate> sse_decode_StreamSink_session_update_Sse(SseDeserializer deserializer);
 
@@ -151,6 +178,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
 @protected ConnectionData sse_decode_connection_data(SseDeserializer deserializer);
 
+@protected ConnectionMethod sse_decode_connection_method(SseDeserializer deserializer);
+
 @protected ErrorInfo sse_decode_error_info(SseDeserializer deserializer);
 
 @protected FieldProblem sse_decode_field_problem(SseDeserializer deserializer);
@@ -158,6 +187,10 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 @protected FormCheckResult sse_decode_form_check_result(SseDeserializer deserializer);
 
 @protected HistoryData sse_decode_history_data(SseDeserializer deserializer);
+
+@protected HostUpdate sse_decode_host_update(SseDeserializer deserializer);
+
+@protected HostUpdateKind sse_decode_host_update_kind(SseDeserializer deserializer);
 
 @protected int sse_decode_i_16(SseDeserializer deserializer);
 
@@ -203,6 +236,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
 @protected int sse_decode_u_32(SseDeserializer deserializer);
 
+@protected BigInt sse_decode_u_64(SseDeserializer deserializer);
+
 @protected int sse_decode_u_8(SseDeserializer deserializer);
 
 @protected void sse_decode_unit(SseDeserializer deserializer);
@@ -219,9 +254,17 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
 @protected void sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(RdpSession self, SseSerializer serializer);
 
+@protected void sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(ShareHost self, SseSerializer serializer);
+
 @protected void sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(RdpSession self, SseSerializer serializer);
 
+@protected void sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(ShareHost self, SseSerializer serializer);
+
 @protected void sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(RdpSession self, SseSerializer serializer);
+
+@protected void sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(ShareHost self, SseSerializer serializer);
+
+@protected void sse_encode_StreamSink_host_update_Sse(RustStreamSink<HostUpdate> self, SseSerializer serializer);
 
 @protected void sse_encode_StreamSink_session_update_Sse(RustStreamSink<SessionUpdate> self, SseSerializer serializer);
 
@@ -243,6 +286,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
 @protected void sse_encode_connection_data(ConnectionData self, SseSerializer serializer);
 
+@protected void sse_encode_connection_method(ConnectionMethod self, SseSerializer serializer);
+
 @protected void sse_encode_error_info(ErrorInfo self, SseSerializer serializer);
 
 @protected void sse_encode_field_problem(FieldProblem self, SseSerializer serializer);
@@ -250,6 +295,10 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 @protected void sse_encode_form_check_result(FormCheckResult self, SseSerializer serializer);
 
 @protected void sse_encode_history_data(HistoryData self, SseSerializer serializer);
+
+@protected void sse_encode_host_update(HostUpdate self, SseSerializer serializer);
+
+@protected void sse_encode_host_update_kind(HostUpdateKind self, SseSerializer serializer);
 
 @protected void sse_encode_i_16(int self, SseSerializer serializer);
 
@@ -294,6 +343,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 @protected void sse_encode_u_16(int self, SseSerializer serializer);
 
 @protected void sse_encode_u_32(int self, SseSerializer serializer);
+
+@protected void sse_encode_u_64(BigInt self, SseSerializer serializer);
 
 @protected void sse_encode_u_8(int self, SseSerializer serializer);
 
@@ -348,6 +399,28 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
             late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSessionPtr = _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>('frbgen_cipher_desk_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession');
             late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession = _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSessionPtr.asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+            
+            void rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
+              ffi.Pointer<ffi.Void> ptr,
+            ) {
+              return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
+                ptr,
+              );
+            }
+
+            late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHostPtr = _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>('frbgen_cipher_desk_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost');
+            late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost = _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHostPtr.asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+            
+            void rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
+              ffi.Pointer<ffi.Void> ptr,
+            ) {
+              return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
+                ptr,
+              );
+            }
+
+            late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHostPtr = _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>('frbgen_cipher_desk_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost');
+            late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost = _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHostPtr.asFunction<void Function(ffi.Pointer<ffi.Void>)>();
             
         }
         

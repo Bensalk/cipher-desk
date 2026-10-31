@@ -14,7 +14,9 @@ import '../session/scancodes.dart';
 import '../src/rust/api/errors.dart';
 import '../src/rust/api/pins.dart';
 import '../src/rust/api/session.dart';
+import '../src/rust/api/store.dart' show ConnectionMethod;
 import '../state/profiles.dart';
+import 'connection_methods.dart';
 import 'error_banner.dart';
 import 'status_chip.dart';
 
@@ -90,6 +92,11 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   double _zoom = 1;
   Offset _pan = Offset.zero;
   bool _trackpad = false;
+  // Stretch the remote picture to fill the window (ignores aspect ratio);
+  // off = fit the whole screen with correct proportions.
+  bool _stretch = false;
+  // Immersive: hide the app bar and key bar so the remote screen fills the window.
+  bool _immersive = false;
   Offset _cursor = Offset.zero; // remote coordinates, trackpad mode
   double _startZoom = 1;
   Offset _startFocal = Offset.zero;
@@ -127,8 +134,9 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   Timer? _clipTimer;
   String? _lastLocalClip;
   bool get _sendsClipboard =>
-      widget.profile.clipboardMode == ClipboardMode.both ||
-      widget.profile.clipboardMode == ClipboardMode.toRemoteOnly;
+      widget.profile.method.supportsClipboard &&
+      (widget.profile.clipboardMode == ClipboardMode.both ||
+      widget.profile.clipboardMode == ClipboardMode.toRemoteOnly);
   static bool get _isAndroid => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
   @override
@@ -200,7 +208,25 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     final pinsPath = widget.pinsPath;
     if (!mounted) return;
     final (w, h) = desktopSizeFor(View.of(context).physicalSize, phoneOrTablet: _isAndroid);
-    final stream = widget.useSavedPassword
+    // Share screen has no clipboard either (only Private Remote Desktop does).
+    final clipboard =
+        widget.profile.method.supportsClipboard ? widget.profile.clipboardMode : ClipboardMode.off;
+    final vnc = widget.profile.method == ConnectionMethod.vnc;
+    final stream = vnc
+        ? (widget.useSavedPassword
+            ? _session.startVncWithSavedPassword(
+                connectionId: widget.profile.id,
+                host: widget.profile.host,
+                port: widget.profile.port,
+                idleMinutes: widget.idleMinutes,
+              )
+            : _session.startVnc(
+                host: widget.profile.host,
+                port: widget.profile.port,
+                password: widget.password ?? '',
+                idleMinutes: widget.idleMinutes,
+              ))
+        : widget.useSavedPassword
         ? _session.startWithSavedPassword(
             connectionId: widget.profile.id,
             host: widget.profile.host,
@@ -209,7 +235,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
             width: w,
             height: h,
             pinsPath: pinsPath,
-            clipboardDirection: widget.profile.clipboardMode,
+            clipboardDirection: clipboard,
             idleMinutes: widget.idleMinutes,
           )
         : _session.start(
@@ -220,7 +246,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
             width: w,
             height: h,
             pinsPath: pinsPath,
-            clipboardDirection: widget.profile.clipboardMode,
+            clipboardDirection: clipboard,
             idleMinutes: widget.idleMinutes,
           );
     _sub = stream.listen(_onUpdate, onError: (_) => _onEnded(null));
@@ -441,6 +467,12 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   /// Top-left of the remote desktop in view coordinates.
   Offset _origin(Size box) => _centred(box, _scale(box)) + _pan;
 
+  // Per-axis scale and origin, so "stretch" can fill the window on each axis
+  // independently. In fit mode both axes share the aspect-correct scale.
+  double _sx(Size box) => _stretch && _width != 0 ? box.width / _width : _scale(box);
+  double _sy(Size box) => _stretch && _height != 0 ? box.height / _height : _scale(box);
+  Offset _origin2(Size box) => _stretch ? Offset.zero : _origin(box);
+
   /// Keeps the zoomed desktop covering the view (no empty margins when zoomed in).
   Offset _clampPan(Size box, double s, Offset pan) {
     final c = _centred(box, s);
@@ -458,11 +490,12 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
 
   /// Converts a position in the view to remote-desktop coordinates.
   (int, int)? _toRemote(Offset local, Size box) {
-    final s = _scale(box);
-    if (s <= 0) return null;
-    final o = _origin(box);
-    final x = ((local.dx - o.dx) / s).round().clamp(0, _width - 1);
-    final y = ((local.dy - o.dy) / s).round().clamp(0, _height - 1);
+    final sx = _sx(box);
+    final sy = _sy(box);
+    if (sx <= 0 || sy <= 0) return null;
+    final o = _origin2(box);
+    final x = ((local.dx - o.dx) / sx).round().clamp(0, _width - 1);
+    final y = ((local.dy - o.dy) / sy).round().clamp(0, _height - 1);
     return (x, y);
   }
 
@@ -762,8 +795,9 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
 
   /// The remote desktop at the current zoom and pan, plus the trackpad cursor.
   Widget _desktop(ui.Image image, Size box) {
-    final s = _scale(box);
-    final o = _origin(box);
+    final sx = _sx(box);
+    final sy = _sy(box);
+    final o = _origin2(box);
     return ClipRect(
       child: SizedBox.expand(
         child: Stack(
@@ -771,14 +805,14 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
             Positioned(
               left: o.dx,
               top: o.dy,
-              width: _width * s,
-              height: _height * s,
+              width: _width * sx,
+              height: _height * sy,
               child: RawImage(image: image, fit: BoxFit.fill, filterQuality: FilterQuality.medium),
             ),
             if (_trackpad)
               Positioned(
-                left: o.dx + _cursor.dx * s - 2,
-                top: o.dy + _cursor.dy * s - 2,
+                left: o.dx + _cursor.dx * sx - 2,
+                top: o.dy + _cursor.dy * sy - 2,
                 child: const IgnorePointer(
                   child: Icon(
                     Icons.navigation,
@@ -878,9 +912,31 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
         if (!didPop) _confirmLeave();
       },
       child: Scaffold(
-      appBar: AppBar(
+      appBar: _immersive
+          ? null
+          : AppBar(
         title: Text(widget.profile.displayName),
         actions: [
+          if (!_ended && _state == RdpConnectionState.connected) ...[
+            IconButton(
+              key: const Key('button-stretch'),
+              tooltip: _stretch ? 'Fit to window (keep shape)' : 'Stretch to fill the window',
+              icon: Icon(_stretch ? Icons.fit_screen_outlined : Icons.aspect_ratio_outlined),
+              onPressed: () => setState(() {
+                _stretch = !_stretch;
+                if (_stretch) {
+                  _zoom = 1;
+                  _pan = Offset.zero;
+                }
+              }),
+            ),
+            IconButton(
+              key: const Key('button-fullscreen'),
+              tooltip: 'Fullscreen',
+              icon: const Icon(Icons.fullscreen),
+              onPressed: () => setState(() => _immersive = true),
+            ),
+          ],
           if (widget.profile.clipboardEnabled && _state == RdpConnectionState.connected)
             Tooltip(
               message: switch (widget.profile.clipboardMode) {
@@ -953,8 +1009,33 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
                 ],
               ),
             ),
-          if (!_ended) Expanded(child: _remoteView()),
-          if (!_ended && _state == RdpConnectionState.connected) _keysBar(),
+          if (!_ended)
+            Expanded(
+              child: _immersive
+                  ? Stack(
+                      children: [
+                        Positioned.fill(child: _remoteView()),
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: SafeArea(
+                            child: Material(
+                              color: Colors.black54,
+                              shape: const CircleBorder(),
+                              child: IconButton(
+                                key: const Key('button-exit-fullscreen'),
+                                tooltip: 'Exit fullscreen',
+                                icon: const Icon(Icons.fullscreen_exit, color: Colors.white),
+                                onPressed: () => setState(() => _immersive = false),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : _remoteView(),
+            ),
+          if (!_ended && !_immersive && _state == RdpConnectionState.connected) _keysBar(),
         ],
       ),
     ),

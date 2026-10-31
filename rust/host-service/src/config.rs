@@ -1,0 +1,96 @@
+//! Where the service keeps its settings and sharing password.
+//!
+//! The service runs as the machine's system account, which cannot read a
+//! password saved in your personal Windows vault. So it keeps its **own**
+//! sharing password, in a machine-wide folder under `ProgramData`, encrypted
+//! with Windows DPAPI at machine scope (only this computer can read it). The
+//! certificate the viewer pins lives in the same folder.
+
+use std::path::PathBuf;
+
+use anyhow::Context as _;
+use rdpv_core::secret::SecretString;
+
+/// Default sharing port (same as the in-session Share screen).
+pub const DEFAULT_PORT: u16 = 3395;
+/// Default viewer sign-in name.
+pub const DEFAULT_USERNAME: &str = "cipher";
+
+/// `C:\ProgramData\Cipher Desk\host-service` (created if needed).
+pub fn data_dir() -> anyhow::Result<PathBuf> {
+    let base = std::env::var_os("ProgramData").context("ProgramData is not set")?;
+    let dir = PathBuf::from(base).join("Cipher Desk").join("host-service");
+    std::fs::create_dir_all(&dir).context("create the service folder")?;
+    Ok(dir)
+}
+
+fn password_file() -> anyhow::Result<PathBuf> {
+    Ok(data_dir()?.join("password.bin"))
+}
+
+fn config_file() -> anyhow::Result<PathBuf> {
+    Ok(data_dir()?.join("config.txt"))
+}
+
+/// The saved username and port (defaults if the file is missing or damaged).
+pub fn load_settings() -> (String, u16) {
+    let text = config_file()
+        .ok()
+        .and_then(|p| std::fs::read_to_string(p).ok());
+    let mut username = DEFAULT_USERNAME.to_owned();
+    let mut port = DEFAULT_PORT;
+    if let Some(text) = text {
+        for line in text.lines() {
+            if let Some(v) = line.strip_prefix("username=") {
+                if !v.trim().is_empty() {
+                    username = v.trim().to_owned();
+                }
+            } else if let Some(v) = line.strip_prefix("port=") {
+                if let Ok(p) = v.trim().parse::<u16>() {
+                    if p != 0 {
+                        port = p;
+                    }
+                }
+            }
+        }
+    }
+    (username, port)
+}
+
+/// Saves the username and port (not secret).
+pub fn save_settings(username: &str, port: u16) -> anyhow::Result<()> {
+    std::fs::write(
+        config_file()?,
+        format!("username={username}\nport={port}\n"),
+    )
+    .context("write the service settings")?;
+    Ok(())
+}
+
+/// Reads the sharing password, if one is set.
+pub fn load_password() -> anyhow::Result<Option<SecretString>> {
+    let path = password_file()?;
+    let Ok(bytes) = std::fs::read(&path) else {
+        return Ok(None);
+    };
+    let plain = rdpv_host::winsecret::machine_unprotect(&bytes)?;
+    let text = String::from_utf8(plain).context("the saved password is damaged")?;
+    Ok(Some(SecretString::new(text)))
+}
+
+/// Saves (or replaces) the sharing password, machine-encrypted.
+pub fn save_password(password: &SecretString) -> anyhow::Result<()> {
+    let bytes = rdpv_host::winsecret::machine_protect(password.expose().as_bytes())?;
+    std::fs::write(password_file()?, bytes).context("write the password")?;
+    Ok(())
+}
+
+/// Makes sure a password exists; returns it, generating a strong one if needed.
+pub fn ensure_password() -> anyhow::Result<SecretString> {
+    if let Some(p) = load_password()? {
+        return Ok(p);
+    }
+    let p = rdpv_host::generate_password()?;
+    save_password(&p)?;
+    Ok(p)
+}

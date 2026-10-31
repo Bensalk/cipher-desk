@@ -181,6 +181,11 @@ try {
     if (-not $SkipWindows) {
         Step "5/5 Building the Windows app (10-15 minutes)"
         flutter build windows --release; Check "Windows build"
+        # The background service for sign-in-screen sharing, placed next to the app.
+        Push-Location ..
+        cargo build --release -p cipher-desk-host-service; Check "Host service build"
+        Pop-Location
+        Copy-Item ..\target\release\cipher-desk-host-service.exe build\windows\x64\runner\Release\ -Force
         $zip = "$Out\CipherDesk-$version-windows-x64.zip"
         if (Test-Path $zip) { Remove-Item $zip }
         Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath $zip

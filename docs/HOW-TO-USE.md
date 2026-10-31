@@ -4,6 +4,7 @@ A step-by-step guide, from installing the app to your first secure connection. B
 
 - [1. Install](#1-install)
 - [2. Add a computer](#2-add-a-computer)
+- [Share this screen (Windows)](#share-this-screen-windows)
 - [3. The first connection: check the certificate](#3-the-first-connection-check-the-certificate)
 - [4. During a session](#4-during-a-session)
 - [5. Settings](#5-settings)
@@ -13,8 +14,11 @@ A step-by-step guide, from installing the app to your first secure connection. B
 
 ---
 
-Before you start, set up the computer you want to connect to:
-[`HOST_SETUP.md`](HOST_SETUP.md). Only connect over your own network or a VPN.
+Before you start, choose a [connection method](CONNECTION-METHODS.md) and follow
+its tutorial to set up the computer you want to connect to:
+[Private Remote Desktop](methods/PRIVATE-REMOTE-DESKTOP.md) ·
+[Share screen](methods/SHARE-SCREEN.md) · [VNC](methods/VNC.md).
+Only connect over your own network or a VPN such as Tailscale.
 
 ## 1. Install
 
@@ -34,16 +38,17 @@ may warn you; check the SHA-256 checksum first.
 
 ## 2. Add a computer
 
-**New connection** → enter a name (optional), the computer's name or IP address,
-the port (leave empty for 3389) and the username (`user`, `DOMAIN\user` or
-`user@domain`). Optional:
+**New connection** → choose the **method** (*Which method should I use?* helps),
+then enter a name (optional), the computer's name or IP address, the port (leave
+empty for the method's usual port) and the username (`user`, `DOMAIN\user` or
+`user@domain`; VNC has none). Optional:
 
 - **Save password** — tick it and type the password to keep it in this device's secure
   storage (Windows Credential Manager, the Linux keyring, the Android Keystore), never
   in the app's files. Windows asks for Windows Hello and Android for your
   fingerprint/face/screen lock before it is used. Without it, you type the password
   each time you connect.
-- **Share clipboard** — off by default. Anything you copy while connected can be read
+- **Share clipboard** (Private Remote Desktop only) — off by default. Anything you copy while connected can be read
   by the remote computer, and it can put text on this device. You can allow one
   direction only.
 - **Wake-on-LAN MAC address** — lets you wake the computer from the connection's menu
@@ -56,11 +61,19 @@ whether everything is set up.
 |:---:|:---:|:---:|
 | <img src="screenshots/phone-new-connection.png" width="230"> | <img src="screenshots/phone-connection-menu.png" width="230"> | <img src="screenshots/phone-readiness.png" width="230"> |
 
+## Share this screen (Windows)
+
+The **Share screen** tab lets your phone or another computer see and control this
+Windows computer's screen while it stays visible here. Tap **Start sharing**, then
+connect from the other device with the method **Share screen** and the details the
+page shows. The full tutorial: [methods/SHARE-SCREEN.md](methods/SHARE-SCREEN.md).
+
 ## 3. The first connection: check the certificate
 
 The first time, the app shows the computer's **certificate fingerprint** and has not
 sent anything yet. Compare it with the fingerprint shown on that computer
-(`HOST_SETUP.md` §2). Only trust it if they match.
+(`HOST_SETUP.md` §2, or the *identity code* on the Share screen page). Only trust
+it if they match. VNC has no certificate; use it through Tailscale.
 
 If a computer you trusted later shows **"Warning: computer identity changed"**, the
 connection is blocked and no password is sent. This can follow a Windows reinstall,
@@ -93,7 +106,7 @@ computer itself.
 
 ## 5. Settings
 
-Theme · block screenshots (Android, on by default) · share clipboard for new
+Theme · block screenshots (Android and Windows, on by default) · share clipboard for new
 connections · Windows Hello confirmation (Windows) · idle disconnect · **trusted
 computers** (view or forget fingerprints) · **remove all saved passwords** ·
 connection history · export / import · what each error message means.
@@ -144,7 +157,9 @@ lists them all. Common ones:
 
 
 - **Computer didn't respond** — it is off or asleep, you are not on the same network or
-  VPN, or a firewall blocks port 3389.
+  VPN, or a firewall blocks the port (3389, 3395 for Share screen, 5900 for VNC).
+- **VNC works only on your own network** — use the computer's local or Tailscale
+  (`100.`) address.
 - **Secure connection not supported** — turn on Network Level Authentication on the
   computer (`HOST_SETUP.md` §2).
 - **Remote Desktop isn't available** — Windows Home cannot accept connections.

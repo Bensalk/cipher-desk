@@ -22,6 +22,7 @@ use rdpv_core::session::{
     SessionEvent,
 };
 use rdpv_core::status::ConnectionError;
+use rdpv_core::vnc::{connect_vnc, VncParams, VncSession};
 
 use crate::api::errors::{error_info, ErrorInfo};
 use crate::frb_generated::StreamSink;
@@ -209,6 +210,7 @@ impl RdpSession {
             pins_path,
             clipboard: clipboard_direction,
             idle_minutes,
+            vnc: false,
         };
         self.spawn(target, Some(SecretString::new(password)), None, sink);
     }
@@ -239,7 +241,35 @@ impl RdpSession {
             pins_path,
             clipboard: clipboard_direction,
             idle_minutes,
+            vnc: false,
         };
+        self.spawn(target, None, Some(connection_id), sink);
+    }
+
+    /// Connects with the VNC method (no username; no clipboard or certificate).
+    /// Only addresses on the own network or Tailscale are allowed.
+    pub fn start_vnc(
+        &self,
+        host: String,
+        port: u16,
+        password: String,
+        idle_minutes: u32,
+        sink: StreamSink<SessionUpdate>,
+    ) {
+        let target = Target::vnc(host, port, idle_minutes);
+        self.spawn(target, Some(SecretString::new(password)), None, sink);
+    }
+
+    /// Like [`RdpSession::start_vnc`], with the password saved in the OS vault.
+    pub fn start_vnc_with_saved_password(
+        &self,
+        connection_id: String,
+        host: String,
+        port: u16,
+        idle_minutes: u32,
+        sink: StreamSink<SessionUpdate>,
+    ) {
+        let target = Target::vnc(host, port, idle_minutes);
         self.spawn(target, None, Some(connection_id), sink);
     }
 
@@ -432,6 +462,75 @@ struct Target {
     clipboard: ClipboardMode,
     /// Disconnect after this many minutes without input; 0 = never (S7).
     idle_minutes: u32,
+    /// The VNC method (no username, certificate or clipboard).
+    vnc: bool,
+}
+
+impl Target {
+    fn vnc(host: String, port: u16, idle_minutes: u32) -> Self {
+        Self {
+            host,
+            port,
+            username: String::new(),
+            width: 0,
+            height: 0,
+            pins_path: String::new(),
+            clipboard: ClipboardMode::Off,
+            idle_minutes,
+            vnc: true,
+        }
+    }
+}
+
+/// An open session of either kind; VNC has no clipboard and no certificate.
+enum Remote {
+    Rdp(Box<Session>),
+    Vnc(Box<VncSession>),
+}
+
+impl Remote {
+    fn size(&self) -> (u16, u16) {
+        match self {
+            Self::Rdp(s) => s.size(),
+            Self::Vnc(s) => s.size(),
+        }
+    }
+    fn poll(&mut self) -> Vec<SessionEvent> {
+        match self {
+            Self::Rdp(s) => s.poll(),
+            Self::Vnc(s) => s.poll(),
+        }
+    }
+    fn send_input(&mut self, events: Vec<InputEvent>) -> Result<(), ConnectionError> {
+        match self {
+            Self::Rdp(s) => s.send_input(events),
+            Self::Vnc(s) => s.send_input(events),
+        }
+    }
+    fn offer_local_clipboard(&mut self, text: String) -> Result<(), ConnectionError> {
+        match self {
+            Self::Rdp(s) => s.offer_local_clipboard(text).map(|_| ()),
+            Self::Vnc(_) => Ok(()),
+        }
+    }
+    fn clamped(&self, r: Region) -> Option<Region> {
+        match self {
+            Self::Rdp(s) => s.clamped(r),
+            Self::Vnc(s) => s.clamped(r),
+        }
+    }
+    fn region_pixels(&self, r: Region) -> Vec<u8> {
+        match self {
+            Self::Rdp(s) => s.region_pixels(r),
+            Self::Vnc(s) => s.region_pixels(r),
+        }
+    }
+    fn disconnect(self) {
+        match self {
+            Self::Rdp(s) => s.disconnect(),
+            Self::Vnc(s) => s.disconnect(),
+        }
+    }
 }
 
 /// Sends an update to the UI; `false` means the UI has gone away.
@@ -447,12 +546,41 @@ fn run(target: &Target, password: SecretString, send: Send<'_>, rx: &Receiver<Co
         pins_path,
         clipboard,
         idle_minutes,
+        vnc,
     } = target;
     let (port, width, height) = (*port, *width, *height);
     let fail = |e: ConnectionError| {
         send(SessionUpdate::ended(Some(e)));
     };
     send(SessionUpdate::status("Connecting…", false));
+    let idle = (*idle_minutes > 0).then(|| Duration::from_secs(u64::from(*idle_minutes) * 60));
+    let policy = SecurityDefaults::secure();
+
+    if *vnc {
+        let Ok(endpoint) = parse_endpoint(host, &port.to_string()) else {
+            return fail(ConnectionError::Unexpected);
+        };
+        let connect_again = || {
+            connect_vnc(VncParams {
+                endpoint: endpoint.clone(),
+                password: SecretString::new(password.expose().to_owned()),
+                connect_timeout: policy.connect_timeout,
+            })
+            .map(|s| Remote::Vnc(Box::new(s)))
+            .map_err(ConnectFailure::Failed)
+        };
+        return match connect_again() {
+            Ok(session) => keep_running(
+                session,
+                &connect_again,
+                send,
+                rx,
+                idle,
+                policy.max_auto_reconnects,
+            ),
+            Err(f) => fail(f.error()),
+        };
+    }
 
     let (Ok(endpoint), Ok(user)) = (
         parse_endpoint(host, &port.to_string()),
@@ -465,7 +593,6 @@ fn run(target: &Target, password: SecretString, send: Send<'_>, rx: &Receiver<Co
         Err(_) => return fail(ConnectionError::Unexpected),
     };
     let key = endpoint.display();
-    let policy = SecurityDefaults::secure();
     let mut pin = pins.get(&key).map(str::to_owned);
     // The password stays in this thread (wiped when dropped) for the whole
     // session, so a dropped network can be reconnected without asking again.
@@ -480,7 +607,7 @@ fn run(target: &Target, password: SecretString, send: Send<'_>, rx: &Receiver<Co
         clipboard: clipboard.policy(),
     };
 
-    let mut session = loop {
+    let session = loop {
         match connect(params(pin.clone())) {
             Ok(s) => break s,
             Err(ConnectFailure::CertificateNeedsApproval { fingerprint }) => {
@@ -508,8 +635,26 @@ fn run(target: &Target, password: SecretString, send: Send<'_>, rx: &Receiver<Co
             Err(ConnectFailure::Failed(e)) => return fail(e),
         }
     };
-    let idle = (*idle_minutes > 0).then(|| Duration::from_secs(u64::from(*idle_minutes) * 60));
+    let connect_again = || connect(params(pin.clone())).map(|s| Remote::Rdp(Box::new(s)));
+    keep_running(
+        Remote::Rdp(Box::new(session)),
+        &connect_again,
+        send,
+        rx,
+        idle,
+        policy.max_auto_reconnects,
+    );
+}
 
+/// Runs a session until it ends, reconnecting after network drops.
+fn keep_running(
+    mut session: Remote,
+    connect_again: &dyn Fn() -> Result<Remote, ConnectFailure>,
+    send: Send<'_>,
+    rx: &Receiver<Command>,
+    idle: Option<Duration>,
+    max_reconnects: u8,
+) {
     loop {
         match drive(session, send, rx, idle) {
             Drive::Ended(err) => {
@@ -519,10 +664,10 @@ fn run(target: &Target, password: SecretString, send: Send<'_>, rx: &Receiver<Co
             Drive::UiGone => return,
             Drive::Lost(err) => {
                 match reconnect(
-                    &|| connect(params(pin.clone())),
+                    connect_again,
                     send,
                     rx,
-                    policy.max_auto_reconnects,
+                    max_reconnects,
                     &ConnectionError::reconnect_delay,
                     err,
                 ) {
@@ -545,7 +690,7 @@ enum Drive {
 }
 
 enum Reconnect {
-    Connected(Box<Session>),
+    Connected(Box<Remote>),
     /// Gave up or the user disconnected; the final update was sent.
     Stopped,
 }
@@ -555,7 +700,7 @@ enum Reconnect {
 /// connection is pinned); a changed certificate or any password/account error
 /// stops at once. The user can disconnect during the pauses.
 fn reconnect(
-    connect_again: &dyn Fn() -> Result<Session, ConnectFailure>,
+    connect_again: &dyn Fn() -> Result<Remote, ConnectFailure>,
     send: Send<'_>,
     rx: &Receiver<Command>,
     max: u8,
@@ -644,7 +789,7 @@ fn wait_for_approval(rx: &Receiver<Command>) -> Option<bool> {
 }
 
 fn drive(
-    mut s: Session,
+    mut s: Remote,
     send: Send<'_>,
     rx: &Receiver<Command>,
     idle_limit: Option<Duration>,
@@ -659,7 +804,14 @@ fn drive(
     // Changed screen area not yet sent, and when pixels were last sent: at most
     // ~30 updates a second, so a busy screen (video, scrolling) cannot queue up
     // more pixels than the UI can draw, which would make the session lag.
-    let mut dirty: Option<Region> = None;
+    // The whole picture first: what arrived while connecting (VNC) or after
+    // a reconnect has not been sent yet.
+    let mut dirty: Option<Region> = (w > 0 && h > 0).then(|| Region {
+        left: 0,
+        top: 0,
+        right: w - 1,
+        bottom: h - 1,
+    });
     let mut last_frame = std::time::Instant::now()
         .checked_sub(FRAME_INTERVAL)
         .unwrap_or_else(std::time::Instant::now);

@@ -1,6 +1,12 @@
 #include "flutter_window.h"
 
+#include <flutter/standard_method_codec.h>
+
 #include <optional>
+
+#ifndef WDA_EXCLUDEFROMCAPTURE
+#define WDA_EXCLUDEFROMCAPTURE 0x00000011
+#endif
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -25,6 +31,36 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+
+  // Protected until Dart says otherwise (same default as the setting).
+  SetWindowDisplayAffinity(GetHandle(), WDA_EXCLUDEFROMCAPTURE);
+  secure_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "rdpv/secure_window",
+          &flutter::StandardMethodCodec::GetInstance());
+  secure_channel_->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
+                 result) {
+        if (call.method_name() != "setSecure") {
+          result->NotImplemented();
+          return;
+        }
+        const auto* on = std::get_if<bool>(call.arguments());
+        if (on == nullptr) {
+          result->Error("bad_argument", "expected a bool");
+          return;
+        }
+        // WDA_EXCLUDEFROMCAPTURE needs Windows 10 2004; older versions show
+        // the window black instead (WDA_MONITOR).
+        HWND window = GetHandle();
+        if (!SetWindowDisplayAffinity(window,
+                                      *on ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE) &&
+            *on) {
+          SetWindowDisplayAffinity(window, WDA_MONITOR);
+        }
+        result->Success();
+      });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {

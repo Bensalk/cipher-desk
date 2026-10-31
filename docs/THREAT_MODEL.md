@@ -99,7 +99,7 @@ connection outcomes (no content, no passwords) for the user's own reference.
 
 | # | Threat | Mitigation | Evidence |
 |---|--------|-----------|----------|
-| E1 | Memory-safety bug exploited by T2 | Rust; `unsafe_code` forbidden in our crates (only the generated FFI module is allowed it) | `Cargo.toml` lints; Stage 9 unsafe audit |
+| E1 | Memory-safety bug exploited by T2 | Rust; `unsafe_code` forbidden in our crates (only the generated FFI module and the Host's Windows capture/input module `rust/host/src/win.rs` are allowed it, each block with a safety comment) | `Cargo.toml` lints; Stage 9 unsafe audit |
 | E2 | T2 reaches local files or devices | No drive, printer, USB or smart-card channel exists in the app; audio is off; only the clipboard channel is added, and only when sharing is on; the device's own name is not sent; server redirection is refused | `session.rs` `connector_config` |
 | E3 | T3 sends intents to the app | Only the launcher activity is exported; the session service is not; the notification uses an immutable `PendingIntent` | `AndroidManifest.xml`, `SessionService.kt` |
 
@@ -114,6 +114,22 @@ connection outcomes (no content, no passwords) for the user's own reference.
 | R-5 | IronRDP is younger than FreeRDP | Fuzzing, pinned versions, advisory scanning, independent review before release (SA-5) |
 | R-6 | The app cannot make the remote computer secure | `docs/HOST_SETUP.md` (SA-4) |
 | R-7 | Android accessibility malware or a rooted phone can read the screen | Platform limitation |
+| R-8 | VNC has no encryption beyond the password check and no server identity, and passwords are limited to 8 characters | Only allowed on the own network or Tailscale; Share screen is recommended instead |
+| R-9 | A computer left signed in for unattended Share screen can be used by anyone at it | The tutorial explains the trade-off; Private Remote Desktop keeps the screen locked |
+| R-10 | The sign-in-screen service runs as LocalSystem (unavoidable: only the system account may attach to the Winlogon desktop) | Opt-in per computer with a UAC prompt; minimal supervisor + one worker; not yet tested on real Windows and must have the SA-5 independent review before it ships |
+
+## 5a. Share screen (Cipher Desk Host) and VNC
+
+| # | Threat | Mitigation | Evidence |
+|---|--------|-----------|----------|
+| H1 | Password guessing against a sharing computer | NLA (CredSSP/NTLM) with a generated 16-character password from the OS random generator, kept in the OS vault; 5 failures in 10 minutes refuse new connections for 15 minutes | `rust/host` `limiter.rs`, `generate_password`; loopback test |
+| H2 | A fake Host in the middle | TLS with the Host's own certificate (ECDSA P-256, created on first use in the app's data folder); the viewer pins its fingerprint like any RDP computer | `identity.rs`, `tests/loopback.rs` |
+| H3 | The viewer reads the sharing password off the shared screen | The Cipher Desk window is excluded from screen capture on Windows while sharing, whatever the screenshot setting | `flutter_window.cpp`, `secure_window.dart` |
+| H4 | Sharing goes on without the user knowing | Sharing starts only from the Share page or the user's own auto-start setting; a banner shows while someone is viewing, with Stop | `share_screen.dart` |
+| H5 | Someone at the computer sees the session | By design (that is the method's purpose); the method choice and tutorial say so | `docs/methods/SHARE-SCREEN.md` |
+| H6 | The sign-in-screen service (LocalSystem) is abused to run code as system | Installed/removed only with a one-time UAC prompt; it launches one worker into the active console session and does nothing else privileged; its own password is DPAPI machine-encrypted; **needs on-device testing and the SA-5 review before release** | `rust/host-service` (`service.rs`, `launch.rs`, `config.rs`), R-10 |
+| V1 | VNC traffic read or changed on the network | VNC is used only with loopback, private, link-local and Tailscale (100.64.0.0/10, fc00::/7) addresses; every resolved address is checked before connecting | `rust/core/src/vnc.rs` `is_private_address`; unit tests |
+| V2 | A fake VNC server | VNC has no server identity; accepted on the own network, and Tailscale authenticates devices | R-8 |
 
 ## 6. Open items
 

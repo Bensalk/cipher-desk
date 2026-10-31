@@ -37,6 +37,7 @@ pub mod status;
 pub mod tls;
 pub mod vault;
 pub mod version;
+pub mod vnc;
 pub mod wol;
 
 /// Internal parsers exposed only to the fuzzing crate (`rust/fuzz`, SA-3).

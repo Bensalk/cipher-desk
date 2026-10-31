@@ -34,6 +34,10 @@ socket2 = { version = "0.6", features = ["all"] }
 
 keyring-core = "1"
 
+# VNC connections (the "VNC" method). Its network part needs a small async runtime.
+vnc-rs = "0.6"
+tokio = { version = "1", features = ["rt", "net", "time", "sync", "macros"] }
+
 # OS password vaults (S4). Android uses the Android Keystore from Kotlin instead.
 [target.'cfg(windows)'.dependencies]
 windows-native-keyring-store = "1.1"
