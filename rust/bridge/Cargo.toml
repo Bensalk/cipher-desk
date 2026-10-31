@@ -19,6 +19,7 @@ tracing.workspace = true
 # Share screen (Cipher Desk Host) is Windows-only.
 [target.'cfg(windows)'.dependencies]
 rdpv-host = { path = "../host" }
+tracing-subscriber.workspace = true
 
 # Same rules as the workspace, except `unsafe_code` is "deny" instead of "forbid"
 # so the generated FFI module alone can opt out (see src/lib.rs).

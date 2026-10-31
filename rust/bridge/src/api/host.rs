@@ -162,6 +162,7 @@ impl ShareHost {
         data_dir: String,
         sink: StreamSink<HostUpdate>,
     ) {
+        init_host_log(&data_dir);
         let fail = |sink: &StreamSink<HostUpdate>, message: &str| {
             let _ = sink.add(HostUpdate::failed(message));
         };
@@ -247,4 +248,52 @@ mod tests {
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_'));
     }
+}
+
+/// Writes the Share-screen host's log to `share-screen-log.txt` in the app data
+/// folder (Windows), so connection and input diagnostics can be inspected. The
+/// log never contains passwords, keystrokes or screen content; `sspi`/`picky`
+/// are silenced by the logging policy. Safe to call more than once.
+#[cfg(windows)]
+fn init_host_log(data_dir: &str) {
+    use std::io::Write as _;
+    use std::sync::{Arc, Mutex, OnceLock};
+
+    static STARTED: OnceLock<()> = OnceLock::new();
+    if STARTED.set(()).is_err() {
+        return; // already initialised this run
+    }
+    let path = std::path::Path::new(data_dir).join("share-screen-log.txt");
+    let Ok(file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    else {
+        return;
+    };
+
+    #[derive(Clone)]
+    struct FileWriter(Arc<Mutex<std::fs::File>>);
+    impl std::io::Write for FileWriter {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0
+                .lock()
+                .map(|mut f| std::io::Write::write(&mut *f, buf))
+                .unwrap_or(Ok(0))
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            self.0
+                .lock()
+                .map(|mut f| std::io::Write::flush(&mut *f))
+                .unwrap_or(Ok(()))
+        }
+    }
+
+    let writer = FileWriter(Arc::new(Mutex::new(file)));
+    let _ = tracing_subscriber::fmt()
+        .with_ansi(false)
+        .with_env_filter(rdpv_core::logging::env_filter("info"))
+        .with_writer(move || writer.clone())
+        .try_init();
+    tracing::info!("share screen started");
 }

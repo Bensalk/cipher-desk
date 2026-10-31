@@ -212,8 +212,25 @@ fn mouse(dx: i32, dy: i32, data: i32, flags: MOUSE_EVENT_FLAGS) -> INPUT {
     }
 }
 
+/// Diagnostic: logs once the first time each kind of input reaches injection,
+/// so we can tell "input arrived at the host" apart from "nothing arrived".
+/// No key values or positions are logged (privacy).
+fn note_first(mouse: bool) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static MOUSE: AtomicBool = AtomicBool::new(false);
+    static KEY: AtomicBool = AtomicBool::new(false);
+    let flag = if mouse { &MOUSE } else { &KEY };
+    if !flag.swap(true, Ordering::Relaxed) {
+        tracing::info!(
+            kind = if mouse { "mouse" } else { "keyboard" },
+            "host: first input event reached injection"
+        );
+    }
+}
+
 impl InputSink for SendInputSink {
     fn send(&mut self, input: Input) {
+        note_first(!matches!(input, Input::Key { .. } | Input::Unicode { .. }));
         match input {
             Input::Key {
                 scancode,
