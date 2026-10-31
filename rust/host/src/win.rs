@@ -163,15 +163,21 @@ unsafe fn draw_cursor(dc: HDC) {
 #[derive(Default)]
 pub struct SendInputSink;
 
-fn send(inputs: &[INPUT]) {
+fn send(inputs: &[INPUT]) -> u32 {
     // SAFETY: `inputs` is a valid slice of fully initialised INPUT values and
     // the size argument is the size of one INPUT, as SendInput requires.
-    unsafe {
-        let _ = SendInput(
+    let sent = unsafe {
+        SendInput(
             inputs,
             i32::try_from(core::mem::size_of::<INPUT>()).unwrap_or(0),
-        );
+        )
+    };
+    if sent as usize != inputs.len() {
+        // SAFETY: reads the thread's last-error code only.
+        let err = unsafe { windows::Win32::Foundation::GetLastError() };
+        tracing::warn!(sent, wanted = inputs.len(), error = ?err, "SendInput rejected input");
     }
+    sent
 }
 
 fn key(scan: u16, flags: KEYBD_EVENT_FLAGS) -> INPUT {
@@ -286,5 +292,23 @@ impl InputSink for ServiceSendInputSink {
     fn send(&mut self, input: Input) {
         let _ = crate::win_desktop::follow_input_desktop();
         self.0.send(input);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Verifies the INPUT structures we build are well-formed enough that
+    // Windows accepts them (SendInput returns the number inserted). This runs
+    // on the CI Windows runner. The events are harmless: a zero-distance
+    // relative mouse move and a key-up for a key that was never pressed.
+    #[test]
+    fn send_input_accepts_our_events() {
+        let mouse_move = mouse(0, 0, 0, MOUSEEVENTF_MOVE);
+        assert_eq!(send(&[mouse_move]), 1, "SendInput rejected a mouse event");
+
+        let key_up = key(0x39, KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP); // space, up
+        assert_eq!(send(&[key_up]), 1, "SendInput rejected a keyboard event");
     }
 }
