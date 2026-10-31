@@ -2,6 +2,22 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.2.1 (31 Oct 2026, test release)
+
+Supersedes the v0.2.0 test drafts. If you tested v0.2.0 and found Share screen
+laggy or unresponsive to mouse/keyboard, that was the older draft — this build
+fixes it. The About screen shows **0.2.1**.
+
+- Share screen: the host now services mouse and keyboard **before** encoding each
+  screen frame, so control works (it was being starved by the screen video)
+- Much smoother picture: the viewer requests **RemoteFX**, so both Share screen and
+  Private Remote Desktop send compact whole-frame updates instead of large bitmaps
+  (no more pixel-by-pixel painting), at ~20 frames a second
+- Viewer: **stretch to fill** the window (or keep aspect) and an **immersive
+  fullscreen** mode with a floating exit button
+- A privacy-safe Share screen diagnostic log (no passwords, keystrokes or screen
+  content) to help track down any remaining input issues
+
 ## v0.2.0 (30 Oct 2026, test release)
 
 Not yet independently security-reviewed; see [docs/RELEASING.md](docs/RELEASING.md).

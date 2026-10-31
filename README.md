@@ -8,7 +8,7 @@
 <h4 align="center">A secure, open-source remote desktop app for Windows, Linux and Android: Remote Desktop (RDP), screen sharing and VNC.</h4>
 
 <p align="center">
-  <a href="https://github.com/Bensalk/cipher-desk/releases"><img src="https://img.shields.io/badge/release-v0.2.0%20test-FFC107?style=flat-square" alt="Release v0.2.0 (test)"></a>
+  <a href="https://github.com/Bensalk/cipher-desk/releases"><img src="https://img.shields.io/badge/release-v0.2.1%20test-FFC107?style=flat-square" alt="Release v0.2.1 (test)"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20Android%2010%2B-00796B?style=flat-square" alt="Windows, Linux, Android 10+">
   <img src="https://img.shields.io/badge/Rust-1.97-B7410E?style=flat-square&logo=rust&logoColor=white" alt="Rust">
   <img src="https://img.shields.io/badge/Flutter-stable-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter">
@@ -33,7 +33,7 @@
 Cipher Desk connects to your own computers from a PC, a Linux machine or an Android phone or tablet, in three ways: privately with Windows Remote Desktop, by sharing a Windows computer's screen with Cipher Desk itself, or with VNC. Made by **Bensal** with security first: it encrypts every connection (VNC is used only on your own network or Tailscale), checks the computer's identity, and never stores a password anywhere except your device's own secure storage. New to Cipher Desk? Follow the [step-by-step guide](docs/HOW-TO-USE.md).
 
 > [!NOTE]
-> **v0.2.0 is a test release.** It passes all automated tests, including live connections to test computers, but it has not yet had an independent security review. What was checked is listed in [docs/SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md).
+> **v0.2.1 is a test release.** It passes all automated tests, including live connections to test computers, but it has not yet had an independent security review. What was checked is listed in [docs/SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md).
 
 ## Key Features
 
@@ -93,15 +93,15 @@ Cipher Desk connects to your own computers from a PC, a Linux machine or an Andr
 
 ## Download
 
-Latest: **v0.2.0 (test release)** – all files and checksums are on the [Releases page](https://github.com/Bensalk/cipher-desk/releases). Release notes are in [CHANGELOG.md](CHANGELOG.md).
+Latest: **v0.2.1 (test release)** – all files and checksums are on the [Releases page](https://github.com/Bensalk/cipher-desk/releases). Release notes are in [CHANGELOG.md](CHANGELOG.md).
 
 | System | Download | |
 |---|---|---|
-| **Android 10+** | [CipherDesk-0.2.0-android.apk](https://github.com/Bensalk/cipher-desk/releases/download/v0.2.0/CipherDesk-0.2.0-android.apk) | Allow installing from your browser or file manager when asked |
-| **Windows 10/11** (installer) | [CipherDesk-0.2.0-x64.msi](https://github.com/Bensalk/cipher-desk/releases/download/v0.2.0/CipherDesk-0.2.0-x64.msi) | Installs for your user only; no administrator rights needed |
-| **Windows** (portable) | [CipherDesk-0.2.0-windows-x64-portable.zip](https://github.com/Bensalk/cipher-desk/releases/download/v0.2.0/CipherDesk-0.2.0-windows-x64-portable.zip) | Unzip anywhere and run `cipher_desk.exe` |
-| **Debian / Ubuntu** | [cipher-desk_0.2.0_amd64.deb](https://github.com/Bensalk/cipher-desk/releases/download/v0.2.0/cipher-desk_0.2.0_amd64.deb) | `sudo apt install ./cipher-desk_0.2.0_amd64.deb` |
-| **Other Linux** | [Cipher_Desk-0.2.0-x86_64.AppImage](https://github.com/Bensalk/cipher-desk/releases/download/v0.2.0/Cipher_Desk-0.2.0-x86_64.AppImage) | Make it executable and run it |
+| **Android 10+** | [CipherDesk-0.2.1-android.apk](https://github.com/Bensalk/cipher-desk/releases/download/v0.2.1/CipherDesk-0.2.1-android.apk) | Allow installing from your browser or file manager when asked |
+| **Windows 10/11** (installer) | [CipherDesk-0.2.1-x64.msi](https://github.com/Bensalk/cipher-desk/releases/download/v0.2.1/CipherDesk-0.2.1-x64.msi) | Installs for your user only; no administrator rights needed |
+| **Windows** (portable) | [CipherDesk-0.2.1-windows-x64-portable.zip](https://github.com/Bensalk/cipher-desk/releases/download/v0.2.1/CipherDesk-0.2.1-windows-x64-portable.zip) | Unzip anywhere and run `cipher_desk.exe` |
+| **Debian / Ubuntu** | [cipher-desk_0.2.1_amd64.deb](https://github.com/Bensalk/cipher-desk/releases/download/v0.2.1/cipher-desk_0.2.1_amd64.deb) | `sudo apt install ./cipher-desk_0.2.1_amd64.deb` |
+| **Other Linux** | [Cipher_Desk-0.2.1-x86_64.AppImage](https://github.com/Bensalk/cipher-desk/releases/download/v0.2.1/Cipher_Desk-0.2.1-x86_64.AppImage) | Make it executable and run it |
 
 - Check a download with `SHA256SUMS` from the same release (`sha256sum -c SHA256SUMS`, or `Get-FileHash` on Windows).
 - The Windows files are not code-signed yet, so Windows SmartScreen may warn you: choose *More info → Run anyway* after checking the checksum.
