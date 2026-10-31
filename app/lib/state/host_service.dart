@@ -107,14 +107,25 @@ class HostService {
   }
 
   /// Runs a command with a Windows admin prompt and waits for it to finish.
-  /// Throws [ElevationCancelled] if the prompt is declined.
+  /// Throws [ElevationCancelled] if the prompt is declined or can't be shown.
   static Future<void> _elevated(String command) async {
     final exe = exePath();
     if (exe == null) throw ElevationCancelled();
+    // Clear any leftover result so we only read this run's output.
+    try {
+      final old = File('$dataDir\\last-result.txt');
+      if (await old.exists()) await old.delete();
+    } on FileSystemException {
+      // ignore
+    }
     final ps =
         "Start-Process -FilePath '$exe' -ArgumentList '$command' -Verb RunAs -Wait -WindowStyle Hidden";
-    final r = await Process.run('powershell', ['-NoProfile', '-Command', ps]);
-    if (r.exitCode != 0) throw ElevationCancelled();
+    try {
+      final r = await Process.run('powershell', ['-NoProfile', '-Command', ps]);
+      if (r.exitCode != 0) throw ElevationCancelled();
+    } on ProcessException {
+      throw ElevationCancelled();
+    }
   }
 
   /// Installs and starts the service; returns the new state plus the sharing

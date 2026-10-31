@@ -129,7 +129,11 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
     // Sharing on the same port in this window would clash with the service.
     if (widget.share.isOn) widget.share.stop();
     await _runService(() async {
-      final (_, password) = await HostService.install();
+      final (status, password) = await HostService.install();
+      if (!status.installed) {
+        _snack('Sign-in screen access could not be turned on. Please try again.');
+        return;
+      }
       if (password != null && mounted) {
         setState(() => _serviceShownPassword = password);
         await _serviceInstalledDialog(password);

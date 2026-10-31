@@ -15,7 +15,7 @@ use anyhow::Context as _;
 use windows::core::{PCWSTR, PWSTR};
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::Security::{
-    DuplicateTokenEx, SecurityIdentification, SetTokenInformation, TokenPrimary, TokenSessionId,
+    DuplicateTokenEx, SecurityImpersonation, SetTokenInformation, TokenPrimary, TokenSessionId,
     TOKEN_ACCESS_MASK, TOKEN_ADJUST_DEFAULT, TOKEN_ADJUST_SESSIONID, TOKEN_ASSIGN_PRIMARY,
     TOKEN_DUPLICATE, TOKEN_QUERY,
 };
@@ -100,7 +100,7 @@ pub fn spawn_worker(exe: &Path, session: u32) -> anyhow::Result<Worker> {
                     | TOKEN_ADJUST_SESSIONID.0,
             ),
             None,
-            SecurityIdentification,
+            SecurityImpersonation,
             TokenPrimary,
             &mut dup,
         );
