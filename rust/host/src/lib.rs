@@ -40,8 +40,10 @@ use rdpv_core::secret::SecretString;
 pub use frames::{Frame, FrameSource, SyntheticSource};
 pub use input::{Button, Input, InputSink, NoInput, RecordingSink};
 
-/// How often the screen is checked for changes while a viewer is connected.
-const CAPTURE_INTERVAL: Duration = Duration::from_millis(100);
+/// How often the screen is checked for changes while a viewer is connected
+/// (~20 frames a second). RemoteFX keeps each update small, so this stays
+/// smooth without flooding the link.
+const CAPTURE_INTERVAL: Duration = Duration::from_millis(50);
 
 /// What the Host reports to the UI.
 #[derive(Debug, Clone, PartialEq, Eq)]
