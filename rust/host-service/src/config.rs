@@ -5,15 +5,11 @@
 //! sharing password, in a machine-wide folder under `ProgramData`, encrypted
 //! with Windows DPAPI at machine scope (only this computer can read it). The
 //! certificate the viewer pins lives in the same folder.
-#![allow(unsafe_code)]
 
 use std::path::PathBuf;
 
 use anyhow::Context as _;
 use rdpv_core::secret::SecretString;
-use windows::Win32::Security::Cryptography::{
-    CryptProtectData, CryptUnprotectData, CRYPTPROTECT_LOCAL_MACHINE, CRYPT_INTEGER_BLOB,
-};
 
 /// Default sharing port (same as the in-session Share screen).
 pub const DEFAULT_PORT: u16 = 3395;
@@ -77,14 +73,14 @@ pub fn load_password() -> anyhow::Result<Option<SecretString>> {
     let Ok(bytes) = std::fs::read(&path) else {
         return Ok(None);
     };
-    let plain = unprotect(&bytes)?;
+    let plain = rdpv_host::winsecret::machine_unprotect(&bytes)?;
     let text = String::from_utf8(plain).context("the saved password is damaged")?;
     Ok(Some(SecretString::new(text)))
 }
 
 /// Saves (or replaces) the sharing password, machine-encrypted.
 pub fn save_password(password: &SecretString) -> anyhow::Result<()> {
-    let bytes = protect(password.expose().as_bytes())?;
+    let bytes = rdpv_host::winsecret::machine_protect(password.expose().as_bytes())?;
     std::fs::write(password_file()?, bytes).context("write the password")?;
     Ok(())
 }
@@ -97,70 +93,4 @@ pub fn ensure_password() -> anyhow::Result<SecretString> {
     let p = rdpv_host::generate_password()?;
     save_password(&p)?;
     Ok(p)
-}
-
-fn blob(data: &[u8]) -> CRYPT_INTEGER_BLOB {
-    CRYPT_INTEGER_BLOB {
-        cbData: u32::try_from(data.len()).unwrap_or(0),
-        pbData: data.as_ptr().cast_mut(),
-    }
-}
-
-/// DPAPI machine-scope encrypt.
-fn protect(data: &[u8]) -> anyhow::Result<Vec<u8>> {
-    let input = blob(data);
-    let mut out = CRYPT_INTEGER_BLOB::default();
-    // SAFETY: `input` points at `data` for the length given; `out` is owned by
-    // Windows after the call and freed below with LocalFree via from_raw copy.
-    unsafe {
-        CryptProtectData(
-            &input,
-            None,
-            None,
-            None,
-            None,
-            CRYPTPROTECT_LOCAL_MACHINE,
-            &mut out,
-        )
-        .map_err(|e| anyhow::anyhow!("protect: {e}"))?;
-        let copied = slice_and_free(&mut out);
-        Ok(copied)
-    }
-}
-
-/// DPAPI decrypt.
-fn unprotect(data: &[u8]) -> anyhow::Result<Vec<u8>> {
-    let input = blob(data);
-    let mut out = CRYPT_INTEGER_BLOB::default();
-    // SAFETY: as above; the output blob is copied out and then freed.
-    unsafe {
-        CryptUnprotectData(
-            &input,
-            None,
-            None,
-            None,
-            None,
-            CRYPTPROTECT_LOCAL_MACHINE,
-            &mut out,
-        )
-        .map_err(|e| anyhow::anyhow!("unprotect: {e}"))?;
-        Ok(slice_and_free(&mut out))
-    }
-}
-
-/// Copies the bytes out of a DPAPI output blob and frees it with `LocalFree`.
-///
-/// # Safety
-/// `out` must be an output blob filled by a DPAPI call.
-unsafe fn slice_and_free(out: &mut CRYPT_INTEGER_BLOB) -> Vec<u8> {
-    use windows::Win32::Foundation::{LocalFree, HLOCAL};
-    // SAFETY: Windows gave us `pbData` with `cbData` valid bytes; we copy them
-    // and hand the pointer back to LocalFree, as DPAPI requires.
-    unsafe {
-        let bytes = core::slice::from_raw_parts(out.pbData, out.cbData as usize).to_vec();
-        if !out.pbData.is_null() {
-            let _ = LocalFree(Some(HLOCAL(out.pbData.cast())));
-        }
-        bytes
-    }
 }

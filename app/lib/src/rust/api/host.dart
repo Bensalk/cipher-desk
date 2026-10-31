@@ -25,8 +25,19 @@ VaultResult  hostHasPassword() => RustLib.instance.api.crateApiHostHostHasPasswo
 /// Saves a new random sharing password in the vault (replacing the old one).
 VaultResult  hostNewPassword() => RustLib.instance.api.crateApiHostHostNewPassword();
 
+/// Saves a sharing password the user typed (in-session Share screen). Empty is
+/// rejected. The caller (UI) checks strength first.
+VaultResult  hostSetPassword({required String password }) => RustLib.instance.api.crateApiHostHostSetPassword(password: password);
+
 /// The saved sharing password, to show on screen when the user asks.
 String?  hostRevealPassword() => RustLib.instance.api.crateApiHostHostRevealPassword();
+
+/// Writes a user-chosen password for the **service** to a machine-encrypted
+/// "pending" file at `pending_path` (never in the clear, never on a command
+/// line). The app then runs the service's `import-password` with that path,
+/// with a one-time admin prompt, to store it. Returns false if it couldn't be
+/// written (or on non-Windows).
+bool  hostServiceStashPassword({required String pendingPath , required String password }) => RustLib.instance.api.crateApiHostHostServiceStashPassword(pendingPath: pendingPath, password: password);
 
             
                 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ShareHost>>

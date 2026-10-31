@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import '../src/rust/api/host.dart' show hostFingerprint;
+import '../src/rust/api/host.dart' show hostFingerprint, hostServiceStashPassword;
 
 /// What the sign-in-screen service looks like right now.
 class HostServiceStatus {
@@ -152,5 +152,26 @@ class HostService {
   static Future<String?> showPassword() async {
     await _elevated('show-password');
     return (await _readResult())['PASSWORD'];
+  }
+
+  /// Sets a password the user typed. The app machine-encrypts it to a pending
+  /// file (never plain text, never on the command line); the elevated service
+  /// imports and stores it. Returns true on success.
+  static Future<bool> setOwnPassword(String password) async {
+    if (!supported) return false;
+    final pending = '$dataDir\\pending-password.bin';
+    if (!hostServiceStashPassword(pendingPath: pending, password: password)) {
+      return false;
+    }
+    await _elevated('import-password "$pending"');
+    final ok = (await _readResult())['PASSWORD_SET'] == '1';
+    // Best effort: the service deletes the pending file; remove any leftover.
+    try {
+      final f = File(pending);
+      if (await f.exists()) await f.delete();
+    } on FileSystemException {
+      // ignore
+    }
+    return ok;
   }
 }

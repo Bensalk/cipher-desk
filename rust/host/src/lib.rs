@@ -24,6 +24,8 @@ mod limiter;
 pub mod win;
 #[cfg(windows)]
 mod win_desktop;
+#[cfg(windows)]
+pub mod winsecret;
 
 use std::net::{Ipv4Addr, SocketAddr};
 use std::path::PathBuf;

@@ -47,11 +47,12 @@ fn main() {
         "stop" => manage::stop(),
         "status" => manage::status(),
         "new-password" => manage::new_password(),
+        "import-password" => manage::import_password(std::env::args().nth(2)),
         "show-password" => manage::show_password(),
         other => {
             eprintln!("unknown command: {other:?}");
             eprintln!(
-                "use: install | uninstall | start | stop | status | new-password | show-password"
+                "use: install | uninstall | start | stop | status | new-password | import-password | show-password"
             );
             std::process::exit(2);
         }

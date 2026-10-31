@@ -91,10 +91,41 @@ pub fn host_new_password() -> VaultResult {
     }
 }
 
+/// Saves a sharing password the user typed (in-session Share screen). Empty is
+/// rejected. The caller (UI) checks strength first.
+#[flutter_rust_bridge::frb(sync)]
+pub fn host_set_password(password: String) -> VaultResult {
+    if password.trim().is_empty() {
+        return VaultResult::NotFound;
+    }
+    vault::save(VAULT_ID, &SecretString::new(password)).into()
+}
+
 /// The saved sharing password, to show on screen when the user asks.
 #[flutter_rust_bridge::frb(sync)]
 pub fn host_reveal_password() -> Option<String> {
     vault::load(VAULT_ID).ok().map(|p| p.expose().to_owned())
+}
+
+/// Writes a user-chosen password for the **service** to a machine-encrypted
+/// "pending" file at `pending_path` (never in the clear, never on a command
+/// line). The app then runs the service's `import-password` with that path,
+/// with a one-time admin prompt, to store it. Returns false if it couldn't be
+/// written (or on non-Windows).
+#[flutter_rust_bridge::frb(sync)]
+pub fn host_service_stash_password(pending_path: String, password: String) -> bool {
+    #[cfg(windows)]
+    {
+        if password.trim().is_empty() {
+            return false;
+        }
+        rdpv_host::winsecret::write_pending(std::path::Path::new(&pending_path), &password).is_ok()
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (pending_path, password);
+        false
+    }
 }
 
 #[cfg(windows)]

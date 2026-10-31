@@ -123,6 +123,17 @@ class ShareController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Sets a password the user typed (the caller checks strength first).
+  /// Returns true if it was saved.
+  bool setOwnPassword(String password) {
+    final ok = hostSetPassword(password: password) == VaultResult.ok;
+    if (ok) {
+      hasPassword = true;
+      notifyListeners();
+    }
+    return ok;
+  }
+
   /// The sharing password, to show on screen.
   String? revealPassword() => hostRevealPassword();
 

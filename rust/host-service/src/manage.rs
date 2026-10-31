@@ -193,6 +193,21 @@ pub fn new_password() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Imports a user-chosen password the app wrote (machine-encrypted) to
+/// `path`, storing it as the service's sharing password and deleting the
+/// pending file. The password is never passed on the command line — only the
+/// file path is.
+pub fn import_password(path: Option<String>) -> anyhow::Result<()> {
+    use anyhow::Context as _;
+    let path = path.context("missing pending-password file path")?;
+    let plain = rdpv_host::winsecret::read_pending(std::path::Path::new(&path))?;
+    crate::config::save_password(&rdpv_core::secret::SecretString::new(plain))?;
+    let mut r = Report::default();
+    r.set("PASSWORD_SET", "1");
+    r.finish("");
+    Ok(())
+}
+
 /// Reports the current sharing password (the app shows it when asked).
 pub fn show_password() -> anyhow::Result<()> {
     let mut r = Report::default();

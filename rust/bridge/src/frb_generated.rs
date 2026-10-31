@@ -41,7 +41,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 122281489;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1606325921;
 
 // Section: executor
 
@@ -1565,6 +1565,70 @@ fn wire__crate__api__host__host_reveal_password_impl(
         },
     )
 }
+fn wire__crate__api__host__host_service_stash_password_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "host_service_stash_password",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_pending_path = <String>::sse_decode(&mut deserializer);
+            let api_password = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::host::host_service_stash_password(
+                    api_pending_path,
+                    api_password,
+                ))?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__host__host_set_password_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "host_set_password",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_password = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::host::host_set_password(api_password))?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
 fn wire__crate__api__host__host_supported_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -2594,7 +2658,7 @@ fn pde_ffi_dispatcher_primary_impl(
         ),
         17 => wire__crate__api__host__ShareHost_start_impl(port, ptr, rust_vec_len, data_len),
         21 => wire__crate__api__store__check_reachable_impl(port, ptr, rust_vec_len, data_len),
-        47 => wire__crate__api__store__vnc_address_allowed_impl(port, ptr, rust_vec_len, data_len),
+        49 => wire__crate__api__store__vnc_address_allowed_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2648,18 +2712,20 @@ fn pde_ffi_dispatcher_sync_impl(
         33 => wire__crate__api__host__host_has_password_impl(ptr, rust_vec_len, data_len),
         34 => wire__crate__api__host__host_new_password_impl(ptr, rust_vec_len, data_len),
         35 => wire__crate__api__host__host_reveal_password_impl(ptr, rust_vec_len, data_len),
-        36 => wire__crate__api__host__host_supported_impl(ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__store__idle_minute_choices_impl(ptr, rust_vec_len, data_len),
-        38 => wire__crate__api__store__is_valid_mac_impl(ptr, rust_vec_len, data_len),
-        39 => wire__crate__api__store__portable_data_dir_impl(ptr, rust_vec_len, data_len),
-        40 => wire__crate__api__info__security_defaults_summary_impl(ptr, rust_vec_len, data_len),
-        41 => wire__crate__api__store__settings_load_impl(ptr, rust_vec_len, data_len),
-        42 => wire__crate__api__store__settings_save_impl(ptr, rust_vec_len, data_len),
-        43 => wire__crate__api__store__trusted_computers_impl(ptr, rust_vec_len, data_len),
-        44 => wire__crate__api__vault__vault_check_password_impl(ptr, rust_vec_len, data_len),
-        45 => wire__crate__api__vault__vault_delete_password_impl(ptr, rust_vec_len, data_len),
-        46 => wire__crate__api__vault__vault_save_password_impl(ptr, rust_vec_len, data_len),
-        48 => wire__crate__api__store__wake_on_lan_impl(ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__host__host_service_stash_password_impl(ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__host__host_set_password_impl(ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__host__host_supported_impl(ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__store__idle_minute_choices_impl(ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__store__is_valid_mac_impl(ptr, rust_vec_len, data_len),
+        41 => wire__crate__api__store__portable_data_dir_impl(ptr, rust_vec_len, data_len),
+        42 => wire__crate__api__info__security_defaults_summary_impl(ptr, rust_vec_len, data_len),
+        43 => wire__crate__api__store__settings_load_impl(ptr, rust_vec_len, data_len),
+        44 => wire__crate__api__store__settings_save_impl(ptr, rust_vec_len, data_len),
+        45 => wire__crate__api__store__trusted_computers_impl(ptr, rust_vec_len, data_len),
+        46 => wire__crate__api__vault__vault_check_password_impl(ptr, rust_vec_len, data_len),
+        47 => wire__crate__api__vault__vault_delete_password_impl(ptr, rust_vec_len, data_len),
+        48 => wire__crate__api__vault__vault_save_password_impl(ptr, rust_vec_len, data_len),
+        50 => wire__crate__api__store__wake_on_lan_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

@@ -103,6 +103,89 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
     }
   }
 
+  /// Asks the user to type their own sharing password. Returns it, or null if
+  /// cancelled. Warns (but allows) if it looks weak.
+  Future<String?> _askCustomPassword() async {
+    final controller = TextEditingController();
+    var obscure = true;
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setLocal) {
+          final pw = controller.text;
+          final weak = pw.length < 10;
+          return AlertDialog(
+            title: const Text('Set your own password'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  key: const Key('custom-password-field'),
+                  controller: controller,
+                  autofocus: true,
+                  obscureText: obscure,
+                  onChanged: (_) => setLocal(() {}),
+                  decoration: InputDecoration(
+                    labelText: 'New sharing password',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscure ? Icons.visibility : Icons.visibility_off),
+                      onPressed: () => setLocal(() => obscure = !obscure),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  pw.isEmpty
+                      ? 'Anyone connecting will type this. Use at least 10 characters.'
+                      : weak
+                          ? '⚠ That is short. A longer password is much safer over a network.'
+                          : '✓ Looks reasonable.',
+                  style: TextStyle(
+                    color: weak && pw.isNotEmpty ? Theme.of(context).colorScheme.error : null,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              FilledButton(
+                key: const Key('custom-password-save'),
+                onPressed: pw.isEmpty ? null : () => Navigator.pop(context, pw),
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    return (result != null && result.isNotEmpty) ? result : null;
+  }
+
+  Future<void> _setOwnInSessionPassword() async {
+    final pw = await _askCustomPassword();
+    if (pw == null) return;
+    if (widget.share.setOwnPassword(pw)) {
+      setState(() => _shownPassword = null);
+      _snack('Password saved.');
+    } else {
+      _snack("That password couldn't be saved.");
+    }
+  }
+
+  Future<void> _setOwnServicePassword() async {
+    final pw = await _askCustomPassword();
+    if (pw == null) return;
+    await _runService(() async {
+      if (await HostService.setOwnPassword(pw)) {
+        if (mounted) setState(() => _serviceShownPassword = null);
+      } else {
+        _snack("That password couldn't be saved.");
+      }
+    }, 'The admin prompt was declined.');
+  }
+
   Future<void> _saveSettings() async {
     final port = int.tryParse(_port.text.trim());
     if (_user.text.trim().isEmpty || port == null || port < 1 || port > 65535) {
@@ -199,23 +282,23 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
     final missing = HostService.exePath() == null;
     final installed = _service.installed;
     final children = <Widget>[
-      Row(
-        children: [
-          Icon(installed ? Icons.verified_user : Icons.vpn_key_outlined,
-              color: installed ? scheme.primary : null),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text('Sign in from home (reach the sign-in screen)',
-                style: Theme.of(context).textTheme.titleMedium),
-          ),
-        ],
-      ),
-      const SizedBox(height: 8),
-      const Text(
-        'Normally Share screen can only show the screen once someone is signed in. '
-        'Turn this on to also show the Windows sign-in and lock screens, so you can '
-        'type the password and sign in from another device. It installs a small '
-        'background service and asks for Windows administrator approval once.',
+      // The primary control: one switch that makes this PC always available to
+      // connect (like AnyDesk) without anyone clicking Start Sharing — it runs
+      // a background service that also reaches the Windows sign-in/lock screen.
+      SwitchListTile(
+        key: const Key('service-always-allow'),
+        contentPadding: EdgeInsets.zero,
+        value: installed,
+        onChanged: (missing || _serviceBusy)
+            ? null
+            : (on) => on ? _installService() : _removeService(),
+        secondary: Icon(installed ? Icons.verified_user : Icons.vpn_key_outlined,
+            color: installed ? scheme.primary : null),
+        title: const Text('Always allow connections to this PC'),
+        subtitle: const Text(
+          'Stay ready to connect without pressing Start Sharing — even at the '
+          'Windows sign-in or lock screen. Asks for administrator approval once.',
+        ),
       ),
     ];
 
@@ -230,17 +313,9 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
         child: Center(child: CircularProgressIndicator()),
       ));
     } else if (!installed) {
-      children.add(Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton.icon(
-            key: const Key('service-install'),
-            onPressed: _installService,
-            icon: const Icon(Icons.vpn_key),
-            label: const Text('Turn on sign-in screen access'),
-          ),
-        ),
+      children.add(const Padding(
+        padding: EdgeInsets.only(top: 4),
+        child: Text('Off — you start sharing manually below each time.'),
       ));
     } else {
       children.addAll([
@@ -278,8 +353,14 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
               },
             ),
             IconButton(
+              key: const Key('service-set-password'),
+              tooltip: 'Set your own password',
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: _setOwnServicePassword,
+            ),
+            IconButton(
               key: const Key('service-new-password'),
-              tooltip: 'New password',
+              tooltip: 'Make a random password',
               icon: const Icon(Icons.refresh),
               onPressed: () => _runService(() async {
                 final p = await HostService.newPassword();
@@ -394,8 +475,14 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
                                 _shownPassword = _shownPassword == null ? s.revealPassword() : null),
                       ),
                       IconButton(
+                        key: const Key('share-set-password'),
+                        tooltip: 'Set your own password',
+                        icon: const Icon(Icons.edit_outlined),
+                        onPressed: _setOwnInSessionPassword,
+                      ),
+                      IconButton(
                         key: const Key('share-new-password'),
-                        tooltip: 'Make a new password',
+                        tooltip: 'Make a random password',
                         icon: const Icon(Icons.refresh),
                         onPressed: _confirmNewPassword,
                       ),
