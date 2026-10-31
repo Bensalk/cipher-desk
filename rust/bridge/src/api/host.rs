@@ -232,31 +232,12 @@ impl ShareHost {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn support_matches_the_platform() {
-        assert_eq!(host_supported(), cfg!(windows));
-    }
-
-    #[test]
-    fn vault_id_is_valid() {
-        // Vault ids allow letters, digits, '-' and '_' only.
-        assert!(VAULT_ID
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_'));
-    }
-}
-
 /// Writes the Share-screen host's log to `share-screen-log.txt` in the app data
 /// folder (Windows), so connection and input diagnostics can be inspected. The
 /// log never contains passwords, keystrokes or screen content; `sspi`/`picky`
 /// are silenced by the logging policy. Safe to call more than once.
 #[cfg(windows)]
 fn init_host_log(data_dir: &str) {
-    use std::io::Write as _;
     use std::sync::{Arc, Mutex, OnceLock};
 
     static STARTED: OnceLock<()> = OnceLock::new();
@@ -296,4 +277,22 @@ fn init_host_log(data_dir: &str) {
         .with_writer(move || writer.clone())
         .try_init();
     tracing::info!("share screen started");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn support_matches_the_platform() {
+        assert_eq!(host_supported(), cfg!(windows));
+    }
+
+    #[test]
+    fn vault_id_is_valid() {
+        // Vault ids allow letters, digits, '-' and '_' only.
+        assert!(VAULT_ID
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_'));
+    }
 }
