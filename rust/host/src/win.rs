@@ -254,7 +254,9 @@ impl InputSink for SendInputSink {
                 };
                 send(&[mouse(0, 0, 0, flags)]);
             }
-            Input::Wheel { delta } => send(&[mouse(0, 0, i32::from(delta), MOUSEEVENTF_WHEEL)]),
+            Input::Wheel { delta } => {
+                send(&[mouse(0, 0, i32::from(delta), MOUSEEVENTF_WHEEL)]);
+            }
         }
     }
 }
