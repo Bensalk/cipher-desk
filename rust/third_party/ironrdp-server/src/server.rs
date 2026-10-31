@@ -1333,7 +1333,12 @@ impl RdpServer {
             }
         };
 
+        // Cipher Desk: `biased` polls the branches top-to-bottom each time, so
+        // client input (keyboard/mouse) is always serviced before a screen
+        // frame is encoded. Without this, heavy screen updates can starve input
+        // and the viewer appears unable to control the computer.
         let state = tokio::select!(
+            biased;
             state = dispatch_pdu => state,
             state = dispatch_display => state,
             state = dispatch_events => state,
