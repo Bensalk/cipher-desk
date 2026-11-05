@@ -609,6 +609,26 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
             onChanged: (v) => s.update(askBeforeConnecting: v),
           ),
           const SizedBox(height: 8),
+          if (Platform.isWindows)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: const Key('share-copy-log'),
+                onPressed: () async {
+                  final log = await widget.share.diagnosticLog();
+                  if (!mounted) return;
+                  if (log.isEmpty) {
+                    _snack('No diagnostic log yet — start sharing first.');
+                    return;
+                  }
+                  await Clipboard.setData(ClipboardData(text: log));
+                  _snack('Diagnostic log copied to clipboard.');
+                },
+                icon: const Icon(Icons.bug_report_outlined),
+                label: const Text('Copy diagnostic log'),
+              ),
+            ),
+          const SizedBox(height: 8),
           Card(
             color: scheme.secondaryContainer,
             child: const Padding(

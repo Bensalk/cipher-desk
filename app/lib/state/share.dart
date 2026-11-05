@@ -235,6 +235,33 @@ class ShareController extends ChangeNotifier {
   Future<String> receivedFolder() async =>
       '${(await _paths()).dir}${Platform.pathSeparator}Received';
 
+  /// Returns the contents of the Share screen diagnostic log, combined from
+  /// the in-app log and the background-service log (both Windows only).
+  /// Returns an empty string if no log exists yet.
+  Future<String> diagnosticLog() async {
+    final sep = Platform.pathSeparator;
+    final appDir = (await _paths()).dir;
+    final serviceDir = '${Platform.environment['ProgramData'] ?? r'C:\ProgramData'}'
+        '${sep}Cipher Desk${sep}host-service';
+
+    final parts = <String>[];
+    for (final path in [
+      '$appDir${sep}share-screen-log.txt',
+      '$serviceDir${sep}share-screen-log.txt',
+    ]) {
+      try {
+        final f = File(path);
+        if (await f.exists()) {
+          final text = await f.readAsString();
+          if (text.isNotEmpty) parts.add(text.trim());
+        }
+      } on FileSystemException {
+        // Skip unreadable files.
+      }
+    }
+    return parts.join('\n\n--- (service log) ---\n\n');
+  }
+
   void stop() {
     SecureWindow.setSharing(false);
     _host?.stop();
