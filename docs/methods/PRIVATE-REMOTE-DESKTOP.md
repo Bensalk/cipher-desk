@@ -58,10 +58,19 @@ More safety settings (separate account, account lockout, firewall):
    step 3.
 4. Optional: tick **Save password** so you don't have to type it each time (it is
    kept in the phone's secure storage).
-5. **Save**, then open the connection's menu → **Check readiness**. Every line
+5. Optional: tick **Share clipboard** to copy text between this device and the
+   remote computer in both directions. You can allow one direction only.
+6. **Save**, then open the connection's menu → **Check readiness**. Every line
    should be green.
-6. **Connect.** The first time, compare the fingerprint with the one from step 6.
+7. **Connect.** The first time, compare the fingerprint with the one from step 6.
    Tap **They match — trust** only if they do.
+
+## Sending a file to the remote computer (Windows host)
+
+Drag a file onto the session window or tap the **Send file** button in the toolbar.
+The file is copied to the remote computer's **Desktop**. Progress shows in the
+toolbar. Files up to 256 MB; one at a time. The remote computer must be running
+Windows (Linux hosts do not yet support file transfer).
 
 ## If it doesn't work
 

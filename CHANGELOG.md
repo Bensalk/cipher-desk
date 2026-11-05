@@ -2,6 +2,34 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.2.2 (5 Nov 2026, test release)
+
+Builds on v0.2.1. The About screen shows **0.2.2**.
+
+**Always-allow connections** — a connection can now be set to *Always allow* so the
+Share screen host accepts it without asking for approval each time. Toggle it on the
+connection's detail page. Use this for a phone or computer you own; keep the default
+*Ask each time* for other devices.
+
+**Custom Share screen password** — you can now replace the generated password on the
+Share screen page with one you choose. Tap *Change password*; the new password is
+saved in Windows Credential Manager like the generated one. Tap *Reset to generated*
+to go back.
+
+**Approval prompt on the host** — when a new device connects to Share screen in *Ask
+each time* mode, a prompt now appears on the host computer asking whether to allow
+it. If nobody answers within 30 seconds the connection is refused. The viewer sees a
+clear "waiting for approval" message while this is happening.
+
+**Clipboard** (Private Remote Desktop) — clipboard sharing is now fully two-way:
+text you copy on the remote computer appears in this device's clipboard too. The
+direction icons in the title bar show which way copying is active.
+
+**File transfer** (Private Remote Desktop, Windows host) — drag a file onto the
+session window, or use the new *Send file* button in the toolbar, to copy it to the
+remote computer's desktop. Progress is shown in the toolbar. Files up to 256 MB; one
+at a time. This is a first version — please test it and report any issues.
+
 ## v0.2.1 (31 Oct 2026, test release)
 
 Supersedes the v0.2.0 test drafts. If you tested v0.2.0 and found Share screen

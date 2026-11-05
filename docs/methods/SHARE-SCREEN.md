@@ -21,7 +21,8 @@ and Cipher Desk on the device you connect from.
 2. Open the **Share screen** tab (left side, or at the bottom on small windows).
 3. A strong **password** is created for you and kept in Windows' secure password
    storage. Tap the eye icon to see it. The refresh icon makes a new one (devices
-   using the old one must then use the new one).
+   using the old one must then use the new one). Tap **Change password** to set your
+   own instead; tap **Reset to generated** to go back to the generated one.
 4. Optional: change the **Username for viewers** (any name; it is not your Windows
    account) and the **Port** (3395). Tap **Save**.
 5. Tap **Start sharing**. The first time, Windows asks whether Cipher Desk may use
@@ -54,6 +55,9 @@ and Cipher Desk on the device you connect from.
 4. Optional: **Save password**.
 5. **Connect.** The first time, compare the identity code with the one on the
    Share page. Tap **They match — trust** only if they do.
+6. If the connection is in *Ask each time* mode, an **approval prompt** appears on
+   the host computer. The viewer sees "waiting for approval" and the host has 30
+   seconds to allow or refuse. If nobody answers, the connection is refused.
 
 While someone is connected, the computer shows **"Your screen is being shared"**
 with a **Stop** button at the top of Cipher Desk.
@@ -62,6 +66,9 @@ with a **Stop** button at the top of Cipher Desk.
 
 - **Security:** the connection is encrypted (TLS) and needs the password. After 5
   wrong passwords, new connections are refused for 15 minutes.
+- **Always-allow connections:** open the connection's detail page and turn on *Always
+  allow* to skip the approval prompt for that device every time. Leave the default
+  *Ask each time* for devices you don't own or fully trust.
 - **Cipher Desk's own window is hidden** from the person viewing (it looks black or
   is left out), so they can never read the sharing password from it.
 - **What can't be controlled remotely:** the Windows sign-in and lock screen (so you

@@ -48,9 +48,12 @@ empty for the method's usual port) and the username (`user`, `DOMAIN\user` or
   in the app's files. Windows asks for Windows Hello and Android for your
   fingerprint/face/screen lock before it is used. Without it, you type the password
   each time you connect.
-- **Share clipboard** (Private Remote Desktop only) — off by default. Anything you copy while connected can be read
-  by the remote computer, and it can put text on this device. You can allow one
-  direction only.
+- **Share clipboard** (Private Remote Desktop only) — off by default. When turned on,
+  text you copy on this device is sent to the remote computer and text the remote
+  computer copies appears on this device. You can allow one direction only.
+- **Send files** (Private Remote Desktop, Windows host only) — drag a file onto the
+  session window or tap the *Send file* button in the toolbar to copy it to the remote
+  computer's desktop. Files up to 256 MB; one at a time.
 - **Wake-on-LAN MAC address** — lets you wake the computer from the connection's menu
   (same local network only).
 
@@ -94,8 +97,12 @@ computer itself.
   whole screen again.
 - **Phones and tablets** get a landscape desktop (up to 1920×1080); turn the device
   sideways for the biggest view.
-- **Clipboard** (if allowed): an icon in the title bar shows the direction. On Android,
-  text you copy on the phone is sent when you return to the app or tap *Send clipboard*.
+- **Clipboard** (if allowed): icons in the title bar show the active direction. On
+  Android, text you copy on the phone is sent when you return to the app or tap *Send
+  clipboard*. Text copied on the remote computer appears in this device's clipboard too.
+- **File transfer** (Private Remote Desktop, Windows host): drag a file onto the window
+  or tap *Send file* in the toolbar. Progress is shown in the toolbar; one file at a
+  time, up to 256 MB.
 - **Network drops:** the app reconnects by itself (up to 3 tries) to the same computer
   with the same certificate. It never retries a wrong password.
 - **Idle:** sessions end after 30 minutes without input (change it in Settings).
