@@ -96,7 +96,7 @@ fn advertise(inner: &Inner) {
 /// copy made here while a viewer is connected becomes pasteable there.
 struct Poller {
     running: Arc<AtomicBool>,
-    _join: JoinHandle<()>,
+    _join: Option<JoinHandle<()>>,
 }
 
 fn spawn_poller(inner: Arc<Inner>) -> Poller {
@@ -119,16 +119,13 @@ fn spawn_poller(inner: Arc<Inner>) -> Poller {
             }
         })
         .ok();
-    match join {
-        Some(join) => Poller {
-            running,
-            _join: join,
-        },
-        None => Poller {
-            // The thread could not start; mark it stopped so Drop is a no-op.
-            running: Arc::new(AtomicBool::new(false)),
-            _join: std::thread::spawn(|| {}),
-        },
+    if join.is_none() {
+        // The thread could not start; nothing to stop later.
+        running.store(false, Ordering::Relaxed);
+    }
+    Poller {
+        running,
+        _join: join,
     }
 }
 
