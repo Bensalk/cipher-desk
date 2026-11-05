@@ -41,6 +41,7 @@ pub fn run() -> anyhow::Result<()> {
             // The service never requires approval, so this cannot fire here;
             // allow it defensively so a viewer is never left waiting.
             Ok(HostEvent::ApprovalRequested) => host.approve(true),
+            Ok(HostEvent::FileReceived { .. }) => tracing::info!("file received from viewer"),
             Ok(HostEvent::LockedOut { minutes }) => tracing::warn!(minutes, "locked out"),
             Ok(HostEvent::Failed { message }) => {
                 tracing::error!(%message, "service host failed");
