@@ -559,6 +559,15 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
               }
             },
           ),
+          SwitchListTile(
+            key: const Key('share-ask-before'),
+            title: const Text('Ask me before each connection'),
+            subtitle: const Text(
+                'Someone with the password still has to be allowed from this PC. '
+                'Leave off if you connect while away from home.'),
+            value: s.askBeforeConnecting,
+            onChanged: (v) => s.update(askBeforeConnecting: v),
+          ),
           const SizedBox(height: 8),
           Card(
             color: scheme.secondaryContainer,
@@ -593,6 +602,7 @@ class _StatusCard extends StatelessWidget {
       ShareStatus.off => (Icons.desktop_access_disabled, 'Sharing is off', scheme.surfaceContainerHighest),
       ShareStatus.starting => (Icons.hourglass_top, 'Starting…', scheme.surfaceContainerHighest),
       ShareStatus.waiting => (Icons.desktop_windows, 'Sharing is on: waiting for a viewer', scheme.primaryContainer),
+      ShareStatus.approvalPending => (Icons.pan_tool_outlined, 'Someone wants to connect to this PC', scheme.tertiaryContainer),
       ShareStatus.viewing => (Icons.visibility, 'Someone is viewing and controlling this screen', scheme.tertiaryContainer),
       ShareStatus.lockedOut => (Icons.lock_clock, 'Sharing is on, but paused after wrong passwords', scheme.errorContainer),
       ShareStatus.failed => (Icons.error_outline, 'Sharing stopped', scheme.errorContainer),
@@ -620,20 +630,48 @@ class _StatusCard extends StatelessWidget {
               Text(share.message!),
             ],
             const SizedBox(height: 12),
-            share.isOn
-                ? FilledButton.icon(
-                    key: const Key('share-stop'),
-                    style: FilledButton.styleFrom(backgroundColor: scheme.error, foregroundColor: scheme.onError),
-                    onPressed: share.stop,
-                    icon: const Icon(Icons.stop),
-                    label: const Text('Stop sharing'),
-                  )
-                : FilledButton.icon(
-                    key: const Key('share-start'),
-                    onPressed: share.hasPassword ? share.start : null,
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text('Start sharing'),
+            if (share.status == ShareStatus.approvalPending) ...[
+              const Text('Allow this connection? If you do nothing, it is '
+                  'refused in a few seconds.'),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      key: const Key('share-approve'),
+                      onPressed: () => share.approve(true),
+                      icon: const Icon(Icons.check),
+                      label: const Text('Allow'),
+                    ),
                   ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      key: const Key('share-reject'),
+                      style: FilledButton.styleFrom(
+                          backgroundColor: scheme.error, foregroundColor: scheme.onError),
+                      onPressed: () => share.approve(false),
+                      icon: const Icon(Icons.block),
+                      label: const Text('Refuse'),
+                    ),
+                  ),
+                ],
+              ),
+            ] else
+              share.isOn
+                  ? FilledButton.icon(
+                      key: const Key('share-stop'),
+                      style: FilledButton.styleFrom(backgroundColor: scheme.error, foregroundColor: scheme.onError),
+                      onPressed: share.stop,
+                      icon: const Icon(Icons.stop),
+                      label: const Text('Stop sharing'),
+                    )
+                  : FilledButton.icon(
+                      key: const Key('share-start'),
+                      onPressed: share.hasPassword ? share.start : null,
+                      icon: const Icon(Icons.play_arrow),
+                      label: const Text('Start sharing'),
+                    ),
           ],
         ),
       ),

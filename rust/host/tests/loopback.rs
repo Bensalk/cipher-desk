@@ -74,6 +74,7 @@ fn start_with<S: rdpv_host::FrameSource + Send + 'static>(source: S) -> Running 
             username: USER.into(),
             password: SecretString::new(password.clone()),
             data_dir: dir.path().to_path_buf(),
+            require_approval: false,
         },
         "127.0.0.1".parse().expect("ip"),
         source,

@@ -24,6 +24,7 @@ pub fn run() -> anyhow::Result<()> {
             username,
             password,
             data_dir,
+            require_approval: false,
         },
         ServiceScreenCapture::default(),
         ServiceSendInputSink::default(),

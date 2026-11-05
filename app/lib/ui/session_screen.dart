@@ -208,7 +208,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     final pinsPath = widget.pinsPath;
     if (!mounted) return;
     final (w, h) = desktopSizeFor(View.of(context).physicalSize, phoneOrTablet: _isAndroid);
-    // Share screen has no clipboard either (only Private Remote Desktop does).
+    // Clipboard is text-only and off for VNC; the method decides.
     final clipboard =
         widget.profile.method.supportsClipboard ? widget.profile.clipboardMode : ClipboardMode.off;
     final vnc = widget.profile.method == ConnectionMethod.vnc;

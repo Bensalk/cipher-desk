@@ -40,8 +40,11 @@ extension ConnectionMethodText on ConnectionMethod {
   /// VNC signs in with a password only.
   bool get needsUsername => this != ConnectionMethod.vnc;
 
-  /// Clipboard sharing works with Windows Remote Desktop only (for now).
-  bool get supportsClipboard => this == ConnectionMethod.privateRemoteDesktop;
+  /// Text clipboard sharing works with Private Remote Desktop and with
+  /// Share screen (Cipher Desk's own host). VNC has none.
+  bool get supportsClipboard =>
+      this == ConnectionMethod.privateRemoteDesktop ||
+      this == ConnectionMethod.shareScreen;
 }
 
 /// Asks two short questions and returns the suggested method, or null if cancelled.

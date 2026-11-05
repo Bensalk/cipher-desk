@@ -24,6 +24,9 @@ pub enum HostUpdateKind {
     ViewerDisconnected,
     /// Too many wrong passwords: refusing connections for `minutes`.
     LockedOut,
+    /// A viewer signed in and is waiting to be allowed (attended mode).
+    /// Answer with [`ShareHost::approve`].
+    ApprovalRequested,
     /// Sharing stopped or could not start (`message`).
     Failed,
 }
@@ -155,23 +158,39 @@ impl ShareHost {
     }
 
     /// Starts sharing with the saved password. `data_dir` is the app's private
-    /// data folder (the Host certificate is kept there).
+    /// data folder (the Host certificate is kept there). When `require_approval`
+    /// is true, each viewer must be allowed from this computer ([`ShareHost::approve`]).
     pub fn start(
         &self,
         port: u16,
         username: String,
         data_dir: String,
+        require_approval: bool,
         sink: StreamSink<HostUpdate>,
     ) {
         #[cfg(windows)]
-        self.start_windows(port, username, data_dir, sink);
+        self.start_windows(port, username, data_dir, require_approval, sink);
         #[cfg(not(windows))]
         {
-            let _ = (port, username, data_dir);
+            let _ = (port, username, data_dir, require_approval);
             let _ = sink.add(HostUpdate::failed(
                 "Sharing this screen works on Windows only.",
             ));
         }
+    }
+
+    /// Allows (`true`) or refuses (`false`) a viewer waiting after
+    /// [`HostUpdateKind::ApprovalRequested`].
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn approve(&self, allow: bool) {
+        #[cfg(windows)]
+        if let Ok(h) = self.handle.lock() {
+            if let Some(handle) = h.as_ref() {
+                handle.approve(allow);
+            }
+        }
+        #[cfg(not(windows))]
+        let _ = allow;
     }
 
     /// Stops sharing and disconnects the viewer.
@@ -191,6 +210,7 @@ impl ShareHost {
         port: u16,
         username: String,
         data_dir: String,
+        require_approval: bool,
         sink: StreamSink<HostUpdate>,
     ) {
         init_host_log(&data_dir);
@@ -213,6 +233,7 @@ impl ShareHost {
             username,
             password,
             data_dir: data_dir.into(),
+            require_approval,
         };
         match rdpv_host::start(
             config,
@@ -250,6 +271,7 @@ impl ShareHost {
                             minutes,
                             ..HostUpdate::of(HostUpdateKind::LockedOut)
                         },
+                        E::ApprovalRequested => HostUpdate::of(HostUpdateKind::ApprovalRequested),
                         E::Failed { message } => HostUpdate::failed(&message),
                     };
                     if sink.add(update).is_err() {

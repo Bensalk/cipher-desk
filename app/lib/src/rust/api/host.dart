@@ -42,12 +42,18 @@ bool  hostServiceStashPassword({required String pendingPath , required String pa
             
                 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ShareHost>>
                 abstract class ShareHost implements RustOpaqueInterface {
-                    static ShareHost  create()=>RustLib.instance.api.crateApiHostShareHostCreate();
+                    /// Allows (`true`) or refuses (`false`) a viewer waiting after
+/// [`HostUpdateKind::ApprovalRequested`].
+ void  approve({required bool allow });
+
+
+static ShareHost  create()=>RustLib.instance.api.crateApiHostShareHostCreate();
 
 
 /// Starts sharing with the saved password. `data_dir` is the app's private
-/// data folder (the Host certificate is kept there).
- Stream<HostUpdate>  start({required int port , required String username , required String dataDir });
+/// data folder (the Host certificate is kept there). When `require_approval`
+/// is true, each viewer must be allowed from this computer ([`ShareHost::approve`]).
+ Stream<HostUpdate>  start({required int port , required String username , required String dataDir , required bool requireApproval });
 
 
 /// Stops sharing and disconnects the viewer.
@@ -96,6 +102,9 @@ viewerConnected,
 viewerDisconnected,
 /// Too many wrong passwords: refusing connections for `minutes`.
 lockedOut,
+/// A viewer signed in and is waiting to be allowed (attended mode).
+/// Answer with [`ShareHost::approve`].
+approvalRequested,
 /// Sharing stopped or could not start (`message`).
 failed,
                     ;

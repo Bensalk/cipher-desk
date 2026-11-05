@@ -16,6 +16,8 @@
 //! Screen capture and input are platform parts ([`FrameSource`], [`InputSink`]);
 //! Windows has real ones, tests use synthetic ones.
 
+#[cfg(windows)]
+pub mod clipboard;
 pub mod frames;
 pub mod identity;
 pub mod input;
@@ -58,6 +60,10 @@ pub enum HostEvent {
     ViewerDisconnected,
     /// Too many wrong passwords: new connections are refused for a while.
     LockedOut { minutes: u64 },
+    /// A viewer has signed in and is waiting for the person at this computer to
+    /// allow or refuse it (only when "ask before each connection" is on).
+    /// Answer with [`HostHandle::approve`].
+    ApprovalRequested,
     /// The Host could not start or stopped with an error.
     Failed { message: String },
 }
@@ -69,15 +75,30 @@ pub struct HostConfig {
     pub password: SecretString,
     /// Folder for the Host certificate (the app's private data folder).
     pub data_dir: PathBuf,
+    /// When true, each signed-in viewer must be allowed from this computer
+    /// before it sees the screen (attended mode). When false, a correct
+    /// password is enough (unattended).
+    pub require_approval: bool,
 }
+
+/// How long to wait for the person at the computer to allow a viewer before
+/// giving up and refusing the connection.
+const APPROVAL_TIMEOUT: Duration = Duration::from_secs(40);
 
 /// A running Host. Dropping it (or calling [`HostHandle::stop`]) stops sharing.
 pub struct HostHandle {
     stop: Option<tokio::sync::oneshot::Sender<()>>,
     thread: Option<std::thread::JoinHandle<()>>,
+    approvals: tokio::sync::mpsc::UnboundedSender<bool>,
 }
 
 impl HostHandle {
+    /// Allows (`true`) or refuses (`false`) a viewer waiting after
+    /// [`HostEvent::ApprovalRequested`]. Ignored if nothing is waiting.
+    pub fn approve(&self, allow: bool) {
+        let _ = self.approvals.send(allow);
+    }
+
     /// Stops sharing at once and closes any viewer's connection.
     pub fn stop(mut self) {
         self.shutdown();
@@ -145,6 +166,22 @@ where
 }
 
 /// Like [`start`], on a chosen address (tests use 127.0.0.1).
+/// Largest clipboard text accepted from the viewer, in bytes of UTF-16 (1 MiB).
+#[cfg(windows)]
+const CLIPBOARD_MAX_BYTES: usize = 1024 * 1024;
+
+/// The clipboard bridge for the Share screen (Windows only). Plain text both
+/// ways; nothing on other platforms, which never host.
+#[cfg(windows)]
+fn cliprdr_factory() -> Option<Box<dyn ironrdp_server::CliprdrServerFactory>> {
+    Some(Box::new(clipboard::HostClipboard::new(CLIPBOARD_MAX_BYTES)))
+}
+
+#[cfg(not(windows))]
+fn cliprdr_factory() -> Option<Box<dyn ironrdp_server::CliprdrServerFactory>> {
+    None
+}
+
 pub fn start_on<S, I>(
     config: HostConfig,
     ip: std::net::IpAddr,
@@ -172,9 +209,13 @@ where
         .map(|a| a.port())
         .unwrap_or(config.port);
 
+    // Approval channel: the UI answers ApprovalRequested through HostHandle.
+    let (approve_tx, approve_rx) = tokio::sync::mpsc::unbounded_channel::<bool>();
     let display = ScreenDisplay {
         source: Arc::new(Mutex::new(source)),
         events: events.clone(),
+        require_approval: config.require_approval,
+        approvals: Arc::new(tokio::sync::Mutex::new(approve_rx)),
     };
     let username = config.username.trim().to_owned();
     let password = config.password;
@@ -197,6 +238,7 @@ where
                 .with_input_handler(input::Handler { sink })
                 .with_display_handler(display)
                 .with_connection_handler(Some(Box::new(limiter)))
+                .with_cliprdr_factory(cliprdr_factory())
                 .build();
             server.set_credentials(Some(Credentials {
                 username,
@@ -233,6 +275,7 @@ where
     Ok(HostHandle {
         stop: Some(stop),
         thread: Some(thread),
+        approvals: approve_tx,
     })
 }
 
@@ -241,6 +284,8 @@ where
 struct ScreenDisplay<S: FrameSource> {
     source: Arc<Mutex<S>>,
     events: mpsc::Sender<HostEvent>,
+    require_approval: bool,
+    approvals: Arc<tokio::sync::Mutex<tokio::sync::mpsc::UnboundedReceiver<bool>>>,
 }
 
 #[async_trait]
@@ -255,7 +300,29 @@ impl<S: FrameSource + Send + 'static> RdpServerDisplay for ScreenDisplay<S> {
     }
 
     async fn updates(&mut self) -> anyhow::Result<Box<dyn RdpServerDisplayUpdates>> {
-        // Called once a viewer has signed in and the session starts.
+        // Called once a viewer has signed in and the session starts. In
+        // attended mode, ask the person at this computer before showing the
+        // screen; a wrong answer or no answer refuses this viewer (the host
+        // keeps listening for the next).
+        if self.require_approval {
+            // Drop any stale answer from an earlier prompt.
+            {
+                let mut rx = self.approvals.lock().await;
+                while rx.try_recv().is_ok() {}
+            }
+            let _ = self.events.send(HostEvent::ApprovalRequested);
+            let allowed = {
+                let mut rx = self.approvals.lock().await;
+                matches!(
+                    tokio::time::timeout(APPROVAL_TIMEOUT, rx.recv()).await,
+                    Ok(Some(true))
+                )
+            };
+            if !allowed {
+                let _ = self.events.send(HostEvent::ViewerDisconnected);
+                anyhow::bail!("viewer was not allowed");
+            }
+        }
         let _ = self.events.send(HostEvent::ViewerConnected {
             address: String::new(),
         });

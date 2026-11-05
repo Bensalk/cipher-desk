@@ -11,7 +11,15 @@ import '../src/rust/api/vault.dart' show VaultResult;
 import 'persistence.dart';
 
 /// Where sharing stands, for the Share page and the "being shared" banner.
-enum ShareStatus { off, starting, waiting, viewing, lockedOut, failed }
+enum ShareStatus {
+  off,
+  starting,
+  waiting,
+  approvalPending,
+  viewing,
+  lockedOut,
+  failed
+}
 
 /// "Share this screen" (Windows only): settings, the running Host and its
 /// status. Lives as long as the app, so sharing keeps going on other pages.
@@ -36,6 +44,10 @@ class ShareController extends ChangeNotifier {
   /// Open Cipher Desk when this Windows user signs in.
   bool openAtSignIn = false;
 
+  /// Ask for a tap on this PC before a viewer is let in. Off by default so
+  /// an away-from-home connection still works with no one at the host.
+  bool askBeforeConnecting = false;
+
   ShareStatus status = ShareStatus.off;
   String? message;
   String? fingerprint;
@@ -46,6 +58,7 @@ class ShareController extends ChangeNotifier {
 
   bool get isOn => status == ShareStatus.starting ||
       status == ShareStatus.waiting ||
+      status == ShareStatus.approvalPending ||
       status == ShareStatus.viewing ||
       status == ShareStatus.lockedOut;
 
@@ -67,6 +80,7 @@ class ShareController extends ChangeNotifier {
         if (p is int && p > 0 && p < 65536) port = p;
         startWhenAppOpens = j['start_when_app_opens'] == true;
         openAtSignIn = j['open_at_sign_in'] == true;
+        askBeforeConnecting = j['ask_before_connecting'] == true;
       }
     } on Object {
       // A damaged file falls back to the defaults.
@@ -85,16 +99,23 @@ class ShareController extends ChangeNotifier {
         'port': port,
         'start_when_app_opens': startWhenAppOpens,
         'open_at_sign_in': openAtSignIn,
+        'ask_before_connecting': askBeforeConnecting,
       }));
     } on FileSystemException {
       // Settings stay in memory for this run.
     }
   }
 
-  Future<void> update({String? username, int? port, bool? startWhenAppOpens}) async {
+  Future<void> update({
+    String? username,
+    int? port,
+    bool? startWhenAppOpens,
+    bool? askBeforeConnecting,
+  }) async {
     if (username != null && username.trim().isNotEmpty) this.username = username.trim();
     if (port != null && port > 0 && port < 65536) this.port = port;
     if (startWhenAppOpens != null) this.startWhenAppOpens = startWhenAppOpens;
+    if (askBeforeConnecting != null) this.askBeforeConnecting = askBeforeConnecting;
     await _save();
     notifyListeners();
   }
@@ -137,6 +158,17 @@ class ShareController extends ChangeNotifier {
   /// The sharing password, to show on screen.
   String? revealPassword() => hostRevealPassword();
 
+  /// Answers a waiting "allow this connection?" prompt. [allow] false refuses
+  /// the viewer; sharing goes back to waiting for the next one.
+  void approve(bool allow) {
+    if (status != ShareStatus.approvalPending) return;
+    _host?.approve(allow: allow);
+    if (!allow) {
+      status = ShareStatus.waiting;
+      notifyListeners();
+    }
+  }
+
   Future<void> start() async {
     if (!supported || isOn) return;
     final host = _host ??= ShareHost.create();
@@ -146,7 +178,12 @@ class ShareController extends ChangeNotifier {
     await SecureWindow.setSharing(true);
     await _sub?.cancel();
     _sub = host
-        .start(port: port, username: username, dataDir: (await _paths()).dir)
+        .start(
+          port: port,
+          username: username,
+          dataDir: (await _paths()).dir,
+          requireApproval: askBeforeConnecting,
+        )
         .listen(_onUpdate, onDone: () {
       if (isOn) {
         status = ShareStatus.off;
@@ -160,10 +197,16 @@ class ShareController extends ChangeNotifier {
       case HostUpdateKind.listening:
         status = ShareStatus.waiting;
         message = null;
+      case HostUpdateKind.approvalRequested:
+        status = ShareStatus.approvalPending;
+        message = null;
       case HostUpdateKind.viewerConnected:
         status = ShareStatus.viewing;
       case HostUpdateKind.viewerDisconnected:
-        if (status == ShareStatus.viewing) status = ShareStatus.waiting;
+        if (status == ShareStatus.viewing ||
+            status == ShareStatus.approvalPending) {
+          status = ShareStatus.waiting;
+        }
       case HostUpdateKind.lockedOut:
         status = ShareStatus.lockedOut;
         message = 'Too many wrong passwords. New connections are refused for '
