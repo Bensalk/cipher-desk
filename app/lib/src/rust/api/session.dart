@@ -8,7 +8,7 @@ import 'errors.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 
-            // These functions are ignored because they are not marked as `pub`: `approval`, `changed`, `clamped`, `disconnect`, `drive`, `ended`, `frame`, `keep_running`, `new`, `offer_local_clipboard`, `pause`, `pending_disconnect`, `policy`, `poll`, `reconnect`, `reconnecting`, `region_pixels`, `remote_clipboard`, `resized`, `run`, `send_input`, `send`, `size`, `spawn`, `status`, `union`, `vnc`, `wait_for_approval`
+            // These functions are ignored because they are not marked as `pub`: `approval`, `changed`, `clamped`, `disconnect`, `drive`, `ended`, `file_received`, `frame`, `keep_running`, `new`, `offer_local_clipboard`, `pause`, `pending_disconnect`, `policy`, `poll`, `reconnect`, `reconnecting`, `region_pixels`, `remote_clipboard`, `resized`, `run`, `send_files`, `send_input`, `send`, `size`, `spawn`, `status`, `union`, `vnc`, `wait_for_approval`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Command`, `Drive`, `Reconnect`, `Remote`, `Target`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`
 
@@ -58,11 +58,16 @@ static RdpSession  create()=>RustLib.instance.api.crateApiSessionRdpSessionCreat
  void  offerClipboardText({required String text });
 
 
+/// Sends local files to the remote computer, which downloads them. Sent
+/// only if clipboard sharing to the remote is allowed for this connection.
+ void  sendFiles({required List<String> paths });
+
+
 /// Connects on a worker thread; updates arrive on `sink` (a Dart stream).
 /// The password is used for this connection only and never stored here.
 /// `pins_path` is the certificate pin file in the app's private data folder.
 /// Can be called once per handle.
- Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required int idleMinutes });
+ Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes });
 
 
 /// Connects with the VNC method (no username; no clipboard or certificate).
@@ -77,7 +82,7 @@ static RdpSession  create()=>RustLib.instance.api.crateApiSessionRdpSessionCreat
 /// Like [`RdpSession::start`], but reads the saved password from the OS
 /// vault inside Rust, so it never passes through the UI (Windows, Linux).
 /// The caller must have confirmed the user's identity first (S5).
- Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required int idleMinutes });
+ Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes });
 
 
 /// Types text (on-screen keyboards, IMEs, pasted text is NOT sent this way).
@@ -161,6 +166,8 @@ ended,
 remoteClipboard,
 /// Text copied on the remote computer was larger than allowed and was dropped.
 remoteClipboardTooLarge,
+/// A file sent by the remote finished arriving (`text` = its name).
+fileReceived,
 /// The network dropped; reconnect attempt `x` of `y` is under way (`label`).
 /// Input is ignored until `Status` with `connected` arrives again.
 reconnecting,

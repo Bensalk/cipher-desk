@@ -35,6 +35,7 @@ fn open(direction: ClipboardDirection, max_bytes: usize) -> Result<Session, Stri
             pinned_fingerprint: pin,
             connect_timeout: Duration::from_secs(5),
             clipboard: ClipboardPolicy::from_direction(direction, max_bytes),
+            receive_dir: None,
         })
     };
     let fp = match connect(params(None)?) {

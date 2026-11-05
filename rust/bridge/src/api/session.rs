@@ -48,6 +48,8 @@ pub enum UpdateKind {
     RemoteClipboard,
     /// Text copied on the remote computer was larger than allowed and was dropped.
     RemoteClipboardTooLarge,
+    /// A file sent by the remote finished arriving (`text` = its name).
+    FileReceived,
     /// The network dropped; reconnect attempt `x` of `y` is under way (`label`).
     /// Input is ignored until `Status` with `connected` arrives again.
     Reconnecting,
@@ -92,6 +94,13 @@ impl SessionUpdate {
         Self {
             text: Some(text),
             ..Self::new(UpdateKind::RemoteClipboard)
+        }
+    }
+
+    fn file_received(name: String) -> Self {
+        Self {
+            text: Some(name),
+            ..Self::new(UpdateKind::FileReceived)
         }
     }
 
@@ -159,6 +168,7 @@ impl SessionUpdate {
 enum Command {
     Input(Vec<InputEvent>),
     OfferClipboard(String),
+    SendFiles(Vec<String>),
     ApproveCertificate(bool),
     /// End the session: `None` = the user disconnected; otherwise the reason
     /// shown (e.g. the Android background grace period ended).
@@ -198,6 +208,7 @@ impl RdpSession {
         height: u16,
         pins_path: String,
         clipboard_direction: ClipboardMode,
+        download_dir: String,
         idle_minutes: u32,
         sink: StreamSink<SessionUpdate>,
     ) {
@@ -209,6 +220,7 @@ impl RdpSession {
             height,
             pins_path,
             clipboard: clipboard_direction,
+            receive_dir: download_dir,
             idle_minutes,
             vnc: false,
         };
@@ -229,6 +241,7 @@ impl RdpSession {
         height: u16,
         pins_path: String,
         clipboard_direction: ClipboardMode,
+        download_dir: String,
         idle_minutes: u32,
         sink: StreamSink<SessionUpdate>,
     ) {
@@ -240,6 +253,7 @@ impl RdpSession {
             height,
             pins_path,
             clipboard: clipboard_direction,
+            receive_dir: download_dir,
             idle_minutes,
             vnc: false,
         };
@@ -398,6 +412,13 @@ impl RdpSession {
         let _ = self.tx.send(Command::OfferClipboard(text));
     }
 
+    /// Sends local files to the remote computer, which downloads them. Sent
+    /// only if clipboard sharing to the remote is allowed for this connection.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn send_files(&self, paths: Vec<String>) {
+        let _ = self.tx.send(Command::SendFiles(paths));
+    }
+
     /// Answers the certificate prompt.
     #[flutter_rust_bridge::frb(sync)]
     pub fn approve_certificate(&self, approve: bool) {
@@ -460,6 +481,8 @@ struct Target {
     height: u16,
     pins_path: String,
     clipboard: ClipboardMode,
+    /// Folder for files the remote sends; empty turns file receiving off.
+    receive_dir: String,
     /// Disconnect after this many minutes without input; 0 = never (S7).
     idle_minutes: u32,
     /// The VNC method (no username, certificate or clipboard).
@@ -476,6 +499,7 @@ impl Target {
             height: 0,
             pins_path: String::new(),
             clipboard: ClipboardMode::Off,
+            receive_dir: String::new(),
             idle_minutes,
             vnc: true,
         }
@@ -513,6 +537,12 @@ impl Remote {
             Self::Vnc(_) => Ok(()),
         }
     }
+    fn send_files(&mut self, paths: Vec<String>) -> Result<(), ConnectionError> {
+        match self {
+            Self::Rdp(s) => s.send_files(paths.into_iter().map(std::path::PathBuf::from).collect()),
+            Self::Vnc(_) => Ok(()),
+        }
+    }
     fn clamped(&self, r: Region) -> Option<Region> {
         match self {
             Self::Rdp(s) => s.clamped(r),
@@ -545,6 +575,7 @@ fn run(target: &Target, password: SecretString, send: Send<'_>, rx: &Receiver<Co
         height,
         pins_path,
         clipboard,
+        receive_dir,
         idle_minutes,
         vnc,
     } = target;
@@ -605,6 +636,7 @@ fn run(target: &Target, password: SecretString, send: Send<'_>, rx: &Receiver<Co
         pinned_fingerprint: pin,
         connect_timeout: policy.connect_timeout,
         clipboard: clipboard.policy(),
+        receive_dir: (!receive_dir.is_empty()).then(|| std::path::PathBuf::from(receive_dir)),
     };
 
     let session = loop {
@@ -782,8 +814,8 @@ fn wait_for_approval(rx: &Receiver<Command>) -> Option<bool> {
         match rx.recv() {
             Ok(Command::ApproveCertificate(a)) => return Some(a),
             Ok(Command::Disconnect(_)) | Err(_) => return None,
-            // Input and clipboard offers before the session exists are dropped.
-            Ok(Command::Input(_) | Command::OfferClipboard(_)) => {}
+            // Input, clipboard and file offers before the session exists are dropped.
+            Ok(Command::Input(_) | Command::OfferClipboard(_) | Command::SendFiles(_)) => {}
         }
     }
 }
@@ -840,6 +872,11 @@ fn drive(
                         return ended(e);
                     }
                 }
+                Ok(Command::SendFiles(paths)) => {
+                    if let Err(e) = s.send_files(paths) {
+                        return ended(e);
+                    }
+                }
                 Ok(Command::ApproveCertificate(_)) => {}
                 Ok(Command::Disconnect(reason)) => {
                     s.disconnect();
@@ -880,6 +917,9 @@ fn drive(
                 }
                 SessionEvent::RemoteClipboardTooLarge => {
                     send(SessionUpdate::new(UpdateKind::RemoteClipboardTooLarge));
+                }
+                SessionEvent::FileReceived { name } => {
+                    send(SessionUpdate::file_received(name));
                 }
                 SessionEvent::Ended(None) => return Drive::Ended(None),
                 SessionEvent::Ended(Some(err)) => return ended(err),

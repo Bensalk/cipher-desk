@@ -39,6 +39,7 @@ pub mod vault;
 pub mod version;
 pub mod vnc;
 pub mod wol;
+pub mod xfer;
 
 /// Internal parsers exposed only to the fuzzing crate (`rust/fuzz`, SA-3).
 /// Never enabled in the app.

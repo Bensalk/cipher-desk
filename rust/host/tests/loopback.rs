@@ -45,6 +45,7 @@ fn params(port: u16, password: &str, pin: Option<String>) -> ConnectParams {
         pinned_fingerprint: pin,
         connect_timeout: Duration::from_secs(10),
         clipboard: rdpv_core::clipboard::ClipboardPolicy::off(),
+        receive_dir: None,
     }
 }
 

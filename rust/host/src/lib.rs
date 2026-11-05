@@ -64,6 +64,8 @@ pub enum HostEvent {
     /// allow or refuse it (only when "ask before each connection" is on).
     /// Answer with [`HostHandle::approve`].
     ApprovalRequested,
+    /// A file sent by the viewer finished arriving in the Received folder.
+    FileReceived { name: String },
     /// The Host could not start or stopped with an error.
     Failed { message: String },
 }
@@ -90,6 +92,8 @@ pub struct HostHandle {
     stop: Option<tokio::sync::oneshot::Sender<()>>,
     thread: Option<std::thread::JoinHandle<()>>,
     approvals: tokio::sync::mpsc::UnboundedSender<bool>,
+    #[cfg(windows)]
+    clip: Option<clipboard::ClipHandle>,
 }
 
 impl HostHandle {
@@ -98,6 +102,19 @@ impl HostHandle {
     pub fn approve(&self, allow: bool) {
         let _ = self.approvals.send(allow);
     }
+
+    /// Offers these files to the connected viewer, which downloads them. Does
+    /// nothing if no viewer is connected or the clipboard channel is not ready.
+    #[cfg(windows)]
+    pub fn send_files(&self, paths: Vec<PathBuf>) {
+        if let Some(c) = &self.clip {
+            c.offer_files(paths);
+        }
+    }
+
+    /// No file sending off Windows (only Windows hosts).
+    #[cfg(not(windows))]
+    pub fn send_files(&self, _paths: Vec<PathBuf>) {}
 
     /// Stops sharing at once and closes any viewer's connection.
     pub fn stop(mut self) {
@@ -165,23 +182,11 @@ where
     start_on(config, Ipv4Addr::UNSPECIFIED.into(), source, sink, events)
 }
 
-/// Like [`start`], on a chosen address (tests use 127.0.0.1).
 /// Largest clipboard text accepted from the viewer, in bytes of UTF-16 (1 MiB).
 #[cfg(windows)]
 const CLIPBOARD_MAX_BYTES: usize = 1024 * 1024;
 
-/// The clipboard bridge for the Share screen (Windows only). Plain text both
-/// ways; nothing on other platforms, which never host.
-#[cfg(windows)]
-fn cliprdr_factory() -> Option<Box<dyn ironrdp_server::CliprdrServerFactory>> {
-    Some(Box::new(clipboard::HostClipboard::new(CLIPBOARD_MAX_BYTES)))
-}
-
-#[cfg(not(windows))]
-fn cliprdr_factory() -> Option<Box<dyn ironrdp_server::CliprdrServerFactory>> {
-    None
-}
-
+/// Like [`start`], on a chosen address (tests use 127.0.0.1).
 pub fn start_on<S, I>(
     config: HostConfig,
     ip: std::net::IpAddr,
@@ -220,6 +225,21 @@ where
     let username = config.username.trim().to_owned();
     let password = config.password;
     let limiter = limiter::Limiter::new(events.clone());
+
+    // Text + file clipboard bridge (Windows only). Files the viewer sends land
+    // in a "Received" folder beside the app's data; `clip` lets the app offer
+    // files to the viewer through [`HostHandle::send_files`]. The concrete
+    // factory (which is `Send`) moves into the host thread and is boxed there,
+    // since the boxed trait object itself is not `Send`.
+    #[cfg(windows)]
+    let host_clip = clipboard::HostClipboard::new(
+        events.clone(),
+        config.data_dir.join("Received"),
+        CLIPBOARD_MAX_BYTES,
+    );
+    #[cfg(windows)]
+    let clip = Some(host_clip.handle());
+
     // The server's session future is not `Send`, so it runs on its own thread
     // with a single-threaded runtime.
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -232,14 +252,16 @@ where
         .name("cipher-desk-host".into())
         .spawn(move || {
             // Built here: some server parts are not `Send`.
-            let mut server = RdpServer::builder()
+            let builder = RdpServer::builder()
                 .with_addr(SocketAddr::new(ip, port))
                 .with_hybrid(acceptor, identity.pub_key.clone())
                 .with_input_handler(input::Handler { sink })
                 .with_display_handler(display)
-                .with_connection_handler(Some(Box::new(limiter)))
-                .with_cliprdr_factory(cliprdr_factory())
-                .build();
+                .with_connection_handler(Some(Box::new(limiter)));
+            // Clipboard and file transfer are Windows-only (only Windows hosts).
+            #[cfg(windows)]
+            let builder = builder.with_cliprdr_factory(Some(Box::new(host_clip)));
+            let mut server = builder.build();
             server.set_credentials(Some(Credentials {
                 username,
                 password: password.expose().to_owned(),
@@ -276,6 +298,8 @@ where
         stop: Some(stop),
         thread: Some(thread),
         approvals: approve_tx,
+        #[cfg(windows)]
+        clip,
     })
 }
 

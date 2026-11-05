@@ -1,15 +1,21 @@
-//! Host-side text clipboard for the Share screen method.
+//! Host-side clipboard and file transfer for the Share screen method.
 //!
-//! The viewer (client) side already shares plain text; this is the matching
-//! piece on the computer being shared, so copy and paste work both ways:
-//! text copied here can be pasted on the viewer, and text copied on the viewer
-//! can be pasted here. Only plain text (CF_UNICODETEXT) is exchanged — never
-//! files, images or rich text. A size cap limits how much text is accepted.
+//! The viewer (client) side already shares plain text and files; this is the
+//! matching piece on the computer being shared, so copy and paste and file
+//! copy work both ways:
+//! - Text copied here can be pasted on the viewer, and vice versa (plain text
+//!   only, CF_UNICODETEXT, with a size cap).
+//! - Files the viewer sends arrive in a "Received" folder; files offered here
+//!   with [`ClipHandle::offer_files`] are downloaded by the viewer.
 //!
 //! This is a `unsafe` module like [`crate::win`]: the Windows clipboard has no
-//! safe wrapper. Every call says why it is sound.
+//! safe wrapper. Every call says why it is sound. File reads and writes use
+//! plain `std::fs`.
 #![allow(unsafe_code)]
 
+use std::collections::HashMap;
+use std::io::{Read, Seek, SeekFrom};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -17,39 +23,95 @@ use std::time::Duration;
 
 use ironrdp_cliprdr::backend::{ClipboardMessage, CliprdrBackend, CliprdrBackendFactory};
 use ironrdp_cliprdr::pdu::{
-    ClipboardFormat, ClipboardFormatId, ClipboardGeneralCapabilityFlags, FileContentsRequest,
-    FileContentsResponse, FormatDataRequest, FormatDataResponse, LockDataId,
-    OwnedFormatDataResponse,
+    ClipboardFormat, ClipboardFormatId, ClipboardFormatName, ClipboardGeneralCapabilityFlags,
+    FileContentsFlags, FileContentsRequest, FileContentsResponse, FileDescriptor,
+    FormatDataRequest, FormatDataResponse, LockDataId, OwnedFormatDataResponse,
 };
-use ironrdp_server::{ServerEvent, ServerEventSender};
+use ironrdp_server::{CliprdrServerFactory, ServerEvent, ServerEventSender};
+use rdpv_core::xfer;
 use tokio::sync::mpsc::UnboundedSender;
 
-use ironrdp_server::CliprdrServerFactory;
+use crate::HostEvent;
 
 /// How often the host clipboard is checked for a change, to tell the viewer.
 const POLL_INTERVAL: Duration = Duration::from_millis(400);
 
-/// Supplies a clipboard backend to the server and holds the event sender the
-/// backend uses to talk back to the server's loop.
+/// Supplies a clipboard backend to the server and holds the shared state the
+/// backend and the app both use.
 pub struct HostClipboard {
     inner: Arc<Inner>,
 }
 
+/// A file the viewer is sending, mid-arrival.
+struct IncomingFile {
+    name: String,
+}
+
 struct Inner {
     sender: Mutex<Option<UnboundedSender<ServerEvent>>>,
+    events: std::sync::mpsc::Sender<HostEvent>,
+    /// Where files the viewer sends are written.
+    receive_dir: PathBuf,
+    /// Same path as text, for the cliprdr temporary directory.
+    receive_dir_str: String,
+    /// Files currently offered to the viewer, indexed as advertised.
+    outgoing: Mutex<Vec<xfer::Outgoing>>,
+    /// Files arriving from the viewer, keyed by stream id.
+    incoming: Mutex<HashMap<u32, IncomingFile>>,
     /// Largest text accepted from the viewer, in bytes of UTF-16.
     max_bytes: usize,
 }
 
 impl HostClipboard {
     /// `max_bytes` caps text accepted from the viewer (bytes of UTF-16).
-    pub fn new(max_bytes: usize) -> Self {
+    /// `receive_dir` is where files the viewer sends are written.
+    pub fn new(
+        events: std::sync::mpsc::Sender<HostEvent>,
+        receive_dir: PathBuf,
+        max_bytes: usize,
+    ) -> Self {
+        let receive_dir_str = receive_dir.to_string_lossy().into_owned();
         Self {
             inner: Arc::new(Inner {
                 sender: Mutex::new(None),
+                events,
+                receive_dir,
+                receive_dir_str,
+                outgoing: Mutex::new(Vec::new()),
+                incoming: Mutex::new(HashMap::new()),
                 max_bytes,
             }),
         }
+    }
+
+    /// A handle the app keeps to offer files to the viewer.
+    pub fn handle(&self) -> ClipHandle {
+        ClipHandle {
+            inner: Arc::clone(&self.inner),
+        }
+    }
+}
+
+/// Lets the app offer files to the connected viewer.
+#[derive(Clone)]
+pub struct ClipHandle {
+    inner: Arc<Inner>,
+}
+
+impl ClipHandle {
+    /// Offers these local files to the viewer, which downloads them. Files that
+    /// are missing or too large are skipped; if none qualify, nothing is sent.
+    pub fn offer_files(&self, paths: Vec<PathBuf>) {
+        let files = xfer::offer(&paths);
+        if files.is_empty() {
+            return;
+        }
+        let descriptors: Vec<FileDescriptor> = files.iter().map(|o| o.descriptor.clone()).collect();
+        if let Ok(mut out) = self.inner.outgoing.lock() {
+            *out = files;
+        }
+        self.inner
+            .send(ClipboardMessage::SendInitiateFileCopy(descriptors));
     }
 }
 
@@ -60,6 +122,13 @@ impl Inner {
                 let _ = tx.send(ServerEvent::Clipboard(msg));
             }
         }
+    }
+
+    /// Path and size of the file offered at `index`, if any.
+    fn offered(&self, index: i32) -> Option<(PathBuf, u64)> {
+        let i = usize::try_from(index).ok()?;
+        let out = self.outgoing.lock().ok()?;
+        out.get(i).map(|o| (o.path.clone(), o.size))
     }
 }
 
@@ -90,6 +159,24 @@ fn advertise(inner: &Inner) {
         Vec::new()
     };
     inner.send(ClipboardMessage::SendInitiateCopy(formats));
+}
+
+/// Reads up to `len` bytes of `path` starting at `position`.
+fn read_range(path: &std::path::Path, position: u64, len: u64) -> Option<Vec<u8>> {
+    let mut f = std::fs::File::open(path).ok()?;
+    f.seek(SeekFrom::Start(position)).ok()?;
+    let cap = len.min(xfer::MAX_FILE_BYTES);
+    let mut buf = vec![0u8; usize::try_from(cap).ok()?];
+    let mut read = 0usize;
+    while read < buf.len() {
+        match f.read(&mut buf[read..]) {
+            Ok(0) => break,
+            Ok(n) => read += n,
+            Err(_) => return None,
+        }
+    }
+    buf.truncate(read);
+    Some(buf)
 }
 
 /// Watches this computer's clipboard and re-advertises when it changes, so a
@@ -153,15 +240,19 @@ impl Drop for Backend {
     }
 }
 
+/// Whether a format in the list is the file-list format ("FileGroupDescriptorW").
+fn is_file_list(f: &ClipboardFormat) -> bool {
+    f.name().map(|n| n.value()) == Some(ClipboardFormatName::FILE_LIST.value())
+}
+
 impl CliprdrBackend for Backend {
     fn temporary_directory(&self) -> &str {
-        // Files are never exchanged; nothing is written here.
-        "."
+        &self.inner.receive_dir_str
     }
 
     fn client_capabilities(&self) -> ClipboardGeneralCapabilityFlags {
-        // Plain text only: no file copy, no long format names.
-        ClipboardGeneralCapabilityFlags::empty()
+        // Plain text plus stream-based file copy.
+        xfer::file_caps()
     }
 
     fn on_ready(&mut self) {
@@ -178,14 +269,51 @@ impl CliprdrBackend for Backend {
     fn on_process_negotiated_capabilities(&mut self, _: ClipboardGeneralCapabilityFlags) {}
 
     fn on_remote_copy(&mut self, formats: &[ClipboardFormat]) {
-        // The viewer copied something: if it offers text, ask for it so we can
-        // put it on this computer's clipboard.
+        // The viewer copied something: pull files if offered, else text.
+        if let Some(file_format) = formats.iter().find(|f| is_file_list(f)) {
+            self.inner
+                .send(ClipboardMessage::SendInitiatePaste(file_format.id()));
+            return;
+        }
         let has_text = formats
             .iter()
             .any(|f| f.id() == ClipboardFormatId::CF_UNICODETEXT);
         if has_text {
             self.inner.send(ClipboardMessage::SendInitiatePaste(
                 ClipboardFormatId::CF_UNICODETEXT,
+            ));
+        }
+    }
+
+    fn on_remote_file_list(&mut self, files: &[FileDescriptor], clip_data_id: Option<u32>) {
+        // The viewer is sending files: request each one's bytes in one range.
+        for (i, fd) in files.iter().enumerate() {
+            let Some(name) = xfer::safe_file_name(&fd.name) else {
+                continue;
+            };
+            let size = fd.file_size.unwrap_or(0);
+            if size > xfer::MAX_FILE_BYTES {
+                continue;
+            }
+            let Ok(stream_id) = u32::try_from(i) else {
+                continue;
+            };
+            let Ok(index) = i32::try_from(i) else {
+                continue;
+            };
+            if let Ok(mut map) = self.inner.incoming.lock() {
+                map.insert(stream_id, IncomingFile { name });
+            }
+            let requested_size = u32::try_from(size).unwrap_or(u32::MAX);
+            self.inner.send(ClipboardMessage::SendFileContentsRequest(
+                FileContentsRequest {
+                    stream_id,
+                    index,
+                    flags: FileContentsFlags::RANGE,
+                    position: 0,
+                    requested_size,
+                    data_id: clip_data_id,
+                },
             ));
         }
     }
@@ -219,9 +347,50 @@ impl CliprdrBackend for Backend {
         }
     }
 
-    // Files and locking are never used (plain text only).
-    fn on_file_contents_request(&mut self, _: FileContentsRequest) {}
-    fn on_file_contents_response(&mut self, _: FileContentsResponse<'_>) {}
+    fn on_file_contents_request(&mut self, request: FileContentsRequest) {
+        // The viewer is downloading a file we offered.
+        let response = match self.inner.offered(request.index) {
+            Some((_path, size)) if request.flags.contains(FileContentsFlags::SIZE) => {
+                FileContentsResponse::new_size_response(request.stream_id, size)
+            }
+            Some((path, _)) => {
+                match read_range(&path, request.position, u64::from(request.requested_size)) {
+                    Some(bytes) => {
+                        FileContentsResponse::new_data_response(request.stream_id, bytes)
+                    }
+                    None => FileContentsResponse::new_error(request.stream_id),
+                }
+            }
+            None => FileContentsResponse::new_error(request.stream_id),
+        };
+        self.inner
+            .send(ClipboardMessage::SendFileContentsResponse(response));
+    }
+
+    fn on_file_contents_response(&mut self, response: FileContentsResponse<'_>) {
+        // A file we requested from the viewer arrived whole; write it.
+        if response.is_error() {
+            return;
+        }
+        let file = match self.inner.incoming.lock() {
+            Ok(mut map) => map.remove(&response.stream_id()),
+            Err(_) => None,
+        };
+        let Some(file) = file else {
+            return;
+        };
+        if std::fs::create_dir_all(&self.inner.receive_dir).is_err() {
+            return;
+        }
+        let path = xfer::unique_path(&self.inner.receive_dir, &file.name);
+        if std::fs::write(&path, response.data()).is_ok() {
+            let _ = self
+                .inner
+                .events
+                .send(HostEvent::FileReceived { name: file.name });
+        }
+    }
+
     fn on_lock(&mut self, _: LockDataId) {}
     fn on_unlock(&mut self, _: LockDataId) {}
 }
@@ -346,7 +515,7 @@ mod winclip {
 
 #[cfg(test)]
 mod tests {
-    use super::decode_unicode_text;
+    use super::{decode_unicode_text, read_range};
 
     #[test]
     fn decodes_utf16_with_terminator() {
@@ -358,5 +527,18 @@ mod tests {
         assert_eq!(decode_unicode_text(&bytes).as_deref(), Some("héllo 😀"));
         assert_eq!(decode_unicode_text(&[0x41]), None); // odd length
         assert_eq!(decode_unicode_text(&[0x00, 0xD8]), None); // lone surrogate
+    }
+
+    #[test]
+    fn read_range_reads_a_slice() {
+        let dir = std::env::temp_dir().join(format!("cd-clip-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let p = dir.join("f.bin");
+        if std::fs::write(&p, b"0123456789").is_err() {
+            return;
+        }
+        assert_eq!(read_range(&p, 2, 3).as_deref(), Some(&b"234"[..]));
+        assert_eq!(read_range(&p, 8, 100).as_deref(), Some(&b"89"[..]));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

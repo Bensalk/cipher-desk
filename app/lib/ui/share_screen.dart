@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -35,6 +36,26 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
     super.initState();
     _loadAddresses();
     _refreshService();
+    widget.share.onFileReceived = (name) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Received "$name" from the viewer into the Received folder.'),
+      ));
+    };
+  }
+
+  /// Picks files on this computer and offers them to the viewer to download.
+  Future<void> _sendFiles() async {
+    final files = await openFiles();
+    if (files.isEmpty) return;
+    widget.share.sendFiles(files.map((f) => f.path).toList());
+    if (!mounted) return;
+    final many = files.length > 1;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(many
+          ? 'Offering ${files.length} files to the viewer…'
+          : 'Offering "${files.first.name}" to the viewer…'),
+    ));
   }
 
   Future<void> _refreshService() async {
@@ -51,6 +72,7 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
 
   @override
   void dispose() {
+    widget.share.onFileReceived = null;
     _user.dispose();
     _port.dispose();
     super.dispose();
@@ -421,6 +443,24 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
           const SizedBox(height: 16),
           _StatusCard(share: s),
           const SizedBox(height: 16),
+          if (s.status == ShareStatus.viewing) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                key: const Key('share-send-file'),
+                onPressed: _sendFiles,
+                icon: const Icon(Icons.upload_file_outlined),
+                label: const Text('Send a file to the viewer'),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(top: 4, bottom: 16),
+              child: Text(
+                'Files the viewer sends you arrive in the Received folder '
+                'inside Cipher Desk’s data folder.',
+              ),
+            ),
+          ],
           if (HostService.supported) ...[
             _signInScreenCard(scheme),
             const SizedBox(height: 16),

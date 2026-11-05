@@ -27,6 +27,8 @@ pub enum HostUpdateKind {
     /// A viewer signed in and is waiting to be allowed (attended mode).
     /// Answer with [`ShareHost::approve`].
     ApprovalRequested,
+    /// A file sent by the viewer finished arriving (`message` = its name).
+    FileReceived,
     /// Sharing stopped or could not start (`message`).
     Failed,
 }
@@ -193,6 +195,20 @@ impl ShareHost {
         let _ = allow;
     }
 
+    /// Offers files to the connected viewer, which downloads them. Does nothing
+    /// if no viewer is connected.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn send_files(&self, paths: Vec<String>) {
+        #[cfg(windows)]
+        if let Ok(h) = self.handle.lock() {
+            if let Some(handle) = h.as_ref() {
+                handle.send_files(paths.into_iter().map(std::path::PathBuf::from).collect());
+            }
+        }
+        #[cfg(not(windows))]
+        let _ = paths;
+    }
+
     /// Stops sharing and disconnects the viewer.
     #[flutter_rust_bridge::frb(sync)]
     pub fn stop(&self) {
@@ -272,6 +288,10 @@ impl ShareHost {
                             ..HostUpdate::of(HostUpdateKind::LockedOut)
                         },
                         E::ApprovalRequested => HostUpdate::of(HostUpdateKind::ApprovalRequested),
+                        E::FileReceived { name } => HostUpdate {
+                            message: Some(name),
+                            ..HostUpdate::of(HostUpdateKind::FileReceived)
+                        },
                         E::Failed { message } => HostUpdate::failed(&message),
                     };
                     if sink.add(update).is_err() {

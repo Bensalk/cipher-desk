@@ -50,6 +50,11 @@ bool  hostServiceStashPassword({required String pendingPath , required String pa
 static ShareHost  create()=>RustLib.instance.api.crateApiHostShareHostCreate();
 
 
+/// Offers files to the connected viewer, which downloads them. Does nothing
+/// if no viewer is connected.
+ void  sendFiles({required List<String> paths });
+
+
 /// Starts sharing with the saved password. `data_dir` is the app's private
 /// data folder (the Host certificate is kept there). When `require_approval`
 /// is true, each viewer must be allowed from this computer ([`ShareHost::approve`]).
@@ -105,6 +110,8 @@ lockedOut,
 /// A viewer signed in and is waiting to be allowed (attended mode).
 /// Answer with [`ShareHost::approve`].
 approvalRequested,
+/// A file sent by the viewer finished arriving (`message` = its name).
+fileReceived,
 /// Sharing stopped or could not start (`message`).
 failed,
                     ;

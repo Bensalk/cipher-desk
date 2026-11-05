@@ -13,11 +13,16 @@
 //!   ([`ConnectionError`]); raw library text is only used for classification.
 
 use core::time::Duration;
+use std::collections::HashMap;
 use std::io::{self, Write as _};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs as _};
+use std::path::PathBuf;
 
 use ironrdp_blocking::Framed;
-use ironrdp_cliprdr::pdu::{ClipboardFormat, ClipboardFormatId, OwnedFormatDataResponse};
+use ironrdp_cliprdr::pdu::{
+    ClipboardFormat, ClipboardFormatId, FileContentsFlags, FileContentsRequest,
+    FileContentsResponse, FileDescriptor, OwnedFormatDataResponse,
+};
 use ironrdp_cliprdr::CliprdrClient;
 use ironrdp_connector::connection_activation::{
     ConnectionActivationFactory, ConnectionActivationState,
@@ -69,6 +74,9 @@ pub struct ConnectParams {
     /// Text clipboard sharing (off by default). When off, the clipboard
     /// channel is not even offered to the host.
     pub clipboard: ClipboardPolicy,
+    /// Folder where files the remote sends are written. `None` turns file
+    /// receiving off (sending is still possible if the policy allows).
+    pub receive_dir: Option<PathBuf>,
 }
 
 /// Why [`connect`] did not produce a session.
@@ -116,6 +124,8 @@ pub enum SessionEvent {
     RemoteClipboardText(String),
     /// Text copied on the host was larger than the policy allows and was dropped.
     RemoteClipboardTooLarge,
+    /// A file sent by the remote finished arriving in the receive folder.
+    FileReceived { name: String },
 }
 
 /// Result of offering this device's clipboard text to the host.
@@ -131,6 +141,26 @@ pub enum ClipboardOffer {
     Unchanged,
 }
 
+/// Reads up to `len` bytes of `path` from `position`, for serving a file the
+/// remote is downloading. `None` if the file cannot be read.
+fn read_file_range(path: &std::path::Path, position: u64, len: u64) -> Option<Vec<u8>> {
+    use std::io::{Read as _, Seek as _, SeekFrom};
+    let mut f = std::fs::File::open(path).ok()?;
+    f.seek(SeekFrom::Start(position)).ok()?;
+    let cap = len.min(crate::xfer::MAX_FILE_BYTES);
+    let mut buf = vec![0u8; usize::try_from(cap).ok()?];
+    let mut read = 0usize;
+    while read < buf.len() {
+        match f.read(&mut buf[read..]) {
+            Ok(0) => break,
+            Ok(n) => read += n,
+            Err(_) => return None,
+        }
+    }
+    buf.truncate(read);
+    Some(buf)
+}
+
 /// Clipboard state for one session.
 struct ClipState {
     policy: ClipboardPolicy,
@@ -140,6 +170,12 @@ struct ClipState {
     /// Last text received from the host, to avoid echoing it straight back.
     last_remote: Option<String>,
     ready: bool,
+    /// Where files the remote sends are written (`None` turns receiving off).
+    receive_dir: Option<PathBuf>,
+    /// Files this device currently offers to the remote, as advertised.
+    outgoing: Vec<crate::xfer::Outgoing>,
+    /// Files arriving from the remote, keyed by stream id → name.
+    incoming: HashMap<u32, String>,
 }
 
 /// An open RDP session.
@@ -174,6 +210,7 @@ pub fn connect(params: ConnectParams) -> Result<Session, ConnectFailure> {
         pinned_fingerprint,
         connect_timeout,
         clipboard,
+        receive_dir,
     } = params;
 
     let addr = resolve(&endpoint).map_err(ConnectFailure::Failed)?;
@@ -200,6 +237,9 @@ pub fn connect(params: ConnectParams) -> Result<Session, ConnectFailure> {
             local_text: None,
             last_remote: None,
             ready: false,
+            receive_dir,
+            outgoing: Vec::new(),
+            incoming: HashMap::new(),
         })
     } else {
         None
@@ -401,6 +441,35 @@ impl Session {
         Ok(ClipboardOffer::Offered)
     }
 
+    /// Offers files to the remote computer, which downloads them. Does nothing
+    /// if clipboard sharing to the remote is off for this connection, or if no
+    /// path is a readable file within the size limit.
+    pub fn send_files(&mut self, paths: Vec<PathBuf>) -> Result<(), ConnectionError> {
+        let descriptors = {
+            let Some(clip) = self.clip.as_mut() else {
+                return Ok(());
+            };
+            if !clip.policy.local_to_host {
+                return Ok(());
+            }
+            let files = crate::xfer::offer(&paths);
+            if files.is_empty() {
+                return Ok(());
+            }
+            let descriptors: Vec<FileDescriptor> =
+                files.iter().map(|o| o.descriptor.clone()).collect();
+            clip.outgoing = files;
+            descriptors
+        };
+        let msgs = self
+            .stage
+            .get_svc_processor_mut::<CliprdrClient>()
+            .ok_or(ConnectionError::Unexpected)?
+            .initiate_file_copy(descriptors)
+            .map_err(|_| ConnectionError::Unexpected)?;
+        self.send_svc(msgs)
+    }
+
     /// Tells the host which formats this device offers (plain text or nothing).
     fn advertise_local(&mut self) -> Result<(), ConnectionError> {
         let offer_text = self
@@ -511,6 +580,104 @@ impl Session {
                     }
                 }
                 ClipAction::DataReceived(_) => {}
+                ClipAction::RemoteFiles(format) => {
+                    if policy.host_to_local {
+                        let msgs = self
+                            .stage
+                            .get_svc_processor_mut::<CliprdrClient>()
+                            .ok_or(ConnectionError::Unexpected)?
+                            .initiate_paste(format)
+                            .map_err(|_| ConnectionError::Unexpected)?;
+                        self.send_svc(msgs)?;
+                    }
+                }
+                ClipAction::FileList {
+                    files,
+                    clip_data_id,
+                } => {
+                    if policy.host_to_local {
+                        // Record each file and build its request while `clip` is
+                        // borrowed; send the requests afterwards.
+                        let mut requests = Vec::new();
+                        for (i, (name, size)) in files.iter().enumerate() {
+                            let Some(name) = crate::xfer::safe_file_name(name) else {
+                                continue;
+                            };
+                            if *size > crate::xfer::MAX_FILE_BYTES {
+                                continue;
+                            }
+                            let (Ok(stream_id), Ok(index)) = (u32::try_from(i), i32::try_from(i))
+                            else {
+                                continue;
+                            };
+                            clip.incoming.insert(stream_id, name);
+                            requests.push(FileContentsRequest {
+                                stream_id,
+                                index,
+                                flags: FileContentsFlags::RANGE,
+                                position: 0,
+                                requested_size: u32::try_from(*size).unwrap_or(u32::MAX),
+                                data_id: clip_data_id,
+                            });
+                        }
+                        for req in requests {
+                            let msgs = self
+                                .stage
+                                .get_svc_processor_mut::<CliprdrClient>()
+                                .ok_or(ConnectionError::Unexpected)?
+                                .request_file_contents(req)
+                                .map_err(|_| ConnectionError::Unexpected)?;
+                            self.send_svc(msgs)?;
+                        }
+                    }
+                }
+                ClipAction::FileRequest(request) => {
+                    let found = if policy.local_to_host {
+                        usize::try_from(request.index)
+                            .ok()
+                            .and_then(|i| clip.outgoing.get(i))
+                            .map(|o| (o.path.clone(), o.size))
+                    } else {
+                        None
+                    };
+                    let response = match found {
+                        Some((_path, size)) if request.flags.contains(FileContentsFlags::SIZE) => {
+                            FileContentsResponse::new_size_response(request.stream_id, size)
+                        }
+                        Some((path, _)) => match read_file_range(
+                            &path,
+                            request.position,
+                            u64::from(request.requested_size),
+                        ) {
+                            Some(bytes) => {
+                                FileContentsResponse::new_data_response(request.stream_id, bytes)
+                            }
+                            None => FileContentsResponse::new_error(request.stream_id),
+                        },
+                        None => FileContentsResponse::new_error(request.stream_id),
+                    };
+                    let msgs = self
+                        .stage
+                        .get_svc_processor_mut::<CliprdrClient>()
+                        .ok_or(ConnectionError::Unexpected)?
+                        .submit_file_contents(response)
+                        .map_err(|_| ConnectionError::Unexpected)?;
+                    self.send_svc(msgs)?;
+                }
+                ClipAction::FileData { stream_id, bytes } => {
+                    if policy.host_to_local {
+                        let name = clip.incoming.remove(&stream_id);
+                        let dir = clip.receive_dir.clone();
+                        if let (Some(name), Some(dir), Some(bytes)) = (name, dir, bytes) {
+                            if std::fs::create_dir_all(&dir).is_ok() {
+                                let path = crate::xfer::unique_path(&dir, &name);
+                                if std::fs::write(&path, &bytes).is_ok() {
+                                    events.push(SessionEvent::FileReceived { name });
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         Ok(())

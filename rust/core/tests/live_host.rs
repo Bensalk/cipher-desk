@@ -60,6 +60,7 @@ fn params(
         pinned_fingerprint: pin,
         connect_timeout: Duration::from_secs(5),
         clipboard: rdpv_core::clipboard::ClipboardPolicy::off(),
+        receive_dir: None,
     })
 }
 

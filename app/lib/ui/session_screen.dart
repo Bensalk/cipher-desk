@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -211,6 +213,11 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     // Clipboard is text-only and off for VNC; the method decides.
     final clipboard =
         widget.profile.method.supportsClipboard ? widget.profile.clipboardMode : ClipboardMode.off;
+    // Files the remote sends land in a "Received" folder beside the app data.
+    // Empty turns file receiving off (when the clipboard is off).
+    final downloadDir = clipboard == ClipboardMode.off
+        ? ''
+        : '${File(pinsPath).parent.path}${Platform.pathSeparator}Received';
     final vnc = widget.profile.method == ConnectionMethod.vnc;
     final stream = vnc
         ? (widget.useSavedPassword
@@ -236,6 +243,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
             height: h,
             pinsPath: pinsPath,
             clipboardDirection: clipboard,
+            downloadDir: downloadDir,
             idleMinutes: widget.idleMinutes,
           )
         : _session.start(
@@ -247,6 +255,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
             height: h,
             pinsPath: pinsPath,
             clipboardDirection: clipboard,
+            downloadDir: downloadDir,
             idleMinutes: widget.idleMinutes,
           );
     _sub = stream.listen(_onUpdate, onError: (_) => _onEnded(null));
@@ -308,7 +317,27 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Text copied on the remote computer was larger than 1 MB and was not copied.'),
         ));
+      case UpdateKind.fileReceived:
+        if (!mounted) return;
+        final name = u.text ?? 'a file';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Received "$name" into the Received folder.'),
+        ));
     }
+  }
+
+  /// Picks local files and sends them to the remote computer.
+  Future<void> _sendFiles() async {
+    final files = await openFiles();
+    if (files.isEmpty) return;
+    _session.sendFiles(paths: files.map((f) => f.path).toList());
+    if (!mounted) return;
+    final many = files.length > 1;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(many
+          ? 'Sending ${files.length} files to the remote computer…'
+          : 'Sending "${files.first.name}" to the remote computer…'),
+    ));
   }
 
   (String, String)? _changedFingerprints;
@@ -876,6 +905,13 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
                 tooltip: 'Send clipboard to the remote computer',
                 icon: const Icon(Icons.content_paste_go_outlined),
                 onPressed: _offerLocalClipboard,
+              ),
+            if (_sendsClipboard)
+              IconButton(
+                key: const Key('button-send-file'),
+                tooltip: 'Send a file to the remote computer',
+                icon: const Icon(Icons.upload_file_outlined),
+                onPressed: _sendFiles,
               ),
           ],
         ),

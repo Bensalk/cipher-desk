@@ -75,7 +75,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
                   String get codegenVersion => '2.13.0';
 
                   @override
-                  int get rustContentHash => 1835807383;
+                  int get rustContentHash => -1360044166;
 
                   static const kDefaultExternalLibraryLoaderConfig = ExternalLibraryLoaderConfig(
                     stem: 'rust_lib_cipher_desk',
@@ -105,13 +105,15 @@ void crateApiSessionRdpSessionMouseMove({required RdpSession that , required int
 
 void crateApiSessionRdpSessionOfferClipboardText({required RdpSession that , required String text });
 
-Stream<SessionUpdate> crateApiSessionRdpSessionStart({required RdpSession that , required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required int idleMinutes });
+void crateApiSessionRdpSessionSendFiles({required RdpSession that , required List<String> paths });
+
+Stream<SessionUpdate> crateApiSessionRdpSessionStart({required RdpSession that , required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes });
 
 Stream<SessionUpdate> crateApiSessionRdpSessionStartVnc({required RdpSession that , required String host , required int port , required String password , required int idleMinutes });
 
 Stream<SessionUpdate> crateApiSessionRdpSessionStartVncWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required int idleMinutes });
 
-Stream<SessionUpdate> crateApiSessionRdpSessionStartWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required int idleMinutes });
+Stream<SessionUpdate> crateApiSessionRdpSessionStartWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes });
 
 void crateApiSessionRdpSessionTypeText({required RdpSession that , required String text });
 
@@ -120,6 +122,8 @@ void crateApiSessionRdpSessionWheel({required RdpSession that , required bool ve
 void crateApiHostShareHostApprove({required ShareHost that , required bool allow });
 
 ShareHost crateApiHostShareHostCreate();
+
+void crateApiHostShareHostSendFiles({required ShareHost that , required List<String> paths });
 
 Stream<HostUpdate> crateApiHostShareHostStart({required ShareHost that , required int port , required String username , required String dataDir , required bool requireApproval });
 
@@ -449,7 +453,33 @@ sse_encode_String(text, serializer);
         );
         
 
-@override Stream<SessionUpdate> crateApiSessionRdpSessionStart({required RdpSession that , required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required int idleMinutes })  { 
+@override void crateApiSessionRdpSessionSendFiles({required RdpSession that , required List<String> paths })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
+sse_encode_list_String(paths, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiSessionRdpSessionSendFilesConstMeta,
+            argValues: [that, paths],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiSessionRdpSessionSendFilesConstMeta => const TaskConstMeta(
+            debugName: "RdpSession_send_files",
+            argNames: ["that", "paths"],
+        );
+        
+
+@override Stream<SessionUpdate> crateApiSessionRdpSessionStart({required RdpSession that , required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes })  { 
             final sink = RustStreamSink<SessionUpdate>();
             unawaited(handler.executeNormal(NormalTask(
             callFfi: (port_) {
@@ -463,9 +493,10 @@ sse_encode_u_16(width, serializer);
 sse_encode_u_16(height, serializer);
 sse_encode_String(pinsPath, serializer);
 sse_encode_clipboard_mode(clipboardDirection, serializer);
+sse_encode_String(downloadDir, serializer);
 sse_encode_u_32(idleMinutes, serializer);
 sse_encode_StreamSink_session_update_Sse(sink, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11, port: port_);
             
             },
             codec: 
@@ -475,7 +506,7 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
         )
         ,
             constMeta: kCrateApiSessionRdpSessionStartConstMeta,
-            argValues: [that, host, port, username, password, width, height, pinsPath, clipboardDirection, idleMinutes, sink],
+            argValues: [that, host, port, username, password, width, height, pinsPath, clipboardDirection, downloadDir, idleMinutes, sink],
             apiImpl: this,
         )));
             return sink.stream;
@@ -484,7 +515,7 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
 
         TaskConstMeta get kCrateApiSessionRdpSessionStartConstMeta => const TaskConstMeta(
             debugName: "RdpSession_start",
-            argNames: ["that", "host", "port", "username", "password", "width", "height", "pinsPath", "clipboardDirection", "idleMinutes", "sink"],
+            argNames: ["that", "host", "port", "username", "password", "width", "height", "pinsPath", "clipboardDirection", "downloadDir", "idleMinutes", "sink"],
         );
         
 
@@ -499,7 +530,7 @@ sse_encode_u_16(port, serializer);
 sse_encode_String(password, serializer);
 sse_encode_u_32(idleMinutes, serializer);
 sse_encode_StreamSink_session_update_Sse(sink, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12, port: port_);
             
             },
             codec: 
@@ -533,7 +564,7 @@ sse_encode_String(host, serializer);
 sse_encode_u_16(port, serializer);
 sse_encode_u_32(idleMinutes, serializer);
 sse_encode_StreamSink_session_update_Sse(sink, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13, port: port_);
             
             },
             codec: 
@@ -556,7 +587,7 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
         );
         
 
-@override Stream<SessionUpdate> crateApiSessionRdpSessionStartWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required int idleMinutes })  { 
+@override Stream<SessionUpdate> crateApiSessionRdpSessionStartWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes })  { 
             final sink = RustStreamSink<SessionUpdate>();
             unawaited(handler.executeNormal(NormalTask(
             callFfi: (port_) {
@@ -570,9 +601,10 @@ sse_encode_u_16(width, serializer);
 sse_encode_u_16(height, serializer);
 sse_encode_String(pinsPath, serializer);
 sse_encode_clipboard_mode(clipboardDirection, serializer);
+sse_encode_String(downloadDir, serializer);
 sse_encode_u_32(idleMinutes, serializer);
 sse_encode_StreamSink_session_update_Sse(sink, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14, port: port_);
             
             },
             codec: 
@@ -582,7 +614,7 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
         )
         ,
             constMeta: kCrateApiSessionRdpSessionStartWithSavedPasswordConstMeta,
-            argValues: [that, connectionId, host, port, username, width, height, pinsPath, clipboardDirection, idleMinutes, sink],
+            argValues: [that, connectionId, host, port, username, width, height, pinsPath, clipboardDirection, downloadDir, idleMinutes, sink],
             apiImpl: this,
         )));
             return sink.stream;
@@ -591,7 +623,7 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
 
         TaskConstMeta get kCrateApiSessionRdpSessionStartWithSavedPasswordConstMeta => const TaskConstMeta(
             debugName: "RdpSession_start_with_saved_password",
-            argNames: ["that", "connectionId", "host", "port", "username", "width", "height", "pinsPath", "clipboardDirection", "idleMinutes", "sink"],
+            argNames: ["that", "connectionId", "host", "port", "username", "width", "height", "pinsPath", "clipboardDirection", "downloadDir", "idleMinutes", "sink"],
         );
         
 
@@ -600,7 +632,7 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
 sse_encode_String(text, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15)!;
             
             },
             codec: 
@@ -627,7 +659,7 @@ sse_encode_String(text, serializer);
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
 sse_encode_bool(vertical, serializer);
 sse_encode_i_16(delta, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
             
             },
             codec: 
@@ -653,7 +685,7 @@ sse_encode_i_16(delta, serializer);
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(that, serializer);
 sse_encode_bool(allow, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17)!;
             
             },
             codec: 
@@ -678,7 +710,7 @@ sse_encode_bool(allow, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18)!;
             
             },
             codec: 
@@ -699,6 +731,32 @@ sse_encode_bool(allow, serializer);
         );
         
 
+@override void crateApiHostShareHostSendFiles({required ShareHost that , required List<String> paths })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+              
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(that, serializer);
+sse_encode_list_String(paths, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
+            
+            },
+            codec: 
+        SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiHostShareHostSendFilesConstMeta,
+            argValues: [that, paths],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiHostShareHostSendFilesConstMeta => const TaskConstMeta(
+            debugName: "ShareHost_send_files",
+            argNames: ["that", "paths"],
+        );
+        
+
 @override Stream<HostUpdate> crateApiHostShareHostStart({required ShareHost that , required int port , required String username , required String dataDir , required bool requireApproval })  { 
             final sink = RustStreamSink<HostUpdate>();
             unawaited(handler.executeNormal(NormalTask(
@@ -710,7 +768,7 @@ sse_encode_String(username, serializer);
 sse_encode_String(dataDir, serializer);
 sse_encode_bool(requireApproval, serializer);
 sse_encode_StreamSink_host_update_Sse(sink, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20, port: port_);
             
             },
             codec: 
@@ -737,7 +795,7 @@ sse_encode_StreamSink_host_update_Sse(sink, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(that, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
             
             },
             codec: 
@@ -762,7 +820,7 @@ sse_encode_StreamSink_host_update_Sse(sink, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 22)!;
             
             },
             codec: 
@@ -793,7 +851,7 @@ sse_encode_String(port, serializer);
 sse_encode_String(username, serializer);
 sse_encode_String(password, serializer);
 sse_encode_bool(hasSavedPassword, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23)!;
             
             },
             codec: 
@@ -820,7 +878,7 @@ sse_encode_bool(hasSavedPassword, serializer);
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(host, serializer);
 sse_encode_u_16(port, serializer);
 sse_encode_u_32(timeoutMs, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 22, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 24, port: port_);
             
             },
             codec: 
@@ -845,7 +903,7 @@ sse_encode_u_32(timeoutMs, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_list_connection_data(connections, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25)!;
             
             },
             codec: 
@@ -870,7 +928,7 @@ sse_encode_u_32(timeoutMs, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(text, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 24)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
             
             },
             codec: 
@@ -895,7 +953,7 @@ sse_encode_u_32(timeoutMs, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(path, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27)!;
             
             },
             codec: 
@@ -922,7 +980,7 @@ sse_encode_u_32(timeoutMs, serializer);
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(path, serializer);
 sse_encode_list_connection_data(connections, serializer);
 sse_encode_list_history_data(history, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28)!;
             
             },
             codec: 
@@ -947,7 +1005,7 @@ sse_encode_list_history_data(history, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29)!;
             
             },
             codec: 
@@ -972,7 +1030,7 @@ sse_encode_list_history_data(history, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
             
             },
             codec: 
@@ -997,7 +1055,7 @@ sse_encode_list_history_data(history, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_connection_method(method, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 31)!;
             
             },
             codec: 
@@ -1024,7 +1082,7 @@ sse_encode_list_history_data(history, serializer);
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(pinsPath, serializer);
 sse_encode_String(host, serializer);
 sse_encode_u_16(port, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32)!;
             
             },
             codec: 
@@ -1050,7 +1108,7 @@ sse_encode_u_16(port, serializer);
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(pinsPath, serializer);
 sse_encode_String(endpoint, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 31)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 33)!;
             
             },
             codec: 
@@ -1075,7 +1133,7 @@ sse_encode_String(endpoint, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 34)!;
             
             },
             codec: 
@@ -1100,7 +1158,7 @@ sse_encode_String(endpoint, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(dataDir, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 33)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 35)!;
             
             },
             codec: 
@@ -1125,7 +1183,7 @@ sse_encode_String(endpoint, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 34)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 36)!;
             
             },
             codec: 
@@ -1150,7 +1208,7 @@ sse_encode_String(endpoint, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 35)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 37)!;
             
             },
             codec: 
@@ -1175,7 +1233,7 @@ sse_encode_String(endpoint, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 36)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 38)!;
             
             },
             codec: 
@@ -1201,7 +1259,7 @@ sse_encode_String(endpoint, serializer);
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(pendingPath, serializer);
 sse_encode_String(password, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 37)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 39)!;
             
             },
             codec: 
@@ -1226,7 +1284,7 @@ sse_encode_String(password, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(password, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 38)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 40)!;
             
             },
             codec: 
@@ -1251,7 +1309,7 @@ sse_encode_String(password, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 39)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 41)!;
             
             },
             codec: 
@@ -1276,7 +1334,7 @@ sse_encode_String(password, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 40)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 42)!;
             
             },
             codec: 
@@ -1301,7 +1359,7 @@ sse_encode_String(password, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(text, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 41)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 43)!;
             
             },
             codec: 
@@ -1326,7 +1384,7 @@ sse_encode_String(password, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 42)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 44)!;
             
             },
             codec: 
@@ -1351,7 +1409,7 @@ sse_encode_String(password, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 43)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 45)!;
             
             },
             codec: 
@@ -1376,7 +1434,7 @@ sse_encode_String(password, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(path, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 44)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 46)!;
             
             },
             codec: 
@@ -1402,7 +1460,7 @@ sse_encode_String(password, serializer);
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(path, serializer);
 sse_encode_box_autoadd_settings_data(data, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 45)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 47)!;
             
             },
             codec: 
@@ -1427,7 +1485,7 @@ sse_encode_box_autoadd_settings_data(data, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(pinsPath, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 46)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 48)!;
             
             },
             codec: 
@@ -1452,7 +1510,7 @@ sse_encode_box_autoadd_settings_data(data, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(connectionId, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 47)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 49)!;
             
             },
             codec: 
@@ -1477,7 +1535,7 @@ sse_encode_box_autoadd_settings_data(data, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(connectionId, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 48)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 50)!;
             
             },
             codec: 
@@ -1503,7 +1561,7 @@ sse_encode_box_autoadd_settings_data(data, serializer);
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(connectionId, serializer);
 sse_encode_String(password, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 49)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 51)!;
             
             },
             codec: 
@@ -1528,7 +1586,7 @@ sse_encode_String(password, serializer);
             callFfi: (port_) {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(host, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 50, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 52, port: port_);
             
             },
             codec: 
@@ -1553,7 +1611,7 @@ sse_encode_String(password, serializer);
             callFfi: () {
               
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(mac, serializer);
-            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 51)!;
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 53)!;
             
             },
             codec: 
@@ -2404,11 +2462,16 @@ sse_encode_i_32(self.index, serializer); }
  void  offerClipboardText({required String text })=>RustLib.instance.api.crateApiSessionRdpSessionOfferClipboardText(that: this, text: text);
 
 
+/// Sends local files to the remote computer, which downloads them. Sent
+/// only if clipboard sharing to the remote is allowed for this connection.
+ void  sendFiles({required List<String> paths })=>RustLib.instance.api.crateApiSessionRdpSessionSendFiles(that: this, paths: paths);
+
+
 /// Connects on a worker thread; updates arrive on `sink` (a Dart stream).
 /// The password is used for this connection only and never stored here.
 /// `pins_path` is the certificate pin file in the app's private data folder.
 /// Can be called once per handle.
- Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required int idleMinutes })=>RustLib.instance.api.crateApiSessionRdpSessionStart(that: this, host: host, port: port, username: username, password: password, width: width, height: height, pinsPath: pinsPath, clipboardDirection: clipboardDirection, idleMinutes: idleMinutes);
+ Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes })=>RustLib.instance.api.crateApiSessionRdpSessionStart(that: this, host: host, port: port, username: username, password: password, width: width, height: height, pinsPath: pinsPath, clipboardDirection: clipboardDirection, downloadDir: downloadDir, idleMinutes: idleMinutes);
 
 
 /// Connects with the VNC method (no username; no clipboard or certificate).
@@ -2423,7 +2486,7 @@ sse_encode_i_32(self.index, serializer); }
 /// Like [`RdpSession::start`], but reads the saved password from the OS
 /// vault inside Rust, so it never passes through the UI (Windows, Linux).
 /// The caller must have confirmed the user's identity first (S5).
- Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required int idleMinutes })=>RustLib.instance.api.crateApiSessionRdpSessionStartWithSavedPassword(that: this, connectionId: connectionId, host: host, port: port, username: username, width: width, height: height, pinsPath: pinsPath, clipboardDirection: clipboardDirection, idleMinutes: idleMinutes);
+ Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes })=>RustLib.instance.api.crateApiSessionRdpSessionStartWithSavedPassword(that: this, connectionId: connectionId, host: host, port: port, username: username, width: width, height: height, pinsPath: pinsPath, clipboardDirection: clipboardDirection, downloadDir: downloadDir, idleMinutes: idleMinutes);
 
 
 /// Types text (on-screen keyboards, IMEs, pasted text is NOT sent this way).
@@ -2453,6 +2516,11 @@ sse_encode_i_32(self.index, serializer); }
                 /// Allows (`true`) or refuses (`false`) a viewer waiting after
 /// [`HostUpdateKind::ApprovalRequested`].
  void  approve({required bool allow })=>RustLib.instance.api.crateApiHostShareHostApprove(that: this, allow: allow);
+
+
+/// Offers files to the connected viewer, which downloads them. Does nothing
+/// if no viewer is connected.
+ void  sendFiles({required List<String> paths })=>RustLib.instance.api.crateApiHostShareHostSendFiles(that: this, paths: paths);
 
 
 /// Starts sharing with the saved password. `data_dir` is the app's private

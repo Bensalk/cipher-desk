@@ -12,8 +12,9 @@ use std::sync::{Arc, Mutex};
 
 use ironrdp_cliprdr::backend::CliprdrBackend;
 use ironrdp_cliprdr::pdu::{
-    ClipboardFormat, ClipboardFormatId, ClipboardGeneralCapabilityFlags, FileContentsRequest,
-    FileContentsResponse, FormatDataRequest, FormatDataResponse, LockDataId,
+    ClipboardFormat, ClipboardFormatId, ClipboardFormatName, ClipboardGeneralCapabilityFlags,
+    FileContentsRequest, FileContentsResponse, FileDescriptor, FormatDataRequest,
+    FormatDataResponse, LockDataId,
 };
 
 /// Which way text may flow, and how much.
@@ -79,6 +80,20 @@ pub(crate) enum ClipAction {
     DataRequested(ClipboardFormatId),
     /// Text arrived from the host (`None` = the host sent an error or no text).
     DataReceived(Option<Vec<u8>>),
+    /// The host offered files; pull the list from this format id.
+    RemoteFiles(ClipboardFormatId),
+    /// A parsed file list arrived: (name, size) per file, with an optional lock id.
+    FileList {
+        files: Vec<(String, u64)>,
+        clip_data_id: Option<u32>,
+    },
+    /// The host wants the bytes of a file we offered.
+    FileRequest(FileContentsRequest),
+    /// Bytes of a file we requested arrived (`None` on error).
+    FileData {
+        stream_id: u32,
+        bytes: Option<Vec<u8>>,
+    },
 }
 
 /// Queue shared between the backend and the session.
@@ -110,8 +125,8 @@ impl CliprdrBackend for QueueBackend {
     }
 
     fn client_capabilities(&self) -> ClipboardGeneralCapabilityFlags {
-        // No file copy, no long format names: plain text only.
-        ClipboardGeneralCapabilityFlags::empty()
+        // Plain text plus stream-based file copy.
+        crate::xfer::file_caps()
     }
 
     fn on_ready(&mut self) {
@@ -125,6 +140,12 @@ impl CliprdrBackend for QueueBackend {
     fn on_process_negotiated_capabilities(&mut self, _: ClipboardGeneralCapabilityFlags) {}
 
     fn on_remote_copy(&mut self, formats: &[ClipboardFormat]) {
+        if let Some(f) = formats
+            .iter()
+            .find(|f| f.name().map(|n| n.value()) == Some(ClipboardFormatName::FILE_LIST.value()))
+        {
+            self.push(ClipAction::RemoteFiles(f.id()));
+        }
         let has_text = formats
             .iter()
             .any(|f| f.id() == ClipboardFormatId::CF_UNICODETEXT);
@@ -140,9 +161,29 @@ impl CliprdrBackend for QueueBackend {
         self.push(ClipAction::DataReceived(data));
     }
 
-    // Files are never offered or accepted.
-    fn on_file_contents_request(&mut self, _: FileContentsRequest) {}
-    fn on_file_contents_response(&mut self, _: FileContentsResponse<'_>) {}
+    fn on_remote_file_list(&mut self, files: &[FileDescriptor], clip_data_id: Option<u32>) {
+        let list = files
+            .iter()
+            .map(|f| (f.name.clone(), f.file_size.unwrap_or(0)))
+            .collect();
+        self.push(ClipAction::FileList {
+            files: list,
+            clip_data_id,
+        });
+    }
+
+    fn on_file_contents_request(&mut self, request: FileContentsRequest) {
+        self.push(ClipAction::FileRequest(request));
+    }
+
+    fn on_file_contents_response(&mut self, response: FileContentsResponse<'_>) {
+        let bytes = (!response.is_error()).then(|| response.data().to_vec());
+        self.push(ClipAction::FileData {
+            stream_id: response.stream_id(),
+            bytes,
+        });
+    }
+
     fn on_lock(&mut self, _: LockDataId) {}
     fn on_unlock(&mut self, _: LockDataId) {}
 }

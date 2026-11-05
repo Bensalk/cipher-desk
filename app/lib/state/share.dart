@@ -192,6 +192,10 @@ class ShareController extends ChangeNotifier {
     });
   }
 
+  /// Called with the file name when a file sent by the viewer finishes
+  /// arriving, so the page can show a brief notice. Set by the UI.
+  void Function(String name)? onFileReceived;
+
   void _onUpdate(HostUpdate u) {
     switch (u.kind) {
       case HostUpdateKind.listening:
@@ -211,6 +215,9 @@ class ShareController extends ChangeNotifier {
         status = ShareStatus.lockedOut;
         message = 'Too many wrong passwords. New connections are refused for '
             '${u.minutes} minutes.';
+      case HostUpdateKind.fileReceived:
+        onFileReceived?.call(u.message ?? 'a file');
+        return; // a one-off notice, not a status change
       case HostUpdateKind.failed:
         status = ShareStatus.failed;
         message = u.message;
@@ -218,6 +225,15 @@ class ShareController extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  /// Offers files to the connected viewer, which downloads them.
+  void sendFiles(List<String> paths) {
+    if (paths.isNotEmpty) _host?.sendFiles(paths: paths);
+  }
+
+  /// Where files the viewer sends are written, for the UI to show.
+  Future<String> receivedFolder() async =>
+      '${(await _paths()).dir}${Platform.pathSeparator}Received';
 
   void stop() {
     SecureWindow.setSharing(false);

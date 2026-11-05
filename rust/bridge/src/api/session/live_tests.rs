@@ -154,6 +154,7 @@ fn start_logged(addr: SocketAddr, h: &Host, capture: Option<Capture>) -> io::Res
         height: 768,
         pins_path: pins.path().join("pins.json").to_string_lossy().into_owned(),
         clipboard: ClipboardMode::Off,
+        receive_dir: String::new(),
         idle_minutes: 0,
         vnc: false,
     };
