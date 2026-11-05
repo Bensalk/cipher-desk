@@ -18,7 +18,7 @@ pub fn run() -> anyhow::Result<()> {
     let (username, port) = crate::config::load_settings();
 
     let (tx, rx) = mpsc::channel::<HostEvent>();
-    let _host = rdpv_host::start(
+    let host = rdpv_host::start(
         HostConfig {
             port,
             username,
@@ -38,6 +38,9 @@ pub fn run() -> anyhow::Result<()> {
             Ok(HostEvent::Listening { port }) => tracing::info!(port, "service host listening"),
             Ok(HostEvent::ViewerConnected { .. }) => tracing::info!("viewer connected"),
             Ok(HostEvent::ViewerDisconnected) => tracing::info!("viewer disconnected"),
+            // The service never requires approval, so this cannot fire here;
+            // allow it defensively so a viewer is never left waiting.
+            Ok(HostEvent::ApprovalRequested) => handle.approve(true),
             Ok(HostEvent::LockedOut { minutes }) => tracing::warn!(minutes, "locked out"),
             Ok(HostEvent::Failed { message }) => {
                 tracing::error!(%message, "service host failed");
