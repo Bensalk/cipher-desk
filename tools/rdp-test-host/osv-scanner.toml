@@ -58,10 +58,6 @@ id = "RUSTSEC-2023-0089"
 ignoreUntil = 2027-01-31
 reason = "atomic-polyfill is unmaintained (no vulnerability); via sspi -> winscard. Test-only host; same review as the app (osv-scanner.toml at the root)."
 
-[[IgnoredVulns]]
-id = "GHSA-qwgh-2vcv-g2f7"
-ignoreUntil = 2027-01-31
-reason = "block-buffer < 0.12.1; same review as the app (osv-scanner.toml at the root). Test-only host, never shipped."
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0404"
@@ -77,3 +73,8 @@ reason = "Same as RUSTSEC-2026-0398 (zstd-safe 7.x via ironrdp-server 0.13); tes
 id = "RUSTSEC-2026-0406"
 ignoreUntil = 2027-01-31
 reason = "Same as RUSTSEC-2026-0398 (zstd-safe 7.x via ironrdp-server 0.13); test-only host, never shipped."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0441"
+ignoreUntil = 2027-06-01
+reason = "pin-utils is unmaintained (upstream archived 2026-10-01, no vulnerability). Test-only host; same review as the app (osv-scanner.toml at the root)."
