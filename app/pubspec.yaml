@@ -14,7 +14,7 @@ dependencies:
   flutter_rust_bridge: 2.13.0
   path_provider: ^2.1.5
   # Windows Hello confirmation before a saved password is used (S5).
-  local_auth: ^2.3.0
+  local_auth: ^3.0.2
   # Choosing where to export and which file to import (Windows and Linux; F7).
   file_selector: ^1.0.3
 
