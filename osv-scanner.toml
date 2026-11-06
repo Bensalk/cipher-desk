@@ -30,3 +30,7 @@ reason = "zbus_names is unmaintained (merged into zbus 6); same path and review 
 id = "RUSTSEC-2026-0372"
 ignoreUntil = 2027-01-31
 reason = "zvariant_derive is unmaintained (merged into zbus 6); same path and review as RUSTSEC-2026-0370."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0441"
+reason = "pin-utils 0.1.1 is yanked with no security vulnerability. Transitive dep; remove once cargo update pulls a non-yanked version."
