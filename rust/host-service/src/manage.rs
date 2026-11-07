@@ -238,6 +238,10 @@ pub fn twostep_begin() -> anyhow::Result<()> {
     r.set("TWOSTEP_KEY", &totp.setup_key());
     r.set("TWOSTEP_URI", &totp.uri(&account));
     r.set("TWOSTEP_ACCOUNT", &account);
+    // The QR code to scan, as rows of 1 (dark) / 0 (light) separated by '|'.
+    if let Some(rows) = totp.qr_rows(&account) {
+        r.set("TWOSTEP_QR", &rows.join("|"));
+    }
     r.finish("Add the key to your authenticator app, then confirm with a code.");
     Ok(())
 }

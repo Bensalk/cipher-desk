@@ -22,6 +22,9 @@ tracing = "0.1"
 rcgen = { version = "0.14", default-features = false, features = ["crypto", "ring", "pem"] }
 zeroize.workspace = true
 ring = "0.17"
+# The QR code Google Authenticator scans when two-step verification is set up
+# (encoder only; no image libraries).
+qrcode = { version = "0.14", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = [

@@ -62,8 +62,10 @@ _Last updated: 7 Nov 2026._
    retype it). Saved password in the OS vault mostly covers this; make sure it
    works for the always-on service too.
 3. **2FA with Google Authenticator** — done in v0.2.8 (always-on sharing
-   only; setup by typing the key, no QR code yet). Possible next: QR code,
-   2FA for manual sharing too.
+   only). v0.2.9 adds the QR code (`qrcode` crate, encoder only, in
+   `rdpv_host::totp::qr_rows`; checked by decoding it with zxing-cpp; service
+   reports it as `TWOSTEP_QR`, app draws it). Possible next: 2FA for manual
+   sharing too.
 4. **File transfer** — Bensal clarified he wants AnyDesk-style Ctrl+C/Ctrl+V
    of files: done in v0.2.8 (Windows; files up to 100 MB each, no folders,
    whole file in memory). v0.2.9: folders and any size (pieces of 4 MiB).

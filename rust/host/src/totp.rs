@@ -82,6 +82,28 @@ impl Totp {
         )
     }
 
+    /// The QR code of [`Totp::uri`], as rows of `1` (dark) and `0` (light),
+    /// for the app to draw. `None` if it cannot be made.
+    pub fn qr_rows(&self, account: &str) -> Option<Vec<String>> {
+        let code = qrcode::QrCode::with_error_correction_level(
+            self.uri(account).as_bytes(),
+            qrcode::EcLevel::M,
+        )
+        .ok()?;
+        let width = code.width();
+        let colors = code.to_colors();
+        Some(
+            colors
+                .chunks(width)
+                .map(|row| {
+                    row.iter()
+                        .map(|c| if *c == qrcode::Color::Dark { '1' } else { '0' })
+                        .collect()
+                })
+                .collect(),
+        )
+    }
+
     /// The 6-digit code for one 30-second step.
     pub fn code_at_step(&self, step: u64) -> String {
         let key = ring::hmac::Key::new(ring::hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY, &self.secret);
@@ -274,6 +296,16 @@ mod tests {
             assert_eq!(t.code_at_step(time / STEP), code, "at {time}");
             assert!(t.verify(code, UNIX_EPOCH + Duration::from_secs(time)));
         }
+    }
+
+    #[test]
+    fn makes_a_square_qr_code() {
+        let t = Totp::new(vec![1; 20]);
+        let rows = t.qr_rows("DESKTOP-PC").expect("qr");
+        assert!(rows.len() >= 21);
+        assert!(rows.iter().all(|r| r.len() == rows.len()));
+        // The top-left finder pattern starts with seven dark modules.
+        assert!(rows[0].starts_with("1111111"));
     }
 
     #[test]

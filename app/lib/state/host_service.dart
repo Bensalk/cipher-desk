@@ -160,13 +160,15 @@ class HostService {
   }
 
   /// Starts two-step verification setup: returns the setup key to type into
-  /// the authenticator app (and the account name it shows), or null.
-  static Future<(String key, String account)?> beginTwoStep() async {
+  /// the authenticator app, the account name it shows, and the QR code to
+  /// scan (rows of '1' dark / '0' light; empty if unavailable), or null.
+  static Future<(String key, String account, List<String> qr)?> beginTwoStep() async {
     await _elevated('twostep-begin');
     final m = await _readResult();
     final key = m['TWOSTEP_KEY'];
     if (key == null || key.isEmpty) return null;
-    return (key, m['TWOSTEP_ACCOUNT'] ?? 'this computer');
+    final qr = (m['TWOSTEP_QR'] ?? '').split('|').where((r) => r.isNotEmpty).toList();
+    return (key, m['TWOSTEP_ACCOUNT'] ?? 'this computer', qr);
   }
 
   /// Confirms setup with a code from the app; true when two-step is now on.

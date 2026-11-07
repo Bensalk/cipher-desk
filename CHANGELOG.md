@@ -12,6 +12,8 @@ Builds on v0.2.8. The About screen shows **0.2.9**.
   shows "Receiving … from the remote computer" with the number and size of the
   files; paste with Ctrl+V once they have arrived. An unfinished file is never
   left behind if the copy stops half-way.
+- Two-step verification setup shows a **QR code**: scan it with Google
+  Authenticator ("Scan a QR code") instead of typing the key.
 
 ## v0.2.8 (7 Nov 2026, test release)
 

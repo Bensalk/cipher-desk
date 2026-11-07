@@ -233,7 +233,7 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
   /// Turns on two-step verification: shows the key to add to Google
   /// Authenticator, then asks for a code to confirm it works.
   Future<void> _setUpTwoStep() async {
-    (String, String)? setup;
+    (String, String, List<String>)? setup;
     try {
       setup = await HostService.beginTwoStep();
     } on ElevationCancelled {
@@ -244,12 +244,12 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
       _snack('Two-step verification could not be set up. Please try again.');
       return;
     }
-    final (key, account) = setup;
+    final (key, account, qr) = setup;
     while (mounted) {
       final code = await showDialog<String>(
         context: context,
         barrierDismissible: false,
-        builder: (_) => _TwoStepSetupDialog(setupKey: key, account: account),
+        builder: (_) => _TwoStepSetupDialog(setupKey: key, account: account, qr: qr),
       );
       if (code == null) return;
       bool ok;
@@ -837,10 +837,13 @@ class SharingBanner extends StatelessWidget {
 
 /// Step 1: add the key to Google Authenticator. Step 2: type the code it shows.
 class _TwoStepSetupDialog extends StatefulWidget {
-  const _TwoStepSetupDialog({required this.setupKey, required this.account});
+  const _TwoStepSetupDialog({required this.setupKey, required this.account, required this.qr});
 
   final String setupKey;
   final String account;
+
+  /// QR code rows ('1' dark, '0' light); empty to show only the key.
+  final List<String> qr;
 
   @override
   State<_TwoStepSetupDialog> createState() => _TwoStepSetupDialogState();
@@ -867,11 +870,20 @@ class _TwoStepSetupDialogState extends State<_TwoStepSetupDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('1. In Google Authenticator tap +, then "Enter a setup key".'),
-            const SizedBox(height: 8),
-            Text('2. Account name: Cipher Desk ${widget.account}'),
-            const SizedBox(height: 8),
-            const Text('3. Key (time based):'),
+            if (widget.qr.isNotEmpty) ...[
+              const Text('1. In Google Authenticator tap +, then "Scan a QR code", '
+                  'and scan this:'),
+              const SizedBox(height: 12),
+              Center(child: _QrImage(rows: widget.qr, size: 220)),
+              const SizedBox(height: 12),
+              const Text('Or tap "Enter a setup key" and type:'),
+            ] else ...[
+              const Text('1. In Google Authenticator tap +, then "Enter a setup key".'),
+              const SizedBox(height: 8),
+              Text('2. Account name: Cipher Desk ${widget.account}'),
+              const SizedBox(height: 8),
+              const Text('3. Key (time based):'),
+            ],
             const SizedBox(height: 4),
             Row(
               children: [
@@ -884,7 +896,7 @@ class _TwoStepSetupDialogState extends State<_TwoStepSetupDialog> {
               ],
             ),
             const SizedBox(height: 12),
-            const Text('4. Type the 6-digit code the app now shows:'),
+            Text('${widget.qr.isNotEmpty ? '2' : '4'}. Type the 6-digit code the app now shows:'),
             TextField(
               key: const Key('field-two-step-code'),
               controller: _code,
@@ -912,4 +924,52 @@ class _TwoStepSetupDialogState extends State<_TwoStepSetupDialog> {
       ],
     );
   }
+}
+
+/// Draws a QR code from rows of '1' (dark) and '0' (light), black on white
+/// with the quiet border scanners need, whatever the app theme.
+class _QrImage extends StatelessWidget {
+  const _QrImage({required this.rows, required this.size});
+
+  final List<String> rows;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('two-step-qr'),
+      width: size,
+      height: size,
+      color: Colors.white,
+      child: CustomPaint(painter: _QrPainter(rows)),
+    );
+  }
+}
+
+class _QrPainter extends CustomPainter {
+  _QrPainter(this.rows);
+
+  final List<String> rows;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const quiet = 4; // modules of white border
+    final n = rows.length + 2 * quiet;
+    final cell = size.width / n;
+    final dark = Paint()..color = Colors.black;
+    for (var y = 0; y < rows.length; y++) {
+      final row = rows[y];
+      for (var x = 0; x < row.length; x++) {
+        if (row.codeUnitAt(x) == 0x31) {
+          canvas.drawRect(
+            Rect.fromLTWH((x + quiet) * cell, (y + quiet) * cell, cell + 0.5, cell + 0.5),
+            dark,
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_QrPainter old) => old.rows != rows;
 }
