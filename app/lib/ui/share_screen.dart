@@ -500,16 +500,19 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
                   key: const Key('share-password'),
                   leading: const Icon(Icons.password),
                   title: const Text('Password'),
+                  // Masked while someone is viewing: they can see this window.
                   subtitle: Text(!s.hasPassword
                       ? 'No password yet'
-                      : (_shownPassword ?? '•••• •••• •••• ••••')),
+                      : (s.status == ShareStatus.viewing
+                          ? '•••• •••• •••• •••• (hidden while someone is viewing)'
+                          : (_shownPassword ?? '•••• •••• •••• ••••'))),
                   trailing: Wrap(
                     children: [
                       IconButton(
                         key: const Key('share-password-show'),
                         tooltip: _shownPassword == null ? 'Show password' : 'Hide password',
                         icon: Icon(_shownPassword == null ? Icons.visibility : Icons.visibility_off),
-                        onPressed: !s.hasPassword
+                        onPressed: !s.hasPassword || s.status == ShareStatus.viewing
                             ? null
                             : () => setState(() =>
                                 _shownPassword = _shownPassword == null ? s.revealPassword() : null),
@@ -637,8 +640,8 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
                 'Good to know\n'
                 '• Keep this computer signed in and unlocked. Windows hides the lock '
                 'screen, password prompts and admin windows from sharing apps.\n'
-                '• The Cipher Desk window itself looks black to the viewer while '
-                '"Block screenshots" is on, so the password is never shown to them.\n'
+                '• The viewer can see and use the Cipher Desk window too. The '
+                'password stays hidden while someone is viewing.\n'
                 '• Use it on your own network or through Tailscale. Do not open the '
                 'port on your router.',
               ),

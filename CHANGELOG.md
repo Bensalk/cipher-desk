@@ -22,6 +22,11 @@ Builds on v0.2.3. The About screen shows **0.2.4**.
   fit* and *Stretch to fill*.
 - **Full screen** now really fills the screen: on Windows the taskbar is hidden,
   and on Android the status and navigation bars are hidden.
+- Share screen: the Cipher Desk window on the shared computer is now visible
+  to the viewer and can be used. Before, it was hidden from the picture but still
+  took clicks, so it could block the viewer without them seeing it. The sharing
+  password is masked while someone is viewing. (*Block screenshots* on Windows
+  now protects the remote screen you are viewing.)
 
 ## v0.2.3 (7 Nov 2026, test release)
 

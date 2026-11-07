@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-import '../platform/secure_window.dart';
 import '../src/rust/api/host.dart';
 import '../src/rust/api/store.dart' show defaultPortFor, ConnectionMethod;
 import '../src/rust/api/vault.dart' show VaultResult;
@@ -186,7 +185,6 @@ class ShareController extends ChangeNotifier {
       return;
     }
     final host = _host ??= ShareHost.create();
-    await SecureWindow.setSharing(true);
     await _sub?.cancel();
     _sub = host
         .start(
@@ -241,7 +239,6 @@ class ShareController extends ChangeNotifier {
       case HostUpdateKind.failed:
         status = ShareStatus.failed;
         message = u.message;
-        SecureWindow.setSharing(false);
     }
     notifyListeners();
   }
@@ -283,7 +280,6 @@ class ShareController extends ChangeNotifier {
   }
 
   void stop() {
-    SecureWindow.setSharing(false);
     _host?.stop();
     _sub?.cancel();
     _sub = null;

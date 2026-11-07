@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 
 import '../platform/app_window.dart';
 import '../platform/remote_clipboard.dart';
+import '../platform/secure_window.dart';
 import '../platform/session_service.dart';
 import '../session/scancodes.dart';
 import '../src/rust/api/errors.dart';
@@ -156,6 +157,8 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // "Block screenshots" protects the remote screen while it is shown here.
+    SecureWindow.setViewing(true);
     // Start after the first frame: _start reads the window size with View.of,
     // which must not be called from initState.
     WidgetsBinding.instance.addPostFrameCallback((_) => _start());
@@ -473,6 +476,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   @override
   void dispose() {
     if (_immersive) AppWindow.setFullScreen(false);
+    SecureWindow.setViewing(false);
     WidgetsBinding.instance.removeObserver(this);
     _clipTimer?.cancel();
     _backgroundTimer?.cancel();
