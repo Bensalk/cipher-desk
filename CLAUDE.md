@@ -42,8 +42,15 @@ Secure, open-source Remote Desktop (RDP) viewer by Bensal for Windows, Linux and
 - Settings and connections in the app's data folder (`portable.txt` / `<AppImage>.data` for portable copies).
 - MSI UpgradeCode `{E56EAB74-3E6E-4A89-948B-8E6CC77A3275}` must never change.
 
+## Handoff
+
+- Read `HANDOFF.md` first: current branch, newest test build, what's waiting for Bensal's test, next features, sandbox gotchas.
+- Before a session ends (or usage runs low), update `HANDOFF.md` and commit it.
+- Every new test build gets a new version number; send Bensal the exact release link.
+
 ## Working style
 
 - Bensal installs from GitHub (APK on his phone, MSI/ZIP on Windows); he doesn't use an IDE. A broken build means no app.
 - Keep explanations short and non-technical.
+- Start every reply with a `Model:` line (Sonnet for routine/support, Opus for hard coding, design decisions, demanding work) and a one-line reason; Bensal can't judge difficulty himself.
 - About screen: "Created by Bensal" is the last item, small and not highlighted.
