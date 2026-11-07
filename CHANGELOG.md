@@ -2,6 +2,19 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.2.3 (7 Nov 2026, test release)
+
+Builds on v0.2.2. The About screen shows **0.2.3**.
+
+- Share screen: keyboard and mouse now work when you connect through the
+  always-on background mode. Windows was refusing every key and click
+  ("access denied") even though the screen was showing.
+- Share screen: *Start sharing* no longer fails with "port in use" while
+  always-on sharing is running. It now says that always-on sharing is already
+  on, so viewers can connect straight away.
+- The diagnostic log now says which screen (desktop or sign-in screen) keys and
+  clicks go to, and reports refused input once instead of once per key.
+
 ## v0.2.2 (5 Nov 2026, test release)
 
 Builds on v0.2.1. The About screen shows **0.2.2**.
