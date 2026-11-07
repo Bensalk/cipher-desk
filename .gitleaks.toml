@@ -33,6 +33,9 @@ regexes = [
   '''192\.0\.2\.\d+''',
   '''example\.(com|org|net)''',
   '''<PASSWORD>''',
+  # The public "ask to connect" sign-in (rdpv_host::REQUEST_PASSWORD): not a
+  # secret by design; the screen is only shown after someone accepts.
+  '''ask-to-connect''',
 ]
 paths = [
   '''\.gitleaks\.toml$''',
