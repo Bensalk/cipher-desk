@@ -12,6 +12,8 @@ _Last updated: 7 Nov 2026._
   screen, VNC, plus the always-on Host service (sign-in screen / unattended).
 - Newest test build: **v0.2.9** (folders + files of any size in copy/paste;
   contains v0.2.7 and v0.2.8). Test order: v0.2.6, then v0.2.9.
+  v0.2.9 draft (commit `3d42b05`, also has the Google Authenticator QR code):
+  https://github.com/Bensalk/cipher-desk/releases/tag/untagged-c32792b832d1967ae919
 - Previous: **v0.2.8** (file copy/paste + Google Authenticator), built
   on top of v0.2.7 (Ask to connect). Test order: v0.2.6, then v0.2.8 (it
   contains v0.2.7). v0.2.8 draft:
