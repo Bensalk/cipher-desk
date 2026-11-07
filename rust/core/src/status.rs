@@ -34,6 +34,9 @@ pub enum ConnectionError {
     DisconnectedByHost,
     /// Another user signed in to the same account on the host.
     SessionTakenOver,
+    /// The remote computer refused this connection, e.g. the person there
+    /// declined an "ask to connect" request or nobody answered in time.
+    AccessDeclined,
     /// The idle timeout ended the session.
     IdleTimeout,
     /// The OS vault could not be used (e.g. no keyring on Linux).
@@ -49,7 +52,7 @@ pub enum ConnectionError {
 
 impl ConnectionError {
     /// Every variant, for tests and the UI's help screen.
-    pub const ALL: [Self; 18] = [
+    pub const ALL: [Self; 19] = [
         Self::WrongCredentials,
         Self::AccountProblem,
         Self::HostRefused,
@@ -63,6 +66,7 @@ impl ConnectionError {
         Self::RemoteDesktopUnavailable,
         Self::DisconnectedByHost,
         Self::SessionTakenOver,
+        Self::AccessDeclined,
         Self::IdleTimeout,
         Self::VaultUnavailable,
         Self::AppInBackground,
@@ -86,6 +90,7 @@ impl ConnectionError {
             Self::RemoteDesktopUnavailable => "Remote Desktop isn't available",
             Self::DisconnectedByHost => "Disconnected by the remote computer",
             Self::SessionTakenOver => "Someone else signed in",
+            Self::AccessDeclined => "The other computer didn't allow it",
             Self::IdleTimeout => "Disconnected after inactivity",
             Self::VaultUnavailable => "Saved password couldn't be used",
             Self::AppInBackground => "Disconnected while in the background",
@@ -110,6 +115,7 @@ impl ConnectionError {
             Self::RemoteDesktopUnavailable => "Remote Desktop needs Windows Pro, Enterprise or Education, with Remote Desktop turned on in Settings.",
             Self::DisconnectedByHost => "The session was ended on the remote computer. You can reconnect.",
             Self::SessionTakenOver => "Another sign-in to the same account ended this session. You can reconnect, which will end theirs.",
+            Self::AccessDeclined => "The person at that computer refused the connection, or nobody answered in time. You can ask again.",
             Self::IdleTimeout => "The session was idle for too long. Reconnect when you need it.",
             Self::VaultUnavailable => "The saved password couldn't be read from this device's secure password storage (it may be locked, missing or unavailable). Type the password to connect, or edit the connection to save it again.",
             Self::AppInBackground => "To save battery and keep the connection secure, a session ends 5 minutes after you leave the app. Reconnect to continue.",
@@ -466,6 +472,7 @@ mod tests {
             (E::RemoteDesktopUnavailable, false, false, false),
             (E::DisconnectedByHost, false, true, false),
             (E::SessionTakenOver, false, true, false),
+            (E::AccessDeclined, false, true, false),
             (E::IdleTimeout, false, true, false),
             (E::VaultUnavailable, false, false, false),
             (E::AppInBackground, false, true, false),

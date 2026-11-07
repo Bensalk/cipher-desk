@@ -21,3 +21,8 @@ Changes from 0.13.0:
   acceptor 0.12; `serve()` added so the caller binds the port itself; CredSSP
   uses a network client that refuses all requests (no Kerberos, so no HTTP
   client is needed).
+- `server.rs`: when the display handler refuses a viewer (`updates()` fails,
+  e.g. "ask to connect" was declined), the server first sends
+  `ServerSetErrorInfo(ServerDeniedConnection)` as a Share Data PDU, so the
+  viewer reports a refusal instead of a lost connection and does not
+  reconnect by itself.

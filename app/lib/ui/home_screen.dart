@@ -160,6 +160,33 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// "Ask to connect": no password. The other computer's always-on sharing
+  /// shows a popup there, and the screen appears once someone accepts it.
+  /// Uses the next port and the public "ask" sign-in (must match
+  /// `rdpv_host::request_port`, `REQUEST_USERNAME` and `REQUEST_PASSWORD`).
+  Future<void> _ask(ConnectionProfile p) async {
+    final paths = await _appPaths();
+    if (!mounted) return;
+    widget.store.markUsed(p.id, DateTime.now());
+    _snack('Asking ${p.displayName}. Someone there has 30 seconds to accept.');
+    final asking = p.copyWith(
+      port: p.port < 65535 ? p.port + 1 : p.port - 1,
+      username: 'ask',
+      savePassword: false,
+    );
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => SessionScreen(
+          profile: asking,
+          password: 'ask-to-connect',
+          pinsPath: paths.pins,
+          idleMinutes: widget.settings.idleMinutes,
+          onOutcome: (outcome) => widget.store.addHistory(p.id, outcome, DateTime.now()),
+        ),
+      ),
+    );
+  }
+
   Future<void> _wake(ConnectionProfile p) async {
     final mac = p.wakeMac;
     if (mac == null) return;
@@ -254,6 +281,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             onDelete: () => _confirmDelete(items[i]),
                             onWake: () => _wake(items[i]),
                             onCheck: () => _checkReadiness(items[i]),
+                            onAsk: () => _ask(items[i]),
                           ),
                         ),
             ),
@@ -340,6 +368,7 @@ class _ProfileTile extends StatelessWidget {
     required this.onDelete,
     required this.onWake,
     required this.onCheck,
+    required this.onAsk,
   });
 
   final ConnectionProfile profile;
@@ -348,6 +377,7 @@ class _ProfileTile extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onWake;
   final VoidCallback onCheck;
+  final VoidCallback onAsk;
 
   @override
   Widget build(BuildContext context) {
@@ -379,9 +409,16 @@ class _ProfileTile extends StatelessWidget {
               'edit' => onEdit(),
               'wake' => onWake(),
               'check' => onCheck(),
+              'ask' => onAsk(),
               _ => onDelete(),
             },
             itemBuilder: (_) => [
+              if (profile.method == ConnectionMethod.shareScreen)
+                const PopupMenuItem(
+                  key: Key('profile-ask'),
+                  value: 'ask',
+                  child: Text('Ask to connect (no password)'),
+                ),
               const PopupMenuItem(value: 'edit', child: Text('Edit')),
               if (profile.wakeMac != null) const PopupMenuItem(value: 'wake', child: Text('Wake up')),
               const PopupMenuItem(value: 'check', child: Text('Check readiness')),

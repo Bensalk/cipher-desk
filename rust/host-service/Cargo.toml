@@ -30,6 +30,7 @@ windows = { version = "0.62", features = [
     "Win32_System_StationsAndDesktops",
     "Win32_System_Memory",
     "Win32_System_Diagnostics_Debug",
+    "Win32_UI_WindowsAndMessaging",
 ] }
 
 # Its own lints: unsafe is needed for the Win32 session/token calls.

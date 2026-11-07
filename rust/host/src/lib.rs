@@ -89,7 +89,20 @@ pub struct HostConfig {
 
 /// How long to wait for the person at the computer to allow a viewer before
 /// giving up and refusing the connection.
-const APPROVAL_TIMEOUT: Duration = Duration::from_secs(40);
+pub const APPROVAL_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// "Ask to connect" (no password): besides the password port, the always-on
+/// Host listens on [`request_port`] with these fixed, public sign-in details.
+/// They are not a secret: anyone who reaches the port can *ask*, and the
+/// screen is only shown after the person at the computer allows it.
+pub const REQUEST_USERNAME: &str = "ask";
+/// See [`REQUEST_USERNAME`].
+pub const REQUEST_PASSWORD: &str = "ask-to-connect";
+
+/// The "ask to connect" port that goes with a sharing port (the next one).
+pub fn request_port(port: u16) -> u16 {
+    port.checked_add(1).unwrap_or(port - 1)
+}
 
 /// A running Host. Dropping it (or calling [`HostHandle::stop`]) stops sharing.
 pub struct HostHandle {
@@ -105,6 +118,12 @@ impl HostHandle {
     /// [`HostEvent::ApprovalRequested`]. Ignored if nothing is waiting.
     pub fn approve(&self, allow: bool) {
         let _ = self.approvals.send(allow);
+    }
+
+    /// A handle that can answer approvals from another thread (e.g. one
+    /// waiting on a popup), without sharing the whole Host handle.
+    pub fn approver(&self) -> Approver {
+        Approver(self.approvals.clone())
     }
 
     /// Offers these files to the connected viewer, which downloads them. Does
@@ -132,6 +151,17 @@ impl HostHandle {
         if let Some(thread) = self.thread.take() {
             let _ = thread.join();
         }
+    }
+}
+
+/// Answers [`HostEvent::ApprovalRequested`]; see [`HostHandle::approver`].
+#[derive(Clone)]
+pub struct Approver(tokio::sync::mpsc::UnboundedSender<bool>);
+
+impl Approver {
+    /// Allows (`true`) or refuses (`false`) the waiting viewer.
+    pub fn approve(&self, allow: bool) {
+        let _ = self.0.send(allow);
     }
 }
 

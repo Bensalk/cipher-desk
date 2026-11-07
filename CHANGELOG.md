@@ -2,6 +2,18 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.2.7 (7 Nov 2026, test release)
+
+Builds on v0.2.6. The About screen shows **0.2.7**.
+
+- **Ask to connect (no password)**, like AnyDesk: for a *Share screen*
+  connection, choose **Ask to connect** in its ⋮ menu. On the other computer,
+  where always-on sharing is turned on, a popup asks whether to allow it. The
+  screen appears only after someone there clicks **Yes**; **No**, or no answer
+  within 30 seconds, refuses it and the viewer shows "The other computer didn't
+  allow it". Connecting with the password still goes straight in.
+- Uses the port after the sharing port (3396 with the default 3395).
+
 ## v0.2.6 (7 Nov 2026, test release)
 
 Builds on v0.2.5. The About screen shows **0.2.6**.

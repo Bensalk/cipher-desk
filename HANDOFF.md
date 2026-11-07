@@ -10,9 +10,10 @@ _Last updated: 7 Nov 2026._
 - Work happens on branch **`connection-methods`** (PR #12, open, not merged to
   `main`). It adds three connection methods: Private Remote Desktop, Share
   screen, VNC, plus the always-on Host service (sign-in screen / unattended).
-- Newest test build: **v0.2.6** (commit `e33df8d`). Its release build
-  (Actions run `42374048174`) was **still running** at handoff: check it
-  finished, then give Bensal the exact v0.2.6 draft link (see "Release drafts").
+- Newest test build: **v0.2.7** (Ask to connect). Bensal should test **v0.2.6
+  first** (window + smooth picture):
+  https://github.com/Bensalk/cipher-desk/releases/tag/untagged-2e87d6a9eaa470bd8946
+  then v0.2.7 (give him its exact draft link; see "Release drafts").
 - Previous build v0.2.5 (commit `0d05486`) finished: draft
   https://github.com/Bensalk/cipher-desk/releases/tag/untagged-944ba7ca4296b207802d
 - Bensal tests on two Windows 11 Pro PCs (desktop + laptop) over Tailscale,
@@ -26,6 +27,7 @@ _Last updated: 7 Nov 2026._
 | v0.2.4 | Picture quality per connection (Best = lossless QOIZ, Balanced, Speed); host always sends the newest picture (less lag); view modes Original / Shrink / Stretch; real full screen (taskbar hidden); Cipher Desk window on the shared PC visible to the viewer (capture-hiding only while *viewing*). |
 | v0.2.5 | Viewer holds a big change until the host has finished sending it (max 150 ms), so Best quality appears whole instead of in bands. `Session::poll` now returns `(events, caught_up)`. |
 | v0.2.6 | Host window no longer hidden from capture at startup (startup race lost the "show" call). |
+| v0.2.7 | **Ask to connect (no password)**: the always-on worker (`rust/host-service/src/worker.rs`) also listens on port+1 with public sign-in `ask` / `ask-to-connect`, `require_approval = true`; popup via `WTSSendMessageW` (Yes/No, 30 s timeout = refuse). Declines are sent as `ServerDeniedConnection` (vendored `server.rs`), shown as new `ConnectionError::AccessDeclined`, never auto-reconnected. App: ⋮ menu "Ask to connect" on Share screen connections (`home_screen.dart` `_ask`). Loopback tests cover allow and decline. |
 
 ## Waiting for Bensal's test results
 
@@ -42,15 +44,15 @@ _Last updated: 7 Nov 2026._
 
 ## Next features Bensal asked for (AnyDesk-like), in his priority order
 
-1. **Accept / Reject popup** on the host for connections that aren't
-   pre-authorised, auto-decline after **30 seconds**, plus "always allow this
-   device". Design constraint: CredSSP/NLA validates only **one** password per
-   host, so "two ways in" (unattended password vs. ask-to-accept) needs a design
-   proposal first — agree it with Bensal before coding.
+1. **Accept / Reject popup — first part done in v0.2.7** (two ports = two ways
+   in, since CredSSP checks one password per listener). Still to do:
+   "always allow this device" checkbox; the popup also when sharing manually
+   from the app (today only with always-on sharing); show who is asking.
 2. **Unattended access password** remembered on his own viewer PC (he must never
    retype it). Saved password in the OS vault mostly covers this; make sure it
    works for the always-on service too.
 3. **2FA with Google Authenticator (TOTP)** on top of the unattended password.
+   Bensal's choice: one code per viewer PC, remembered for 30 days. Not started.
 4. **File transfer window, both directions** (not clipboard). A basic "send
    files" already exists in both `session_screen.dart` and `share_screen.dart`
    (files land in a Received folder); he wants a proper two-pane transfer window.

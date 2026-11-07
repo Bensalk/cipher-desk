@@ -1301,6 +1301,8 @@ pub(crate) fn classify_disconnect_reason(text: &str) -> ConnectionError {
         ConnectionError::IdleTimeout
     } else if t.contains("another") || t.contains("replaced") || t.contains("other connection") {
         ConnectionError::SessionTakenOver
+    } else if t.contains("denied the connection") {
+        ConnectionError::AccessDeclined
     } else {
         ConnectionError::DisconnectedByHost
     }
@@ -1406,6 +1408,12 @@ mod tests {
         assert_eq!(
             classify_disconnect_reason("server initiated disconnect"),
             ConnectionError::DisconnectedByHost
+        );
+        assert_eq!(
+            classify_disconnect_reason(
+                "[Protocol independent error] The server denied the connection"
+            ),
+            ConnectionError::AccessDeclined
         );
     }
 

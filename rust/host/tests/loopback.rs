@@ -70,6 +70,13 @@ fn start() -> Running {
 }
 
 fn start_with<S: rdpv_host::FrameSource + Send + 'static>(source: S) -> Running {
+    start_full(source, false)
+}
+
+fn start_full<S: rdpv_host::FrameSource + Send + 'static>(
+    source: S,
+    require_approval: bool,
+) -> Running {
     let dir = tempfile::tempdir().expect("temp dir");
     let port = free_port();
     let password = test_password();
@@ -81,7 +88,7 @@ fn start_with<S: rdpv_host::FrameSource + Send + 'static>(source: S) -> Running 
             username: USER.into(),
             password: SecretString::new(password.clone()),
             data_dir: dir.path().to_path_buf(),
-            require_approval: false,
+            require_approval,
         },
         "127.0.0.1".parse().expect("ip"),
         source,
@@ -414,4 +421,63 @@ fn balanced_is_sharper_than_speed() {
         balanced < speed,
         "Balanced ({balanced}) should be sharper than Speed ({speed})"
     );
+}
+
+/// "Ask to connect": the viewer signs in, the Host asks the person at the
+/// computer, and the answer decides. Returns how the viewer's session went.
+fn ask_and_answer(allow: bool) -> Result<usize, Option<ConnectionError>> {
+    let r = start_full(SyntheticSource::new(640, 480), true);
+    let approver = r._host.approver();
+    let events = r.events;
+    // The person at the computer answers once asked.
+    let answered = std::thread::spawn(move || loop {
+        match events.recv_timeout(Duration::from_secs(20)) {
+            Ok(HostEvent::ApprovalRequested) => {
+                approver.approve(allow);
+                return true;
+            }
+            Ok(_) => {}
+            Err(_) => return false,
+        }
+    });
+    let mut s = connect(params(r.port, &r.password, Some(r.fingerprint.clone())))
+        .unwrap_or_else(|f| panic!("connect failed: {f:?}"));
+    let deadline = Instant::now() + Duration::from_secs(15);
+    let mut updates = 0;
+    let outcome = loop {
+        if Instant::now() > deadline {
+            break Ok(updates);
+        }
+        for e in s.poll().0 {
+            match e {
+                SessionEvent::Updated(_) => updates += 1,
+                SessionEvent::Ended(err) => return Err(err),
+                _ => {}
+            }
+        }
+        if updates >= 3 {
+            break Ok(updates);
+        }
+    };
+    assert!(
+        answered.join().expect("answer thread"),
+        "the Host never asked"
+    );
+    outcome
+}
+
+#[test]
+fn an_allowed_request_shows_the_screen() {
+    let updates = ask_and_answer(true).unwrap_or_else(|e| panic!("ended: {e:?}"));
+    assert!(updates >= 3, "only {updates} picture updates");
+}
+
+#[test]
+fn a_declined_request_is_reported_as_declined() {
+    match ask_and_answer(false) {
+        Err(Some(ConnectionError::AccessDeclined)) => {}
+        other => panic!("expected AccessDeclined, got {other:?}"),
+    }
+    // Declined is final: the viewer must not reconnect (and ask again) by itself.
+    assert!(!ConnectionError::AccessDeclined.auto_reconnect_allowed());
 }

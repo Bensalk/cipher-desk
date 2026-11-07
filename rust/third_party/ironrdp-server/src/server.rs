@@ -1245,7 +1245,17 @@ impl RdpServer {
         W: FramedWrite,
     {
         debug!("Starting client loop");
-        let mut display_updates = self.display.lock().await.updates().await?;
+        // Cipher Desk: the display may refuse the viewer (the person at the
+        // computer declined, or nobody answered). Tell the viewer it was
+        // denied, so it shows that instead of a lost connection and does not
+        // reconnect on its own.
+        let mut display_updates = match self.display.lock().await.updates().await {
+            Ok(updates) => updates,
+            Err(e) => {
+                let _ = send_denied_share_data(io_channel_id, user_channel_id, writer).await;
+                return Err(e);
+            }
+        };
         let mut writer = SharedWriter::new(writer);
         let mut display_writer = writer.clone();
         let mut event_writer = writer.clone();
@@ -1846,6 +1856,38 @@ async fn send_access_denied(
         ProtocolIndependentCode::ServerDeniedConnection,
     ));
     let user_data = encode_vec(&info)?.into();
+    let pdu = SendDataIndication {
+        initiator_id: user_channel_id,
+        channel_id: io_channel_id,
+        user_data,
+    };
+    let msg = encode_vec(&X224(pdu))?;
+    writer.write_all(&msg).await?;
+    Ok(())
+}
+
+/// Cipher Desk: sends `ServerSetErrorInfoPdu(ServerDeniedConnection)` as a
+/// Share Data PDU on the I/O channel, the form a viewer in the active stage
+/// reads as a graceful disconnect with a reason.
+async fn send_denied_share_data(
+    io_channel_id: u16,
+    user_channel_id: u16,
+    writer: &mut impl FramedWrite,
+) -> Result<(), anyhow::Error> {
+    let data = rdp::headers::ShareDataHeader {
+        share_data_pdu: rdp::headers::ShareDataPdu::ServerSetErrorInfo(ServerSetErrorInfoPdu(
+            ErrorInfo::ProtocolIndependentCode(ProtocolIndependentCode::ServerDeniedConnection),
+        )),
+        stream_priority: rdp::headers::StreamPriority::Medium,
+        compression_flags: rdp::headers::CompressionFlags::empty(),
+        compression_type: rdp::client_info::CompressionType::K8,
+    };
+    let pdu = rdp::headers::ShareControlHeader {
+        share_id: 0,
+        pdu_source: io_channel_id,
+        share_control_pdu: ShareControlPdu::Data(data),
+    };
+    let user_data = encode_vec(&pdu)?.into();
     let pdu = SendDataIndication {
         initiator_id: user_channel_id,
         channel_id: io_channel_id,
