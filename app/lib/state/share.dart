@@ -8,6 +8,7 @@ import '../platform/secure_window.dart';
 import '../src/rust/api/host.dart';
 import '../src/rust/api/store.dart' show defaultPortFor, ConnectionMethod;
 import '../src/rust/api/vault.dart' show VaultResult;
+import 'host_service.dart';
 import 'persistence.dart';
 
 /// Where sharing stands, for the Share page and the "being shared" banner.
@@ -171,10 +172,20 @@ class ShareController extends ChangeNotifier {
 
   Future<void> start() async {
     if (!supported || isOn) return;
-    final host = _host ??= ShareHost.create();
     status = ShareStatus.starting;
     message = null;
     notifyListeners();
+    // The always-on background service listens on the same port. While it
+    // runs, viewers can already connect, and a second copy here could only
+    // fail with "port in use", so say so instead of trying.
+    if (await _serviceRunning()) {
+      status = ShareStatus.off;
+      message = 'Always-on sharing is already running on this PC, so viewers '
+          'can connect now. You don\'t need to start sharing here.';
+      notifyListeners();
+      return;
+    }
+    final host = _host ??= ShareHost.create();
     await SecureWindow.setSharing(true);
     await _sub?.cancel();
     _sub = host
@@ -190,6 +201,15 @@ class ShareController extends ChangeNotifier {
         notifyListeners();
       }
     });
+  }
+
+  static Future<bool> _serviceRunning() async {
+    if (!HostService.supported) return false;
+    try {
+      return (await HostService.status()).running;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Called with the file name when a file sent by the viewer finishes

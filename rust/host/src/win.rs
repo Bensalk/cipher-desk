@@ -175,7 +175,14 @@ fn send(inputs: &[INPUT]) -> u32 {
     if sent as usize != inputs.len() {
         // SAFETY: reads the thread's last-error code only.
         let err = unsafe { windows::Win32::Foundation::GetLastError() };
-        tracing::warn!(sent, wanted = inputs.len(), error = ?err, "SendInput rejected input");
+        // Once Windows refuses input it usually refuses all of it; log the first
+        // refusal and then a running count, not one line per key and mouse move.
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static REJECTED: AtomicU64 = AtomicU64::new(0);
+        let total = REJECTED.fetch_add(1, Ordering::Relaxed) + 1;
+        if total == 1 || total % 200 == 0 {
+            tracing::warn!(sent, wanted = inputs.len(), error = ?err, total, "SendInput rejected input");
+        }
     }
     sent
 }
@@ -302,15 +309,63 @@ impl FrameSource for ServiceScreenCapture {
     }
 }
 
-/// Input for the Host **service** worker: attaches to the current input desktop
-/// before each event, so typing and clicks reach the sign-in screen too.
-#[derive(Default)]
-pub struct ServiceSendInputSink(SendInputSink);
+/// Input for the Host **service** worker. Keys and clicks are performed on a
+/// thread of their own that attaches to the current input desktop before each
+/// event (normal desktop, lock or sign-in screen), the same way screen capture
+/// does, instead of on the server's network thread.
+pub struct ServiceSendInputSink {
+    tx: Option<std::sync::mpsc::Sender<Input>>,
+}
+
+impl Default for ServiceSendInputSink {
+    fn default() -> Self {
+        let (tx, rx) = std::sync::mpsc::channel::<Input>();
+        let spawned = std::thread::Builder::new()
+            .name("cipher-desk-input".into())
+            .spawn(move || service_input_loop(&rx));
+        match spawned {
+            Ok(_) => Self { tx: Some(tx) },
+            Err(e) => {
+                tracing::warn!(error = %e, "input thread did not start");
+                Self { tx: None }
+            }
+        }
+    }
+}
 
 impl InputSink for ServiceSendInputSink {
     fn send(&mut self, input: Input) {
-        let _ = crate::win_desktop::follow_input_desktop();
-        self.0.send(input);
+        if let Some(tx) = &self.tx {
+            let _ = tx.send(input);
+        }
+    }
+}
+
+/// Performs input until the sink is dropped (the viewer disconnected).
+/// Logs which desktop input goes to when it changes, and why switching failed
+/// (once per distinct error), so a log shows where keys and clicks went.
+fn service_input_loop(rx: &std::sync::mpsc::Receiver<Input>) {
+    let mut sink = SendInputSink;
+    let mut desktop: Option<String> = None;
+    let mut last_error: Option<String> = None;
+    for input in rx {
+        match crate::win_desktop::follow_input_desktop() {
+            Ok(name) => {
+                last_error = None;
+                if desktop.as_deref() != Some(name.as_str()) {
+                    tracing::info!(desktop = %name, "input: attached to desktop");
+                    desktop = Some(name);
+                }
+            }
+            Err(e) => {
+                let message = format!("{e:#}");
+                if last_error.as_deref() != Some(message.as_str()) {
+                    tracing::warn!(error = %message, "input: could not attach to the screen's desktop");
+                    last_error = Some(message);
+                }
+            }
+        }
+        sink.send(input);
     }
 }
 

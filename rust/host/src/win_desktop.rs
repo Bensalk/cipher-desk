@@ -22,12 +22,15 @@ use windows::Win32::System::StationsAndDesktops::{
 };
 
 // Enough access to read the screen and inject input on the desktop.
+// DESKTOP_JOURNALPLAYBACK is what SendInput checks: without it, every key and
+// click from a thread attached with this handle fails with "access denied".
 const ACCESS: DESKTOP_ACCESS_FLAGS = DESKTOP_ACCESS_FLAGS(
     0x0001 // DESKTOP_READOBJECTS
         | 0x0080 // DESKTOP_WRITEOBJECTS
         | 0x0040 // DESKTOP_ENUMERATE
         | 0x0100 // DESKTOP_SWITCHDESKTOP
         | 0x0002 // DESKTOP_CREATEWINDOW
+        | 0x0020 // DESKTOP_JOURNALPLAYBACK
         | 0x0020000, // DESKTOP_READ_CONTROL
 );
 
