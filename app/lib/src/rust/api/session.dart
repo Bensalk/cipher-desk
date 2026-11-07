@@ -8,9 +8,9 @@ import 'errors.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 
-            // These functions are ignored because they are not marked as `pub`: `approval`, `changed`, `clamped`, `disconnect`, `drive`, `ended`, `file_received`, `frame`, `keep_running`, `new`, `offer_local_clipboard`, `pause`, `pending_disconnect`, `policy`, `poll`, `reconnect`, `reconnecting`, `region_pixels`, `remote_clipboard`, `resized`, `run`, `send_files`, `send_input`, `send`, `size`, `spawn`, `status`, `union`, `vnc`, `wait_for_approval`
+            // These functions are ignored because they are not marked as `pub`: `approval`, `changed`, `clamped`, `disconnect`, `drive`, `ended`, `file_received`, `frame`, `from_core`, `keep_running`, `new`, `offer_local_clipboard`, `pause`, `pending_disconnect`, `policy`, `poll`, `reconnect`, `reconnecting`, `region_pixels`, `remote_clipboard`, `resized`, `run`, `send_files`, `send_input`, `send`, `size`, `spawn`, `status`, `to_core`, `union`, `vnc`, `wait_for_approval`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Command`, `Drive`, `Reconnect`, `Remote`, `Target`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`
 
 
             
@@ -67,7 +67,7 @@ static RdpSession  create()=>RustLib.instance.api.crateApiSessionRdpSessionCreat
 /// The password is used for this connection only and never stored here.
 /// `pins_path` is the certificate pin file in the app's private data folder.
 /// Can be called once per handle.
- Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes });
+ Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality });
 
 
 /// Connects with the VNC method (no username; no clipboard or certificate).
@@ -82,7 +82,7 @@ static RdpSession  create()=>RustLib.instance.api.crateApiSessionRdpSessionCreat
 /// Like [`RdpSession::start`], but reads the saved password from the OS
 /// vault inside Rust, so it never passes through the UI (Windows, Linux).
 /// The caller must have confirmed the user's identity first (S5).
- Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes });
+ Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality });
 
 
 /// Types text (on-screen keyboards, IMEs, pasted text is NOT sent this way).
@@ -107,6 +107,18 @@ both,
 toRemoteOnly,
 /// Only from the remote computer to this device.
 fromRemoteOnly,
+                    ;
+                    
+                }
+
+/// Picture quality of a connection (like AnyDesk's display quality).
+enum PictureQuality {
+                    /// Exact pixels with Cipher Desk Host; uses the most data.
+best,
+/// Sharp picture with compression; good for most links.
+balanced,
+/// Least data and quickest response on slow links.
+speed,
                     ;
                     
                 }

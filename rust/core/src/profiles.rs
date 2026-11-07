@@ -34,6 +34,20 @@ pub enum ClipboardSetting {
     FromRemote,
 }
 
+/// Picture quality of a connection, like the display quality setting of
+/// AnyDesk or TeamViewer. Older files have none: they use [`Quality::Balanced`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Quality {
+    /// Exact pixels (lossless with Cipher Desk Host); uses the most data.
+    Best,
+    /// Sharp picture with compression; a good choice for most links.
+    #[default]
+    Balanced,
+    /// Least data and quickest response on slow links; softer picture.
+    Speed,
+}
+
 /// How a connection is made. Older files have no method: they are Private Remote Desktop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -90,6 +104,8 @@ pub struct Connection {
     pub wake_mac: Option<String>,
     #[serde(default)]
     pub method: ConnectionMethod,
+    #[serde(default)]
+    pub quality: Quality,
 }
 
 /// How a connection attempt ended (no details, no secrets).
@@ -252,6 +268,8 @@ pub struct ExportedConnection {
     pub wake_mac: Option<String>,
     #[serde(default)]
     pub method: ConnectionMethod,
+    #[serde(default)]
+    pub quality: Quality,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -276,6 +294,7 @@ pub fn export(connections: &[Connection]) -> String {
                 clipboard: c.clipboard,
                 wake_mac: c.wake_mac.clone(),
                 method: c.method,
+                quality: c.quality,
             })
             .collect(),
     };
@@ -329,6 +348,7 @@ pub fn import(text: &str) -> Imported {
                 last_used: None,
                 wake_mac: e.wake_mac.clone(),
                 method: e.method,
+                quality: e.quality,
             })
         })
         .map(|mut e| {
@@ -360,6 +380,7 @@ mod tests {
             last_used: Some(1_800_000_000),
             wake_mac: Some("00:11:22:33:44:55".into()),
             method: ConnectionMethod::PrivateRemoteDesktop,
+            quality: Quality::Best,
         }
     }
 

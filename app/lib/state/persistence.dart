@@ -128,6 +128,7 @@ class ProfilePersistence {
         lastUsed: p.lastUsed == null ? null : p.lastUsed!.millisecondsSinceEpoch ~/ 1000,
         wakeMac: p.wakeMac,
         method: p.method,
+        quality: p.quality,
       );
 
   static ConnectionProfile fromData(ConnectionData c) => ConnectionProfile(
@@ -141,6 +142,7 @@ class ProfilePersistence {
         lastUsed: c.lastUsed == null ? null : DateTime.fromMillisecondsSinceEpoch(c.lastUsed! * 1000),
         wakeMac: c.wakeMac,
         method: c.method,
+        quality: c.quality,
       );
 }
 

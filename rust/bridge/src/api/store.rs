@@ -12,7 +12,7 @@ use rdpv_core::profiles::{
 use rdpv_core::settings::{self, Settings, Theme};
 use rdpv_core::wol;
 
-use crate::api::session::ClipboardMode;
+use crate::api::session::{ClipboardMode, PictureQuality};
 
 /// How a connection is made.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -61,6 +61,7 @@ pub struct ConnectionData {
     pub last_used: Option<i64>,
     pub wake_mac: Option<String>,
     pub method: ConnectionMethod,
+    pub quality: PictureQuality,
 }
 
 #[derive(Debug, Clone)]
@@ -114,6 +115,7 @@ fn to_core(c: &ConnectionData) -> Connection {
         last_used: c.last_used,
         wake_mac: c.wake_mac.clone(),
         method: method_to_core(c.method),
+        quality: c.quality.to_core(),
     }
 }
 
@@ -129,6 +131,7 @@ fn from_core(c: Connection) -> ConnectionData {
         last_used: c.last_used,
         wake_mac: c.wake_mac,
         method: method_from_core(c.method),
+        quality: PictureQuality::from_core(c.quality),
     }
 }
 
@@ -214,6 +217,7 @@ pub fn connections_import(text: String) -> ImportResult {
                 last_used: None,
                 wake_mac: e.wake_mac,
                 method: method_from_core(e.method),
+                quality: PictureQuality::from_core(e.quality),
             })
             .collect(),
         skipped: u32::try_from(i.skipped).unwrap_or(u32::MAX),
@@ -397,6 +401,7 @@ mod tests {
             last_used: Some(5),
             wake_mac: None,
             method: ConnectionMethod::ShareScreen,
+            quality: PictureQuality::Speed,
         }
     }
 

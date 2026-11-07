@@ -76,15 +76,16 @@ final ClipboardMode clipboard;
 final PlatformInt64? lastUsed;
 final String? wakeMac;
 final ConnectionMethod method;
+final PictureQuality quality;
 
-                const ConnectionData({required this.id ,required this.name ,required this.host ,required this.port ,required this.username ,required this.savePassword ,required this.clipboard ,this.lastUsed ,this.wakeMac ,required this.method ,});
+                const ConnectionData({required this.id ,required this.name ,required this.host ,required this.port ,required this.username ,required this.savePassword ,required this.clipboard ,this.lastUsed ,this.wakeMac ,required this.method ,required this.quality ,});
 
 
 
 
 
         @override
-        int get hashCode => id.hashCode^name.hashCode^host.hashCode^port.hashCode^username.hashCode^savePassword.hashCode^clipboard.hashCode^lastUsed.hashCode^wakeMac.hashCode^method.hashCode;
+        int get hashCode => id.hashCode^name.hashCode^host.hashCode^port.hashCode^username.hashCode^savePassword.hashCode^clipboard.hashCode^lastUsed.hashCode^wakeMac.hashCode^method.hashCode^quality.hashCode;
 
 
 
@@ -93,7 +94,7 @@ final ConnectionMethod method;
             identical(this, other) ||
             other is ConnectionData &&
                 runtimeType == other.runtimeType
-                && id == other.id&& name == other.name&& host == other.host&& port == other.port&& username == other.username&& savePassword == other.savePassword&& clipboard == other.clipboard&& lastUsed == other.lastUsed&& wakeMac == other.wakeMac&& method == other.method;
+                && id == other.id&& name == other.name&& host == other.host&& port == other.port&& username == other.username&& savePassword == other.savePassword&& clipboard == other.clipboard&& lastUsed == other.lastUsed&& wakeMac == other.wakeMac&& method == other.method&& quality == other.quality;
 
             }
 

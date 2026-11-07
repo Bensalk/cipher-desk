@@ -575,6 +575,7 @@ fn wire__crate__api__session__RdpSession_start_impl(
                 <crate::api::session::ClipboardMode>::sse_decode(&mut deserializer);
             let api_download_dir = <String>::sse_decode(&mut deserializer);
             let api_idle_minutes = <u32>::sse_decode(&mut deserializer);
+            let api_quality = <crate::api::session::PictureQuality>::sse_decode(&mut deserializer);
             let api_sink = <StreamSink<
                 crate::api::session::SessionUpdate,
                 flutter_rust_bridge::for_generated::SseCodec,
@@ -609,6 +610,7 @@ fn wire__crate__api__session__RdpSession_start_impl(
                             api_clipboard_direction,
                             api_download_dir,
                             api_idle_minutes,
+                            api_quality,
                             api_sink,
                         );
                     })?;
@@ -786,6 +788,7 @@ fn wire__crate__api__session__RdpSession_start_with_saved_password_impl(
                 <crate::api::session::ClipboardMode>::sse_decode(&mut deserializer);
             let api_download_dir = <String>::sse_decode(&mut deserializer);
             let api_idle_minutes = <u32>::sse_decode(&mut deserializer);
+            let api_quality = <crate::api::session::PictureQuality>::sse_decode(&mut deserializer);
             let api_sink = <StreamSink<
                 crate::api::session::SessionUpdate,
                 flutter_rust_bridge::for_generated::SseCodec,
@@ -820,6 +823,7 @@ fn wire__crate__api__session__RdpSession_start_with_saved_password_impl(
                             api_clipboard_direction,
                             api_download_dir,
                             api_idle_minutes,
+                            api_quality,
                             api_sink,
                         );
                     })?;
@@ -2313,6 +2317,7 @@ impl SseDecode for crate::api::store::ConnectionData {
         let mut var_lastUsed = <Option<i64>>::sse_decode(deserializer);
         let mut var_wakeMac = <Option<String>>::sse_decode(deserializer);
         let mut var_method = <crate::api::store::ConnectionMethod>::sse_decode(deserializer);
+        let mut var_quality = <crate::api::session::PictureQuality>::sse_decode(deserializer);
         return crate::api::store::ConnectionData {
             id: var_id,
             name: var_name,
@@ -2324,6 +2329,7 @@ impl SseDecode for crate::api::store::ConnectionData {
             last_used: var_lastUsed,
             wake_mac: var_wakeMac,
             method: var_method,
+            quality: var_quality,
         };
     }
 }
@@ -2634,6 +2640,19 @@ impl SseDecode for Option<u16> {
         } else {
             return None;
         }
+    }
+}
+
+impl SseDecode for crate::api::session::PictureQuality {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::session::PictureQuality::Best,
+            1 => crate::api::session::PictureQuality::Balanced,
+            2 => crate::api::session::PictureQuality::Speed,
+            _ => unreachable!("Invalid variant for PictureQuality: {}", inner),
+        };
     }
 }
 
@@ -2977,6 +2996,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::store::ConnectionData {
             self.last_used.into_into_dart().into_dart(),
             self.wake_mac.into_into_dart().into_dart(),
             self.method.into_into_dart().into_dart(),
+            self.quality.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -3189,6 +3209,28 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::store::LoadResult>
     for crate::api::store::LoadResult
 {
     fn into_into_dart(self) -> crate::api::store::LoadResult {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::session::PictureQuality {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Best => 0.into_dart(),
+            Self::Balanced => 1.into_dart(),
+            Self::Speed => 2.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::session::PictureQuality
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::session::PictureQuality>
+    for crate::api::session::PictureQuality
+{
+    fn into_into_dart(self) -> crate::api::session::PictureQuality {
         self
     }
 }
@@ -3464,6 +3506,7 @@ impl SseEncode for crate::api::store::ConnectionData {
         <Option<i64>>::sse_encode(self.last_used, serializer);
         <Option<String>>::sse_encode(self.wake_mac, serializer);
         <crate::api::store::ConnectionMethod>::sse_encode(self.method, serializer);
+        <crate::api::session::PictureQuality>::sse_encode(self.quality, serializer);
     }
 }
 
@@ -3713,6 +3756,23 @@ impl SseEncode for Option<u16> {
         if let Some(value) = self {
             <u16>::sse_encode(value, serializer);
         }
+    }
+}
+
+impl SseEncode for crate::api::session::PictureQuality {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::session::PictureQuality::Best => 0,
+                crate::api::session::PictureQuality::Balanced => 1,
+                crate::api::session::PictureQuality::Speed => 2,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
     }
 }
 

@@ -16,6 +16,7 @@ use tracing::{debug, warn};
 
 use self::bitmap::BitmapEncoder;
 use self::rfx::RfxEncoder;
+pub(crate) use self::rfx::RfxQuality;
 use super::BitmapUpdate;
 use crate::macros::time_warn;
 use crate::{ColorPointer, DisplayUpdate, Framebuffer, RGBAPointer};
@@ -47,6 +48,7 @@ impl CodecId {
 #[derive(Debug)]
 pub(crate) struct UpdateEncoderCodecs {
     remotefx: Option<(EntropyBits, u8)>,
+    rfx_quality: RfxQuality,
     #[cfg(feature = "qoi")]
     qoi: Option<u8>,
     #[cfg(feature = "qoiz")]
@@ -61,6 +63,7 @@ impl UpdateEncoderCodecs {
     pub(crate) fn new() -> Self {
         Self {
             remotefx: None,
+            rfx_quality: RfxQuality::default(),
             #[cfg(feature = "qoi")]
             qoi: None,
             #[cfg(feature = "qoiz")]
@@ -73,6 +76,11 @@ impl UpdateEncoderCodecs {
     #[cfg_attr(feature = "__bench", visibility::make(pub))]
     pub(crate) fn set_remotefx(&mut self, remotefx: Option<(EntropyBits, u8)>) {
         self.remotefx = remotefx
+    }
+
+    /// How much RemoteFX compresses (Cipher Desk quality setting).
+    pub(crate) fn set_rfx_quality(&mut self, quality: RfxQuality) {
+        self.rfx_quality = quality
     }
 
     #[cfg(feature = "qoi")]
@@ -139,8 +147,9 @@ impl UpdateEncoder {
                 UpdateEncoderCodecs { qoi: Some(id), .. } => BitmapUpdater::Qoi(QoiHandler::new(id)),
                 UpdateEncoderCodecs {
                     remotefx: Some((algo, id)),
+                    rfx_quality,
                     ..
-                } => BitmapUpdater::RemoteFx(RemoteFxHandler::new(algo, id, desktop_size)),
+                } => BitmapUpdater::RemoteFx(RemoteFxHandler::new(algo, id, desktop_size, rfx_quality)),
                 // NSCodec is the lowest-priority codec because it predates
                 // RemoteFX and produces larger output. It's relevant mainly
                 // for clients (notably macOS Microsoft Remote Desktop /
@@ -550,9 +559,9 @@ struct RemoteFxHandler {
 }
 
 impl RemoteFxHandler {
-    fn new(algo: EntropyBits, codec_id: u8, desktop_size: DesktopSize) -> Self {
+    fn new(algo: EntropyBits, codec_id: u8, desktop_size: DesktopSize, quality: RfxQuality) -> Self {
         Self {
-            remotefx: RfxEncoder::new(algo),
+            remotefx: RfxEncoder::new(algo, quality),
             desktop_size: Some(desktop_size),
             codec_id,
         }

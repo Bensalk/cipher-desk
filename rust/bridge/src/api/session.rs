@@ -210,6 +210,7 @@ impl RdpSession {
         clipboard_direction: ClipboardMode,
         download_dir: String,
         idle_minutes: u32,
+        quality: PictureQuality,
         sink: StreamSink<SessionUpdate>,
     ) {
         let target = Target {
@@ -223,6 +224,7 @@ impl RdpSession {
             receive_dir: download_dir,
             idle_minutes,
             vnc: false,
+            quality,
         };
         self.spawn(target, Some(SecretString::new(password)), None, sink);
     }
@@ -243,6 +245,7 @@ impl RdpSession {
         clipboard_direction: ClipboardMode,
         download_dir: String,
         idle_minutes: u32,
+        quality: PictureQuality,
         sink: StreamSink<SessionUpdate>,
     ) {
         let target = Target {
@@ -256,6 +259,7 @@ impl RdpSession {
             receive_dir: download_dir,
             idle_minutes,
             vnc: false,
+            quality,
         };
         self.spawn(target, None, Some(connection_id), sink);
     }
@@ -472,6 +476,37 @@ impl ClipboardMode {
     }
 }
 
+/// Picture quality of a connection (like AnyDesk's display quality).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PictureQuality {
+    /// Exact pixels with Cipher Desk Host; uses the most data.
+    Best,
+    /// Sharp picture with compression; good for most links.
+    Balanced,
+    /// Least data and quickest response on slow links.
+    Speed,
+}
+
+impl PictureQuality {
+    pub(crate) fn to_core(self) -> rdpv_core::profiles::Quality {
+        use rdpv_core::profiles::Quality;
+        match self {
+            Self::Best => Quality::Best,
+            Self::Balanced => Quality::Balanced,
+            Self::Speed => Quality::Speed,
+        }
+    }
+
+    pub(crate) fn from_core(q: rdpv_core::profiles::Quality) -> Self {
+        use rdpv_core::profiles::Quality;
+        match q {
+            Quality::Best => Self::Best,
+            Quality::Balanced => Self::Balanced,
+            Quality::Speed => Self::Speed,
+        }
+    }
+}
+
 /// Where to connect (everything except the password).
 struct Target {
     host: String,
@@ -487,6 +522,8 @@ struct Target {
     idle_minutes: u32,
     /// The VNC method (no username, certificate or clipboard).
     vnc: bool,
+    /// Picture quality (Remote Desktop and Share screen).
+    quality: PictureQuality,
 }
 
 impl Target {
@@ -502,6 +539,7 @@ impl Target {
             receive_dir: String::new(),
             idle_minutes,
             vnc: true,
+            quality: PictureQuality::Balanced,
         }
     }
 }
@@ -578,6 +616,7 @@ fn run(target: &Target, password: SecretString, send: Send<'_>, rx: &Receiver<Co
         receive_dir,
         idle_minutes,
         vnc,
+        quality,
     } = target;
     let (port, width, height) = (*port, *width, *height);
     let fail = |e: ConnectionError| {
@@ -637,6 +676,7 @@ fn run(target: &Target, password: SecretString, send: Send<'_>, rx: &Receiver<Co
         connect_timeout: policy.connect_timeout,
         clipboard: clipboard.policy(),
         receive_dir: (!receive_dir.is_empty()).then(|| std::path::PathBuf::from(receive_dir)),
+        quality: quality.to_core(),
     };
 
     let session = loop {

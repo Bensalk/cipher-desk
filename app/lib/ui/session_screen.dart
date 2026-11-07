@@ -10,6 +10,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../platform/app_window.dart';
 import '../platform/remote_clipboard.dart';
 import '../platform/session_service.dart';
 import '../session/scancodes.dart';
@@ -20,6 +21,7 @@ import '../src/rust/api/store.dart' show ConnectionMethod;
 import '../state/profiles.dart';
 import 'connection_methods.dart';
 import 'error_banner.dart';
+import 'picture_quality.dart';
 import 'status_chip.dart';
 
 /// The remote desktop size to ask for, in pixels (even numbers).
@@ -55,6 +57,7 @@ class SessionScreen extends StatefulWidget {
     this.useSavedPassword = false,
     this.idleMinutes = 30,
     this.onOutcome,
+    this.onQualityChanged,
   });
 
   final ConnectionProfile profile;
@@ -68,6 +71,10 @@ class SessionScreen extends StatefulWidget {
   /// Called once when the session ends, with "connected" (it was used and
   /// then closed), "cancelled" (closed before connecting) or an error id.
   final void Function(String outcome)? onOutcome;
+
+  /// Saves a new picture quality for this connection. The screen then closes
+  /// with `true`, so the caller connects again with the new setting.
+  final void Function(PictureQuality quality)? onQualityChanged;
 
   /// Typed (or, on Android, vault-read) password. Used once, never stored here.
   final String? password;
@@ -96,7 +103,11 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   bool _trackpad = false;
   // Stretch the remote picture to fill the window (ignores aspect ratio);
   // off = fit the whole screen with correct proportions.
-  bool _stretch = false;
+  _ViewMode _view = _ViewMode.shrink;
+
+  /// Screen pixels per logical pixel, for "Original size" (one remote pixel
+  /// on one screen pixel).
+  double _dpr = 1;
   // Immersive: hide the app bar and key bar so the remote screen fills the window.
   bool _immersive = false;
   Offset _cursor = Offset.zero; // remote coordinates, trackpad mode
@@ -245,6 +256,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
             clipboardDirection: clipboard,
             downloadDir: downloadDir,
             idleMinutes: widget.idleMinutes,
+            quality: widget.profile.quality,
           )
         : _session.start(
             host: widget.profile.host,
@@ -257,6 +269,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
             clipboardDirection: clipboard,
             downloadDir: downloadDir,
             idleMinutes: widget.idleMinutes,
+            quality: widget.profile.quality,
           );
     _sub = stream.listen(_onUpdate, onError: (_) => _onEnded(null));
   }
@@ -377,6 +390,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   }
 
   void _onEnded(ErrorInfo? error) {
+    if (_immersive) _setImmersive(false);
     _heldModifiers.clear();
     _clipTimer?.cancel();
     _backgroundTimer?.cancel();
@@ -458,6 +472,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
 
   @override
   void dispose() {
+    if (_immersive) AppWindow.setFullScreen(false);
     WidgetsBinding.instance.removeObserver(this);
     _clipTimer?.cancel();
     _backgroundTimer?.cancel();
@@ -485,8 +500,17 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   static const maxZoom = 4.0;
 
   /// Scale with zoom 1 = whole desktop visible (like BoxFit.contain).
-  double _baseScale(Size box) =>
-      (_width == 0 || _height == 0) ? 0.0 : math.min(box.width / _width, box.height / _height);
+  double _baseScale(Size box) {
+    if (_width == 0 || _height == 0) return 0.0;
+    final fit = math.min(box.width / _width, box.height / _height);
+    return switch (_view) {
+      // One remote pixel per screen pixel.
+      _ViewMode.original => 1 / _dpr,
+      // The whole screen, but never enlarged (enlarging only blurs it).
+      _ViewMode.shrink => math.min(fit, 1 / _dpr),
+      _ViewMode.stretch => fit,
+    };
+  }
 
   double _scale(Size box) => _baseScale(box) * _zoom;
 
@@ -498,9 +522,34 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
 
   // Per-axis scale and origin, so "stretch" can fill the window on each axis
   // independently. In fit mode both axes share the aspect-correct scale.
+  bool get _stretch => _view == _ViewMode.stretch;
   double _sx(Size box) => _stretch && _width != 0 ? box.width / _width : _scale(box);
   double _sy(Size box) => _stretch && _height != 0 ? box.height / _height : _scale(box);
-  Offset _origin2(Size box) => _stretch ? Offset.zero : _origin(box);
+  Offset _origin2(Size box) {
+    if (_stretch) return Offset.zero;
+    final o = _origin(box);
+    // On whole screen pixels, so 1:1 pixels stay sharp.
+    return Offset((o.dx * _dpr).roundToDouble() / _dpr, (o.dy * _dpr).roundToDouble() / _dpr);
+  }
+
+  /// "Original size" with a remote screen larger than the window: the view
+  /// follows the mouse, so moving it towards an edge shows that part.
+  void _followMouse(Offset local, Size box) {
+    if (_view != _ViewMode.original || _zoom != 1) return;
+    final s = _scale(box);
+    double axis(double pointer, double view, double content, double centred) {
+      if (content <= view) return 0;
+      final f = (pointer / view).clamp(0.0, 1.0);
+      return -f * (content - view) - centred;
+    }
+
+    final c = _centred(box, s);
+    final pan = Offset(
+      axis(local.dx, box.width, _width * s, c.dx),
+      axis(local.dy, box.height, _height * s, c.dy),
+    );
+    if ((pan - _pan).distance >= 0.5) setState(() => _pan = pan);
+  }
 
   /// Keeps the zoomed desktop covering the view (no empty margins when zoomed in).
   Offset _clampPan(Size box, double s, Offset pan) {
@@ -648,6 +697,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   /// accepts those, so a mouse click is never sent twice).
   void _pointer(PointerEvent e, Size box, {bool? down}) {
     if (_touchKinds.contains(e.kind)) return;
+    if (down == null) _followMouse(e.localPosition, box);
     final p = _toRemote(e.localPosition, box);
     if (p == null) return;
     if (down == null) {
@@ -823,6 +873,70 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   }
 
   /// The remote desktop at the current zoom and pan, plus the trackpad cursor.
+  /// Full screen: hides the toolbar and, on Windows and Android, the taskbar
+  /// or system bars too.
+  void _setImmersive(bool on) {
+    if (_immersive == on) return;
+    if (mounted) setState(() => _immersive = on);
+    AppWindow.setFullScreen(on);
+    _focus.requestFocus();
+  }
+
+  Widget _viewMenu() => PopupMenuButton<_ViewMode>(
+        key: const Key('button-view-mode'),
+        tooltip: 'View: ${_view.label}',
+        icon: Icon(_view.icon),
+        initialValue: _view,
+        onSelected: (v) => setState(() {
+          _view = v;
+          _zoom = 1;
+          _pan = Offset.zero;
+          _focus.requestFocus();
+        }),
+        itemBuilder: (_) => [
+          for (final v in _ViewMode.values)
+            CheckedPopupMenuItem(
+              value: v,
+              checked: v == _view,
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(v.label),
+                subtitle: Text(v.description),
+              ),
+            ),
+        ],
+      );
+
+  Widget _qualityMenu() => PopupMenuButton<PictureQuality>(
+        key: const Key('button-quality'),
+        tooltip: 'Picture quality: ${widget.profile.quality.label}',
+        icon: Icon(widget.profile.quality.icon),
+        initialValue: widget.profile.quality,
+        onSelected: (q) {
+          if (q == widget.profile.quality) return;
+          // The quality is agreed when connecting: save it and connect again.
+          widget.onQualityChanged?.call(q);
+          Navigator.of(context).pop(true);
+        },
+        itemBuilder: (_) => [
+          for (final q in PictureQuality.values)
+            CheckedPopupMenuItem(
+              value: q,
+              checked: q == widget.profile.quality,
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(q.label),
+                subtitle: Text(q.description),
+              ),
+            ),
+          const PopupMenuDivider(),
+          const PopupMenuItem<PictureQuality>(
+            enabled: false,
+            child: Text('Changing it reconnects.'),
+          ),
+        ],
+      );
+
   Widget _desktop(ui.Image image, Size box) {
     final sx = _sx(box);
     final sy = _sy(box);
@@ -836,7 +950,14 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
               top: o.dy,
               width: _width * sx,
               height: _height * sy,
-              child: RawImage(image: image, fit: BoxFit.fill, filterQuality: FilterQuality.medium),
+              child: RawImage(
+                image: image,
+                fit: BoxFit.fill,
+                // 1:1 pixels need no smoothing; scaled views do.
+                filterQuality: _view == _ViewMode.original && _zoom == 1
+                    ? FilterQuality.none
+                    : FilterQuality.medium,
+              ),
             ),
             if (_trackpad)
               Positioned(
@@ -941,6 +1062,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
 
   @override
   Widget build(BuildContext context) {
+    _dpr = MediaQuery.devicePixelRatioOf(context);
     final changed = _changedFingerprints;
     return PopScope(
       canPop: !_sessionOpen,
@@ -954,23 +1076,14 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
         title: Text(widget.profile.displayName),
         actions: [
           if (!_ended && _state == RdpConnectionState.connected) ...[
-            IconButton(
-              key: const Key('button-stretch'),
-              tooltip: _stretch ? 'Fit to window (keep shape)' : 'Stretch to fill the window',
-              icon: Icon(_stretch ? Icons.fit_screen_outlined : Icons.aspect_ratio_outlined),
-              onPressed: () => setState(() {
-                _stretch = !_stretch;
-                if (_stretch) {
-                  _zoom = 1;
-                  _pan = Offset.zero;
-                }
-              }),
-            ),
+            _viewMenu(),
+            if (widget.profile.method != ConnectionMethod.vnc && widget.onQualityChanged != null)
+              _qualityMenu(),
             IconButton(
               key: const Key('button-fullscreen'),
-              tooltip: 'Fullscreen',
+              tooltip: 'Full screen',
               icon: const Icon(Icons.fullscreen),
-              onPressed: () => setState(() => _immersive = true),
+              onPressed: () => _setImmersive(true),
             ),
           ],
           if (widget.profile.clipboardEnabled && _state == RdpConnectionState.connected)
@@ -1057,12 +1170,21 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
                           child: SafeArea(
                             child: Material(
                               color: Colors.black54,
-                              shape: const CircleBorder(),
-                              child: IconButton(
-                                key: const Key('button-exit-fullscreen'),
-                                tooltip: 'Exit fullscreen',
-                                icon: const Icon(Icons.fullscreen_exit, color: Colors.white),
-                                onPressed: () => setState(() => _immersive = false),
+                              shape: const StadiumBorder(),
+                              child: IconTheme(
+                                data: const IconThemeData(color: Colors.white),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _viewMenu(),
+                                    IconButton(
+                                      key: const Key('button-exit-fullscreen'),
+                                      tooltip: 'Exit full screen',
+                                      icon: const Icon(Icons.fullscreen_exit),
+                                      onPressed: () => _setImmersive(false),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -1142,4 +1264,29 @@ class _FingerprintCompare extends StatelessWidget {
       ),
     );
   }
+}
+
+/// How the remote screen fits the window (like AnyDesk's view modes).
+enum _ViewMode {
+  original,
+  shrink,
+  stretch;
+
+  String get label => switch (this) {
+        _ViewMode.original => 'Original size',
+        _ViewMode.shrink => 'Shrink to fit',
+        _ViewMode.stretch => 'Stretch to fill',
+      };
+
+  String get description => switch (this) {
+        _ViewMode.original => 'Sharpest: one remote pixel per screen pixel. Move the mouse to an edge to see more.',
+        _ViewMode.shrink => 'The whole screen, never enlarged.',
+        _ViewMode.stretch => 'Fills the window.',
+      };
+
+  IconData get icon => switch (this) {
+        _ViewMode.original => Icons.crop_original,
+        _ViewMode.shrink => Icons.fit_screen_outlined,
+        _ViewMode.stretch => Icons.aspect_ratio_outlined,
+      };
 }

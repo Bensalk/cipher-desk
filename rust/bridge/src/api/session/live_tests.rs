@@ -157,6 +157,7 @@ fn start_logged(addr: SocketAddr, h: &Host, capture: Option<Capture>) -> io::Res
         receive_dir: String::new(),
         idle_minutes: 0,
         vnc: false,
+        quality: super::PictureQuality::Balanced,
     };
     let password = SecretString::new(h.password.clone());
     let (ctx, crx) = mpsc::channel();

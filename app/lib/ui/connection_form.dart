@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../platform/password_vault.dart';
 import '../src/rust/api/store.dart';
 import '../src/rust/api/form.dart';
-import '../src/rust/api/session.dart' show ClipboardMode;
+import '../src/rust/api/session.dart' show ClipboardMode, PictureQuality;
 import '../state/profiles.dart';
 import 'connection_methods.dart';
+import 'picture_quality.dart';
 
 /// Create or edit a connection (Stage 3). Returns the saved profile, or null.
 ///
@@ -44,6 +45,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
   late bool _savePassword;
   late ClipboardMode _clipboard;
   late ConnectionMethod _method;
+  late PictureQuality _quality;
   Map<String, String> _problems = const {};
   bool _submitted = false;
 
@@ -58,6 +60,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
     _mac = TextEditingController(text: p?.wakeMac ?? '');
     _savePassword = p?.savePassword ?? false;
     _method = p?.method ?? ConnectionMethod.privateRemoteDesktop;
+    _quality = p?.quality ?? PictureQuality.balanced;
     _clipboard = p?.clipboardMode ??
         (widget.clipboardDefault ? ClipboardMode.both : ClipboardMode.off);
   }
@@ -143,6 +146,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
       // Clipboard sharing is only offered for Private Remote Desktop.
       clipboardMode: _method.supportsClipboard ? _clipboard : ClipboardMode.off,
       method: _method,
+      quality: _quality,
       lastUsed: widget.existing?.lastUsed,
       wakeMac: _mac.text.trim().isEmpty ? null : _mac.text.trim(),
     );
@@ -304,6 +308,24 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                       style: TextStyle(color: Theme.of(context).colorScheme.error),
                     ),
                   ),
+                if (_method != ConnectionMethod.vnc) ...[
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<PictureQuality>(
+                    key: const Key('field-quality'),
+                    initialValue: _quality,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: 'Picture quality',
+                      helperText: _quality.description,
+                      helperMaxLines: 3,
+                    ),
+                    items: [
+                      for (final q in PictureQuality.values)
+                        DropdownMenuItem(value: q, child: Text(q.label)),
+                    ],
+                    onChanged: (v) => setState(() => _quality = v ?? PictureQuality.balanced),
+                  ),
+                ],
                 if (_method.supportsClipboard) ...[
                 const SizedBox(height: 8),
                 DropdownButtonFormField<ClipboardMode>(

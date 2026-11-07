@@ -144,11 +144,16 @@ class _HomeScreenState extends State<HomeScreen> {
           pinsPath: paths.pins,
           idleMinutes: widget.settings.idleMinutes,
           onOutcome: (outcome) => widget.store.addHistory(p.id, outcome, DateTime.now()),
+          onQualityChanged: (quality) {
+            final current = widget.store.byId(p.id);
+            if (current != null) widget.store.upsert(current.copyWith(quality: quality));
+          },
         ),
       ),
     );
     password = null;
-    // After re-trusting a changed certificate, connect again (asks to check it).
+    // After re-trusting a changed certificate, or choosing another picture
+    // quality, connect again.
     if (reconnect == true && mounted) {
       final current = widget.store.byId(p.id);
       if (current != null) await _connect(current);

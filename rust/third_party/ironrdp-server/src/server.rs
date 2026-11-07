@@ -38,7 +38,7 @@ use crate::autodetect::{AutoDetectManager, RttSnapshot};
 use crate::clipboard::CliprdrServerFactory;
 use crate::display::{DisplayUpdate, RdpServerDisplay};
 use crate::echo::{EchoDvcBridge, EchoServerHandle, EchoServerMessage, build_echo_request};
-use crate::encoder::{UpdateEncoder, UpdateEncoderCodecs};
+use crate::encoder::{RfxQuality, UpdateEncoder, UpdateEncoderCodecs};
 #[cfg(feature = "egfx")]
 use crate::gfx::{EgfxServerMessage, GfxServerFactory};
 use crate::handler::RdpServerInputHandler;
@@ -1422,6 +1422,15 @@ impl RdpServer {
                     }
                 }
                 CapabilitySet::Bitmap(b) => {
+                    // Cipher Desk: the viewer's quality setting. A viewer that
+                    // asks for 16-bit colour wants the least data ("Speed");
+                    // otherwise send sharp RemoteFX. Lossless QOIZ, when the
+                    // viewer offers it, does not use these values.
+                    update_codecs.set_rfx_quality(if b.pref_bits_per_pix <= 16 {
+                        RfxQuality::Small
+                    } else {
+                        RfxQuality::Sharp
+                    });
                     if !b.desktop_resize_flag {
                         debug!("Desktop resize is not supported by the client");
                         continue;

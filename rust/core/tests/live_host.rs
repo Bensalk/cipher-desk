@@ -61,6 +61,7 @@ fn params(
         connect_timeout: Duration::from_secs(5),
         clipboard: rdpv_core::clipboard::ClipboardPolicy::off(),
         receive_dir: None,
+        quality: rdpv_core::profiles::Quality::Balanced,
     })
 }
 

@@ -44,10 +44,14 @@ use rdpv_core::secret::SecretString;
 pub use frames::{Frame, FrameSource, SyntheticSource};
 pub use input::{Button, Input, InputSink, NoInput, RecordingSink};
 
-/// How often the screen is checked for changes while a viewer is connected
-/// (~20 frames a second). RemoteFX keeps each update small, so this stays
-/// smooth without flooding the link.
-const CAPTURE_INTERVAL: Duration = Duration::from_millis(50);
+/// Shortest time between screen grabs while a viewer is connected (about 30
+/// frames a second). A grab also waits until the previous one has been taken
+/// for sending, so a slow link lowers the frame rate instead of queueing old
+/// pictures: the viewer always gets the newest screen.
+const CAPTURE_INTERVAL: Duration = Duration::from_millis(33);
+
+/// How often the capture thread checks whether the previous grab has gone out.
+const SEND_WAIT_STEP: Duration = Duration::from_millis(2);
 
 /// What the Host reports to the UI.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -370,9 +374,19 @@ fn capture_loop<S: FrameSource + Send>(
 ) {
     let mut differ = frames::Differ::default();
     loop {
+        // Fresh pictures only: wait until everything from the last grab has
+        // been taken for sending (the encoder takes the next update only after
+        // the previous one is written to the network).
+        while tx.capacity() < tx.max_capacity() {
+            if tx.is_closed() {
+                return;
+            }
+            std::thread::sleep(SEND_WAIT_STEP);
+        }
         if tx.is_closed() {
             return;
         }
+        let started = std::time::Instant::now();
         let frame = match source.lock() {
             Ok(mut s) => s.capture(),
             Err(_) => return,
@@ -400,7 +414,10 @@ fn capture_loop<S: FrameSource + Send>(
             // keep the last picture and try again.
             Err(e) => tracing::debug!(error = %e, "capture failed"),
         }
-        std::thread::sleep(CAPTURE_INTERVAL);
+        // Grabbing takes time too; only wait for what is left of the interval.
+        if let Some(rest) = CAPTURE_INTERVAL.checked_sub(started.elapsed()) {
+            std::thread::sleep(rest);
+        }
     }
 }
 

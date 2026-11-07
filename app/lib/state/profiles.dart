@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
-import '../src/rust/api/session.dart' show ClipboardMode;
+import '../src/rust/api/session.dart' show ClipboardMode, PictureQuality;
 import '../src/rust/api/store.dart' show ConnectionMethod;
 
 /// A saved connection. Deliberately has **no password field**: passwords are
@@ -20,6 +20,7 @@ class ConnectionProfile {
     this.lastUsed,
     this.wakeMac,
     this.method = ConnectionMethod.privateRemoteDesktop,
+    this.quality = PictureQuality.balanced,
   });
 
   final String id;
@@ -43,6 +44,9 @@ class ConnectionProfile {
   /// Private Remote Desktop, Share screen or VNC.
   final ConnectionMethod method;
 
+  /// Picture quality: Best (exact pixels), Balanced or Speed.
+  final PictureQuality quality;
+
   /// "host:port", bracketing IPv6 addresses.
   String get endpoint => host.contains(':') ? '[$host]:$port' : '$host:$port';
 
@@ -61,6 +65,7 @@ class ConnectionProfile {
     String? wakeMac,
     bool clearWakeMac = false,
     ConnectionMethod? method,
+    PictureQuality? quality,
   }) {
     return ConnectionProfile(
       id: id ?? this.id,
@@ -73,6 +78,7 @@ class ConnectionProfile {
       lastUsed: lastUsed ?? this.lastUsed,
       wakeMac: clearWakeMac ? null : (wakeMac ?? this.wakeMac),
       method: method ?? this.method,
+      quality: quality ?? this.quality,
     );
   }
 }

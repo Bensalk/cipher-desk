@@ -121,6 +121,8 @@ CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_ShareHostPtr => wi
 
 @protected int? dco_decode_opt_box_autoadd_u_16(dynamic raw);
 
+@protected PictureQuality dco_decode_picture_quality(dynamic raw);
+
 @protected SessionUpdate dco_decode_session_update(dynamic raw);
 
 @protected SettingsData dco_decode_settings_data(dynamic raw);
@@ -229,6 +231,8 @@ CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_ShareHostPtr => wi
 
 @protected int? sse_decode_opt_box_autoadd_u_16(SseDeserializer deserializer);
 
+@protected PictureQuality sse_decode_picture_quality(SseDeserializer deserializer);
+
 @protected SessionUpdate sse_decode_session_update(SseDeserializer deserializer);
 
 @protected SettingsData sse_decode_settings_data(SseDeserializer deserializer);
@@ -336,6 +340,8 @@ CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_ShareHostPtr => wi
 @protected void sse_encode_opt_box_autoadd_i_64(PlatformInt64? self, SseSerializer serializer);
 
 @protected void sse_encode_opt_box_autoadd_u_16(int? self, SseSerializer serializer);
+
+@protected void sse_encode_picture_quality(PictureQuality self, SseSerializer serializer);
 
 @protected void sse_encode_session_update(SessionUpdate self, SseSerializer serializer);
 

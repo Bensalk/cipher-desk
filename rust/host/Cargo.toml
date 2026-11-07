@@ -9,10 +9,9 @@ publish.workspace = true
 
 [dependencies]
 rdpv-core = { path = "../core" }
-# Older IronRDP server release than the client crates; its types never mix with
-# the client's. Default features off: they add the QOIZ codec and its zstd
-# library, which the app does not need.
-ironrdp-server = { path = "../third_party/ironrdp-server" }
+# Copy of the IronRDP server for the 0.12 crates (see its README). QOIZ is the
+# lossless codec behind the viewer's "Best quality" setting.
+ironrdp-server = { path = "../third_party/ironrdp-server", features = ["qoiz"] }
 ironrdp-cliprdr.workspace = true
 ironrdp-core.workspace = true
 anyhow = "1"

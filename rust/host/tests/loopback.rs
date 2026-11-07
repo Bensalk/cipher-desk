@@ -10,6 +10,7 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use rdpv_core::input::{parse_endpoint, parse_username};
+use rdpv_core::profiles::Quality;
 use rdpv_core::secret::SecretString;
 use rdpv_core::session::{
     connect, ConnectFailure, ConnectParams, InputEvent, PointerButton, SessionEvent,
@@ -36,6 +37,10 @@ fn free_port() -> u16 {
 }
 
 fn params(port: u16, password: &str, pin: Option<String>) -> ConnectParams {
+    params_with(port, password, pin, Quality::Balanced)
+}
+
+fn params_with(port: u16, password: &str, pin: Option<String>, quality: Quality) -> ConnectParams {
     ConnectParams {
         endpoint: parse_endpoint("127.0.0.1", &port.to_string()).expect("endpoint"),
         username: parse_username(USER).expect("username"),
@@ -46,6 +51,7 @@ fn params(port: u16, password: &str, pin: Option<String>) -> ConnectParams {
         connect_timeout: Duration::from_secs(10),
         clipboard: rdpv_core::clipboard::ClipboardPolicy::off(),
         receive_dir: None,
+        quality,
     }
 }
 
@@ -293,4 +299,119 @@ fn a_resolution_change_resizes_the_viewer() {
     // The session is still healthy after the resize.
     assert!(!s.is_ended(), "session ended after the resize");
     s.disconnect();
+}
+
+/// A still picture with fine detail everywhere (like small text), so lossy
+/// compression shows up as differences.
+struct DetailedPicture {
+    width: u16,
+    height: u16,
+}
+
+impl DetailedPicture {
+    /// The picture as the viewer stores it: red, green, blue per pixel.
+    fn rgb(&self) -> Vec<[u8; 3]> {
+        let (w, h) = (usize::from(self.width), usize::from(self.height));
+        (0..h)
+            .flat_map(|y| (0..w).map(move |x| Self::pixel(x, y)))
+            .map(|[b, g, r]| [r, g, b])
+            .collect()
+    }
+
+    /// Blue, green, red of one pixel.
+    fn pixel(x: usize, y: usize) -> [u8; 3] {
+        let v = ((x * 31) ^ (y * 17)).to_le_bytes()[0];
+        [v, v.wrapping_mul(3), v.wrapping_add(90)]
+    }
+}
+
+impl rdpv_host::FrameSource for DetailedPicture {
+    fn size(&mut self) -> (u16, u16) {
+        (self.width, self.height)
+    }
+
+    fn capture(&mut self) -> anyhow::Result<rdpv_host::Frame> {
+        let (w, h) = (usize::from(self.width), usize::from(self.height));
+        let mut bgra = Vec::with_capacity(w * h * 4);
+        for y in 0..h {
+            for x in 0..w {
+                bgra.extend_from_slice(&Self::pixel(x, y));
+                bgra.push(0xFF);
+            }
+        }
+        Ok(rdpv_host::Frame {
+            width: self.width,
+            height: self.height,
+            bgra,
+        })
+    }
+}
+
+/// Connects with `quality` to a Host sharing [`DetailedPicture`] and returns
+/// the average difference per colour value (0 = exact) once the picture has
+/// arrived.
+fn picture_error(quality: Quality) -> f64 {
+    let picture = DetailedPicture {
+        width: 320,
+        height: 192,
+    };
+    let expected = picture.rgb();
+    let r = start_with(picture);
+    let mut s = connect(params_with(
+        r.port,
+        &r.password,
+        Some(r.fingerprint.clone()),
+        quality,
+    ))
+    .unwrap_or_else(|f| panic!("connect failed ({quality:?}): {f:?}"));
+    assert_eq!(s.size(), (320, 192));
+
+    // Updates keep arriving until the whole picture is in; take the error once
+    // it stops changing.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let mut last = f64::MAX;
+    let mut steady = 0;
+    while Instant::now() < deadline && steady < 5 {
+        for e in s.poll() {
+            if let SessionEvent::Ended(err) = e {
+                panic!("session ended ({quality:?}): {err:?}");
+            }
+        }
+        let got = s.frame();
+        let total: u64 = expected
+            .iter()
+            .zip(got.chunks_exact(4))
+            .flat_map(|(want, px)| (0..3).map(move |c| u64::from(want[c].abs_diff(px[c]))))
+            .sum();
+        #[allow(clippy::cast_precision_loss)]
+        let error = total as f64 / (expected.len() * 3) as f64;
+        steady = if (error - last).abs() < f64::EPSILON {
+            steady + 1
+        } else {
+            0
+        };
+        last = error;
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    s.disconnect();
+    last
+}
+
+#[test]
+fn best_quality_arrives_pixel_for_pixel() {
+    let error = picture_error(Quality::Best);
+    assert!(error == 0.0, "Best must be lossless, average error {error}");
+}
+
+#[test]
+fn balanced_is_sharper_than_speed() {
+    let balanced = picture_error(Quality::Balanced);
+    let speed = picture_error(Quality::Speed);
+    // Measured on this deliberately hard picture: about 2.5 and 17.
+    assert!(balanced < 6.0, "Balanced picture too far off: {balanced}");
+    assert!(speed < 30.0, "Speed picture too far off: {speed}");
+    assert!(
+        balanced < speed,
+        "Balanced ({balanced}) should be sharper than Speed ({speed})"
+    );
 }

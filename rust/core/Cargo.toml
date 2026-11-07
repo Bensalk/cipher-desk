@@ -9,9 +9,10 @@ publish.workspace = true
 
 [dependencies]
 ironrdp-connector.workspace = true
-ironrdp-session.workspace = true
+# "qoiz": decode the lossless codec the Share screen host sends for "Best quality".
+ironrdp-session = { workspace = true, features = ["qoiz"] }
 ironrdp-graphics.workspace = true
-ironrdp-pdu.workspace = true
+ironrdp-pdu = { workspace = true, features = ["qoiz"] }
 ironrdp-core.workspace = true
 ironrdp-blocking.workspace = true
 ironrdp-input.workspace = true

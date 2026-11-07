@@ -43,6 +43,7 @@ use ironrdp_session::{
 
 use crate::clipboard::{decode_unicode_text, ClipAction, ClipQueue, ClipboardPolicy, QueueBackend};
 use crate::input::{Endpoint, Username};
+use crate::profiles::Quality;
 use crate::secret::SecretString;
 use crate::status::ConnectionError;
 use crate::tls;
@@ -77,6 +78,9 @@ pub struct ConnectParams {
     /// Folder where files the remote sends are written. `None` turns file
     /// receiving off (sending is still possible if the policy allows).
     pub receive_dir: Option<PathBuf>,
+    /// Picture quality: which codecs the viewer offers and how the host
+    /// should compress (see [`picture_settings`]).
+    pub quality: Quality,
 }
 
 /// Why [`connect`] did not produce a session.
@@ -211,6 +215,7 @@ pub fn connect(params: ConnectParams) -> Result<Session, ConnectFailure> {
         connect_timeout,
         clipboard,
         receive_dir,
+        quality,
     } = params;
 
     let addr = resolve(&endpoint).map_err(ConnectFailure::Failed)?;
@@ -222,7 +227,7 @@ pub fn connect(params: ConnectParams) -> Result<Session, ConnectFailure> {
         .local_addr()
         .map_err(|e| ConnectFailure::Failed(classify_io(&e)))?;
 
-    let config = connector_config(&username, &password, desktop_width, desktop_height);
+    let config = connector_config(&username, &password, desktop_width, desktop_height, quality);
     // The connector holds its own copy of the password until CredSSP is done.
     drop(password);
     let mut connector = ClientConnector::new(config, client_addr);
@@ -916,12 +921,65 @@ impl InputEvent {
 // ---------------------------------------------------------------------------
 // Connection helpers
 
+/// What a quality setting asks of the host: the connection type (Windows
+/// Remote Desktop tunes its own compression by it), the codecs offered, the
+/// colour depth and which visual effects to leave out.
+///
+/// - Best: also offers the lossless QOIZ codec, which Cipher Desk Host
+///   prefers (exact pixels). Windows Remote Desktop ignores it and uses RemoteFX.
+/// - Balanced: RemoteFX, 32-bit colour; Cipher Desk Host then uses its
+///   sharpest RemoteFX setting.
+/// - Speed: RemoteFX and 16-bit colour (Cipher Desk Host then compresses
+///   harder), and no wallpaper, themes or animations on Windows Remote Desktop.
+fn picture_settings(
+    quality: Quality,
+) -> (
+    ConnectionType,
+    ironrdp_connector::BitmapConfig,
+    PerformanceFlags,
+) {
+    let (connection_type, codec_list, color_depth, effects): (_, &[&str], u32, _) = match quality {
+        Quality::Best => (
+            ConnectionType::Lan,
+            &["qoiz:on", "qoi:on", "remotefx:on"],
+            32,
+            PerformanceFlags::default(),
+        ),
+        Quality::Balanced => (
+            ConnectionType::BroadbandHigh,
+            &["qoiz:off", "qoi:off", "remotefx:on"],
+            32,
+            PerformanceFlags::default(),
+        ),
+        Quality::Speed => (
+            ConnectionType::BroadbandLow,
+            &["qoiz:off", "qoi:off", "remotefx:on"],
+            16,
+            PerformanceFlags::DISABLE_WALLPAPER
+                | PerformanceFlags::DISABLE_FULLWINDOWDRAG
+                | PerformanceFlags::DISABLE_MENUANIMATIONS
+                | PerformanceFlags::DISABLE_THEMING
+                | PerformanceFlags::DISABLE_CURSOR_SHADOW,
+        ),
+    };
+    let codecs = ironrdp_pdu::rdp::capability_sets::client_codecs_capabilities(codec_list)
+        .unwrap_or_else(|_| ironrdp_pdu::rdp::capability_sets::BitmapCodecs(Vec::new()));
+    let bitmap = ironrdp_connector::BitmapConfig {
+        lossy_compression: !matches!(quality, Quality::Best),
+        color_depth,
+        codecs,
+    };
+    (connection_type, bitmap, effects)
+}
+
 fn connector_config(
     username: &Username,
     password: &SecretString,
     width: u16,
     height: u16,
+    quality: Quality,
 ) -> ironrdp_connector::Config {
+    let (connection_type, bitmap, performance_flags) = picture_settings(quality);
     // DOMAIN\user -> user + domain; user@domain (UPN) and plain names are passed as typed.
     let (user, domain) = match (&username.domain, username.upn) {
         (Some(d), false) => (username.user.clone(), Some(d.clone())),
@@ -942,7 +1000,7 @@ fn connector_config(
         keyboard_subtype: 0,
         keyboard_layout: 0,
         keyboard_functional_keys_count: 12,
-        connection_type: ConnectionType::Lan,
+        connection_type,
         ime_file_name: String::new(),
         dig_product_id: String::new(),
         desktop_size: DesktopSize {
@@ -956,16 +1014,9 @@ fn connector_config(
         device_scale_factor: None,
         monitor_extended_layout: None,
         relative_mouse_input: false,
-        // Ask for RemoteFX: the host then sends compact, whole-frame updates
-        // instead of large plain bitmaps, which is far smoother (the viewer's
-        // active stage decodes RemoteFX). Falls back to bitmaps if the host
-        // does not offer it.
-        bitmap: Some(ironrdp_connector::BitmapConfig {
-            lossy_compression: true,
-            color_depth: 32,
-            codecs: ironrdp_pdu::rdp::capability_sets::client_codecs_capabilities(&["remotefx"])
-                .unwrap_or_else(|_| ironrdp_pdu::rdp::capability_sets::BitmapCodecs(Vec::new())),
-        }),
+        // RemoteFX or lossless QOIZ: compact updates instead of large plain
+        // bitmaps. Falls back to bitmaps if the host offers neither.
+        bitmap: Some(bitmap),
         client_build: 0,
         // Privacy: a fixed name, so the device's own name is not sent to the host.
         client_name: "rdpv".to_owned(),
@@ -981,7 +1032,7 @@ fn connector_config(
         // S3: audio redirection off.
         enable_audio_playback: false,
         enable_audio_capture: false,
-        performance_flags: PerformanceFlags::default(),
+        performance_flags,
         license_cache: None,
         timezone_info: TimezoneInfo::default(),
         compression_type: None,
@@ -1244,6 +1295,24 @@ pub(crate) fn classify_disconnect_reason(text: &str) -> ConnectionError {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn only_best_quality_offers_the_lossless_codec() {
+        use ironrdp_pdu::rdp::capability_sets::CodecProperty;
+        let offers = |q: Quality| {
+            let (_, bitmap, _) = picture_settings(q);
+            let has =
+                |f: fn(&CodecProperty) -> bool| bitmap.codecs.0.iter().any(|c| f(&c.property));
+            (
+                has(|p| matches!(p, CodecProperty::QoiZ)),
+                has(|p| matches!(p, CodecProperty::RemoteFx(_))),
+                bitmap.color_depth,
+            )
+        };
+        assert_eq!(offers(Quality::Best), (true, true, 32));
+        assert_eq!(offers(Quality::Balanced), (false, true, 32));
+        assert_eq!(offers(Quality::Speed), (false, true, 16));
+    }
+
+    #[test]
     fn desktop_size_limits() {
         use super::check_desktop_size as ok;
         assert!(ok(1024, 768).is_ok());
@@ -1348,7 +1417,7 @@ mod tests {
             upn: false,
         };
         let pw = SecretString::new(["a", "b", "c", "1"].concat());
-        let c = connector_config(&user, &pw, 1024, 768);
+        let c = connector_config(&user, &pw, 1024, 768, Quality::Balanced);
         assert!(c.enable_credssp);
         assert!(!c.enable_standard_rdp_security);
         assert!(!c.enable_audio_playback && !c.enable_audio_capture);
@@ -1359,7 +1428,7 @@ mod tests {
             domain: Some("example.com".into()),
             upn: true,
         };
-        let c = connector_config(&upn, &pw, 1024, 768);
+        let c = connector_config(&upn, &pw, 1024, 768, Quality::Balanced);
         assert!(c.domain.is_none());
         assert!(
             matches!(c.credentials, Credentials::UsernamePassword { ref username, .. } if username == "alice@example.com")
