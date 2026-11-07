@@ -1,7 +1,14 @@
 #include "flutter_window.h"
 
+#include <flutter/standard_method_codec.h>
+
 #include <optional>
 
+#ifndef WDA_EXCLUDEFROMCAPTURE
+#define WDA_EXCLUDEFROMCAPTURE 0x00000011
+#endif
+
+#include "file_clipboard.h"
 #include "flutter/generated_plugin_registrant.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
@@ -25,6 +32,60 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+
+  // Visible to screen capture until Dart turns protection on (only while a
+  // remote session is shown). Not protected by default: Dart's first call can
+  // arrive before the handler below exists and be lost, and a protected window
+  // on a shared computer is invisible to the viewer but still takes clicks.
+  secure_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "rdpv/secure_window",
+          &flutter::StandardMethodCodec::GetInstance());
+  secure_channel_->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
+                 result) {
+        if (call.method_name() != "setSecure") {
+          result->NotImplemented();
+          return;
+        }
+        const auto* on = std::get_if<bool>(call.arguments());
+        if (on == nullptr) {
+          result->Error("bad_argument", "expected a bool");
+          return;
+        }
+        // WDA_EXCLUDEFROMCAPTURE needs Windows 10 2004; older versions show
+        // the window black instead (WDA_MONITOR).
+        HWND window = GetHandle();
+        if (!SetWindowDisplayAffinity(window,
+                                      *on ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE) &&
+            *on) {
+          SetWindowDisplayAffinity(window, WDA_MONITOR);
+        }
+        result->Success();
+      });
+  window_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "rdpv/window",
+          &flutter::StandardMethodCodec::GetInstance());
+  window_channel_->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
+                 result) {
+        if (call.method_name() != "setFullScreen") {
+          result->NotImplemented();
+          return;
+        }
+        const auto* on = std::get_if<bool>(call.arguments());
+        if (on == nullptr) {
+          result->Error("bad_argument", "expected a bool");
+          return;
+        }
+        SetFullScreen(*on);
+        result->Success();
+      });
+  file_clipboard_channel_ =
+      CreateFileClipboardChannel(flutter_controller_->engine()->messenger());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -37,6 +98,34 @@ bool FlutterWindow::OnCreate() {
   flutter_controller_->ForceRedraw();
 
   return true;
+}
+
+void FlutterWindow::SetFullScreen(bool on) {
+  HWND window = GetHandle();
+  if (on && !fullscreen_) {
+    // Remember the frame, size and place, then cover the whole monitor the
+    // window is on without a frame.
+    MONITORINFO monitor = {sizeof(monitor)};
+    if (!GetWindowPlacement(window, &saved_placement_) ||
+        !GetMonitorInfo(MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST),
+                        &monitor)) {
+      return;
+    }
+    saved_style_ = GetWindowLongPtr(window, GWL_STYLE);
+    SetWindowLongPtr(window, GWL_STYLE, saved_style_ & ~WS_OVERLAPPEDWINDOW);
+    SetWindowPos(window, HWND_TOP, monitor.rcMonitor.left, monitor.rcMonitor.top,
+                 monitor.rcMonitor.right - monitor.rcMonitor.left,
+                 monitor.rcMonitor.bottom - monitor.rcMonitor.top,
+                 SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    fullscreen_ = true;
+  } else if (!on && fullscreen_) {
+    SetWindowLongPtr(window, GWL_STYLE, saved_style_);
+    SetWindowPlacement(window, &saved_placement_);
+    SetWindowPos(window, nullptr, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER |
+                     SWP_FRAMECHANGED);
+    fullscreen_ = false;
+  }
 }
 
 void FlutterWindow::OnDestroy() {

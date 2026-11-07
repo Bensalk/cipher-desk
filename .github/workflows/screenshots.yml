@@ -77,13 +77,14 @@ jobs:
         if: always()
         env:
           TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
           [ -d shots ] && ls shots/*.png >/dev/null 2>&1 || { echo "No screenshots taken"; exit 1; }
           cd shots
           git init -q && git checkout -q -b screenshots
           git add ./*.png
           git -c user.name=github-actions -c user.email=actions@github.com commit -q -m "App screenshots [skip ci]"
-          git push -f -q "https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git" screenshots
+          git push -f -q "https://x-access-token:${TOKEN}@github.com/${REPO}.git" screenshots
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:

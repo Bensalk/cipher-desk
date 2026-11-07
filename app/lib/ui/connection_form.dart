@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../platform/password_vault.dart';
 import '../src/rust/api/store.dart';
 import '../src/rust/api/form.dart';
-import '../src/rust/api/session.dart' show ClipboardMode;
+import '../src/rust/api/session.dart' show ClipboardMode, PictureQuality;
 import '../state/profiles.dart';
+import 'connection_methods.dart';
+import 'picture_quality.dart';
 
 /// Create or edit a connection (Stage 3). Returns the saved profile, or null.
 ///
@@ -42,6 +44,8 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
   bool _obscure = true;
   late bool _savePassword;
   late ClipboardMode _clipboard;
+  late ConnectionMethod _method;
+  late PictureQuality _quality;
   Map<String, String> _problems = const {};
   bool _submitted = false;
 
@@ -55,6 +59,8 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
     _username = TextEditingController(text: p?.username ?? '');
     _mac = TextEditingController(text: p?.wakeMac ?? '');
     _savePassword = p?.savePassword ?? false;
+    _method = p?.method ?? ConnectionMethod.privateRemoteDesktop;
+    _quality = p?.quality ?? PictureQuality.balanced;
     _clipboard = p?.clipboardMode ??
         (widget.clipboardDefault ? ClipboardMode.both : ClipboardMode.off);
   }
@@ -71,6 +77,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
 
   FormCheckResult _check() {
     return checkConnectionForm(
+      method: _method,
       profileName: _name.text,
       host: _host.text,
       port: _port.text,
@@ -133,10 +140,13 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
       id: id,
       name: _name.text.trim(),
       host: r.host ?? _host.text.trim(),
-      port: r.port ?? defaultPort(),
-      username: _username.text.trim(),
+      port: r.port ?? defaultPortFor(method: _method),
+      username: _method.needsUsername ? _username.text.trim() : '',
       savePassword: savePassword,
-      clipboardMode: _clipboard,
+      // Clipboard sharing is only offered for Private Remote Desktop.
+      clipboardMode: _method.supportsClipboard ? _clipboard : ClipboardMode.off,
+      method: _method,
+      quality: _quality,
       lastUsed: widget.existing?.lastUsed,
       wakeMac: _mac.text.trim().isEmpty ? null : _mac.text.trim(),
     );
@@ -162,6 +172,14 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                _MethodPicker(
+                  method: _method,
+                  onChanged: (m) {
+                    setState(() => _method = m);
+                    _revalidate();
+                  },
+                ),
+                const SizedBox(height: 16),
                 TextField(
                   key: const Key('field-name'),
                   controller: _name,
@@ -202,7 +220,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                         controller: _port,
                         decoration: InputDecoration(
                           labelText: 'Port',
-                          hintText: '${defaultPort()}',
+                          hintText: '${defaultPortFor(method: _method)}',
                           errorText: _problems['port'],
                           errorMaxLines: 3,
                         ),
@@ -213,13 +231,16 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                     ),
                   ],
                 ),
+                if (_method.needsUsername) ...[
                 const SizedBox(height: 12),
                 TextField(
                   key: const Key('field-username'),
                   controller: _username,
                   decoration: InputDecoration(
                     labelText: 'Username',
-                    hintText: r'user, DOMAIN\user or user@domain',
+                    hintText: _method == ConnectionMethod.shareScreen
+                        ? 'as shown on the computer\'s "Share this screen" page'
+                        : r'user, DOMAIN\user or user@domain',
                     errorText: _problems['username'],
                     errorMaxLines: 2,
                   ),
@@ -228,6 +249,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                   textInputAction: TextInputAction.next,
                   onChanged: (_) => _revalidate(),
                 ),
+                ],
                 const SizedBox(height: 8),
                 CheckboxListTile(
                   key: const Key('field-save-password'),
@@ -286,6 +308,25 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                       style: TextStyle(color: Theme.of(context).colorScheme.error),
                     ),
                   ),
+                if (_method != ConnectionMethod.vnc) ...[
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<PictureQuality>(
+                    key: const Key('field-quality'),
+                    initialValue: _quality,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: 'Picture quality',
+                      helperText: _quality.description,
+                      helperMaxLines: 3,
+                    ),
+                    items: [
+                      for (final q in PictureQuality.values)
+                        DropdownMenuItem(value: q, child: Text(q.label)),
+                    ],
+                    onChanged: (v) => setState(() => _quality = v ?? PictureQuality.balanced),
+                  ),
+                ],
+                if (_method.supportsClipboard) ...[
                 const SizedBox(height: 8),
                 DropdownButtonFormField<ClipboardMode>(
                   key: const Key('field-clipboard'),
@@ -312,6 +353,7 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                   ],
                   onChanged: (v) => setState(() => _clipboard = v ?? ClipboardMode.off),
                 ),
+                ],
                 const SizedBox(height: 16),
                 TextField(
                   key: const Key('field-mac'),
@@ -341,6 +383,54 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The three connection methods, with a short explanation and the helper.
+class _MethodPicker extends StatelessWidget {
+  const _MethodPicker({required this.method, required this.onChanged});
+
+  final ConnectionMethod method;
+  final ValueChanged<ConnectionMethod> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Connection method', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        SegmentedButton<ConnectionMethod>(
+          key: const Key('field-method'),
+          showSelectedIcon: false,
+          segments: [
+            for (final m in ConnectionMethod.values)
+              ButtonSegment(
+                value: m,
+                icon: Icon(m.icon),
+                label: Text(m.shortLabel, key: Key('method-${m.name}')),
+                tooltip: m.label,
+              ),
+          ],
+          selected: {method},
+          onSelectionChanged: (s) => onChanged(s.first),
+        ),
+        const SizedBox(height: 8),
+        Text(method.description, style: Theme.of(context).textTheme.bodySmall),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: const Key('button-method-helper'),
+            icon: const Icon(Icons.help_outline),
+            label: const Text('Which method should I use?'),
+            onPressed: () async {
+              final m = await showMethodHelper(context);
+              if (m != null) onChanged(m);
+            },
+          ),
+        ),
+      ],
     );
   }
 }

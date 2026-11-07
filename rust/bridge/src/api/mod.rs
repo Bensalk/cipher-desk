@@ -1,5 +1,6 @@
 pub mod errors;
 pub mod form;
+pub mod host;
 pub mod info;
 pub mod pins;
 pub mod session;

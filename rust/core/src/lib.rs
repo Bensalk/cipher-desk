@@ -30,6 +30,7 @@ pub mod pins;
 pub mod policy;
 pub mod portable;
 pub mod profiles;
+pub mod second_factor;
 pub mod secret;
 pub mod session;
 pub mod settings;
@@ -37,7 +38,9 @@ pub mod status;
 pub mod tls;
 pub mod vault;
 pub mod version;
+pub mod vnc;
 pub mod wol;
+pub mod xfer;
 
 /// Internal parsers exposed only to the fuzzing crate (`rust/fuzz`, SA-3).
 /// Never enabled in the app.

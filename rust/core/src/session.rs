@@ -15,9 +15,13 @@
 use core::time::Duration;
 use std::io::{self, Write as _};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs as _};
+use std::path::PathBuf;
 
 use ironrdp_blocking::Framed;
-use ironrdp_cliprdr::pdu::{ClipboardFormat, ClipboardFormatId, OwnedFormatDataResponse};
+use ironrdp_cliprdr::pdu::{
+    ClipboardFormat, ClipboardFormatId, FileContentsResponse, FileDescriptor,
+    OwnedFormatDataResponse,
+};
 use ironrdp_cliprdr::CliprdrClient;
 use ironrdp_connector::connection_activation::{
     ConnectionActivationFactory, ConnectionActivationState,
@@ -38,6 +42,7 @@ use ironrdp_session::{
 
 use crate::clipboard::{decode_unicode_text, ClipAction, ClipQueue, ClipboardPolicy, QueueBackend};
 use crate::input::{Endpoint, Username};
+use crate::profiles::Quality;
 use crate::secret::SecretString;
 use crate::status::ConnectionError;
 use crate::tls;
@@ -69,6 +74,15 @@ pub struct ConnectParams {
     /// Text clipboard sharing (off by default). When off, the clipboard
     /// channel is not even offered to the host.
     pub clipboard: ClipboardPolicy,
+    /// Folder where files the remote sends are written. `None` turns file
+    /// receiving off (sending is still possible if the policy allows).
+    pub receive_dir: Option<PathBuf>,
+    /// Picture quality: which codecs the viewer offers and how the host
+    /// should compress (see [`picture_settings`]).
+    pub quality: Quality,
+    /// Share screen: this device's id and the authenticator code, for hosts
+    /// with two-step verification. `None` for other computers.
+    pub second_factor: Option<crate::second_factor::SecondFactor>,
 }
 
 /// Why [`connect`] did not produce a session.
@@ -116,6 +130,12 @@ pub enum SessionEvent {
     RemoteClipboardText(String),
     /// Text copied on the host was larger than the policy allows and was dropped.
     RemoteClipboardTooLarge,
+    /// Files or a folder copied on the remote started arriving.
+    FilesIncoming { files: usize, bytes: u64 },
+    /// A file or folder copied on the remote finished arriving in the
+    /// receive folder (one event per top-level item). `path` is where it was
+    /// saved (the name may have " (1)" added).
+    FileReceived { name: String, path: PathBuf },
 }
 
 /// Result of offering this device's clipboard text to the host.
@@ -140,6 +160,12 @@ struct ClipState {
     /// Last text received from the host, to avoid echoing it straight back.
     last_remote: Option<String>,
     ready: bool,
+    /// Where files the remote sends are written (`None` turns receiving off).
+    receive_dir: Option<PathBuf>,
+    /// Files this device currently offers to the remote, as advertised.
+    outgoing: Vec<crate::xfer::Outgoing>,
+    /// Files arriving from the remote (one copy at a time, in pieces).
+    receiving: Option<crate::xfer::Receiver>,
 }
 
 /// An open RDP session.
@@ -174,6 +200,9 @@ pub fn connect(params: ConnectParams) -> Result<Session, ConnectFailure> {
         pinned_fingerprint,
         connect_timeout,
         clipboard,
+        receive_dir,
+        quality,
+        second_factor,
     } = params;
 
     let addr = resolve(&endpoint).map_err(ConnectFailure::Failed)?;
@@ -185,10 +214,13 @@ pub fn connect(params: ConnectParams) -> Result<Session, ConnectFailure> {
         .local_addr()
         .map_err(|e| ConnectFailure::Failed(classify_io(&e)))?;
 
-    let config = connector_config(&username, &password, desktop_width, desktop_height);
+    let config = connector_config(&username, &password, desktop_width, desktop_height, quality);
     // The connector holds its own copy of the password until CredSSP is done.
     drop(password);
     let mut connector = ClientConnector::new(config, client_addr);
+    if let Some(f) = &second_factor {
+        connector = connector.with_redirection_password_cookie(f.encode());
+    }
     let clip = if clipboard.is_enabled() {
         let queue = ClipQueue::default();
         connector = connector.with_static_channel(CliprdrClient::new(Box::new(QueueBackend::new(
@@ -200,6 +232,9 @@ pub fn connect(params: ConnectParams) -> Result<Session, ConnectFailure> {
             local_text: None,
             last_remote: None,
             ready: false,
+            receive_dir,
+            outgoing: Vec::new(),
+            receiving: None,
         })
     } else {
         None
@@ -320,16 +355,26 @@ impl Session {
     /// Reads and processes what the server sent. Returns after about
     /// [`POLL_INTERVAL`] when nothing arrives, or after [`POLL_BUDGET`] when
     /// data keeps arriving.
-    pub fn poll(&mut self) -> Vec<SessionEvent> {
+    ///
+    /// The second value says whether the server has gone quiet (`true`) or
+    /// was cut off mid-stream by [`POLL_BUDGET`] while more was still
+    /// arriving (`false`). A caller that paints a picture from the pixels
+    /// this touches should wait for `true` where it can, so a big update
+    /// (e.g. a lossless frame) is shown whole instead of in visible bands.
+    pub fn poll(&mut self) -> (Vec<SessionEvent>, bool) {
         let mut events = Vec::new();
         if self.ended {
-            return events;
+            return (events, true);
         }
         let started = std::time::Instant::now();
+        let mut caught_up = false;
         while started.elapsed() < POLL_BUDGET {
             let (action, payload) = match self.framed.read_pdu() {
                 Ok(pdu) => pdu,
-                Err(e) if is_idle_read(&e) => break,
+                Err(e) if is_idle_read(&e) => {
+                    caught_up = true;
+                    break;
+                }
                 Err(e) => {
                     tracing::info!(kind = ?e.kind(), "session read failed");
                     // During a session every network failure is a lost connection,
@@ -339,6 +384,7 @@ impl Session {
                         other => other,
                     };
                     self.end(&mut events, Some(err));
+                    caught_up = true;
                     break;
                 }
             };
@@ -352,14 +398,17 @@ impl Session {
                 Err(e) => {
                     tracing::warn!(error = %e.report(), "session processing failed");
                     self.end(&mut events, Some(ConnectionError::Unexpected));
+                    caught_up = true;
                     break;
                 }
             };
             if let Err(err) = self.handle_outputs(outputs, &mut events) {
                 self.end(&mut events, Some(err));
+                caught_up = true;
                 break;
             }
             if self.ended {
+                caught_up = true;
                 break;
             }
         }
@@ -368,7 +417,7 @@ impl Session {
                 self.end(&mut events, Some(err));
             }
         }
-        events
+        (events, caught_up)
     }
 
     /// Offers this device's clipboard text to the host (if the policy allows).
@@ -399,6 +448,70 @@ impl Session {
             self.advertise_local()?;
         }
         Ok(ClipboardOffer::Offered)
+    }
+
+    /// Offers files to the remote computer, which downloads them. Does nothing
+    /// if clipboard sharing to the remote is off for this connection, or if no
+    /// path is a readable file within the size limit.
+    pub fn send_files(&mut self, paths: Vec<PathBuf>) -> Result<(), ConnectionError> {
+        let descriptors = {
+            let Some(clip) = self.clip.as_mut() else {
+                return Ok(());
+            };
+            if !clip.policy.local_to_host {
+                return Ok(());
+            }
+            let files = crate::xfer::offer(&paths);
+            if files.is_empty() {
+                return Ok(());
+            }
+            let descriptors: Vec<FileDescriptor> =
+                files.iter().map(|o| o.descriptor.clone()).collect();
+            clip.outgoing = files;
+            descriptors
+        };
+        let msgs = self
+            .stage
+            .get_svc_processor_mut::<CliprdrClient>()
+            .ok_or(ConnectionError::Unexpected)?
+            .initiate_file_copy(descriptors)
+            .map_err(|_| ConnectionError::Unexpected)?;
+        self.send_svc(msgs)
+    }
+
+    /// Carries out a step of receiving files: ask for the next piece, or
+    /// report the finished items.
+    fn receive_step(
+        &mut self,
+        step: crate::xfer::Step,
+        events: &mut Vec<SessionEvent>,
+    ) -> Result<(), ConnectionError> {
+        match step {
+            crate::xfer::Step::Request(req) => {
+                let msgs = self
+                    .stage
+                    .get_svc_processor_mut::<CliprdrClient>()
+                    .ok_or(ConnectionError::Unexpected)?
+                    .request_file_contents(req)
+                    .map_err(|_| ConnectionError::Unexpected)?;
+                self.send_svc(msgs)
+            }
+            crate::xfer::Step::Done(top_level) => {
+                if let Some(clip) = self.clip.as_mut() {
+                    clip.receiving = None;
+                }
+                for path in top_level {
+                    if path.exists() {
+                        let name = path
+                            .file_name()
+                            .map(|n| n.to_string_lossy().into_owned())
+                            .unwrap_or_default();
+                        events.push(SessionEvent::FileReceived { name, path });
+                    }
+                }
+                Ok(())
+            }
+        }
     }
 
     /// Tells the host which formats this device offers (plain text or nothing).
@@ -511,6 +624,71 @@ impl Session {
                     }
                 }
                 ClipAction::DataReceived(_) => {}
+                ClipAction::RemoteFiles(format) => {
+                    if policy.host_to_local {
+                        let msgs = self
+                            .stage
+                            .get_svc_processor_mut::<CliprdrClient>()
+                            .ok_or(ConnectionError::Unexpected)?
+                            .initiate_paste(format)
+                            .map_err(|_| ConnectionError::Unexpected)?;
+                        self.send_svc(msgs)?;
+                    }
+                }
+                ClipAction::FileList {
+                    files,
+                    clip_data_id,
+                } => {
+                    if policy.host_to_local {
+                        if let Some(dir) = clip.receive_dir.clone() {
+                            // A new copy replaces one still arriving.
+                            clip.receiving = None;
+                            let (rx, step) =
+                                crate::xfer::Receiver::start(files, clip_data_id, &dir);
+                            let count = rx.file_count();
+                            if count > 0 {
+                                events.push(SessionEvent::FilesIncoming {
+                                    files: count,
+                                    bytes: rx.total_bytes,
+                                });
+                            }
+                            clip.receiving = Some(rx);
+                            self.receive_step(step, events)?;
+                        }
+                    }
+                }
+                ClipAction::FileRequest(request) => {
+                    let answer = if policy.local_to_host {
+                        crate::xfer::answer(&clip.outgoing, &request)
+                    } else {
+                        None
+                    };
+                    let response = match answer {
+                        Some(crate::xfer::FileContentsAnswer::Size(size)) => {
+                            FileContentsResponse::new_size_response(request.stream_id, size)
+                        }
+                        Some(crate::xfer::FileContentsAnswer::Data(bytes)) => {
+                            FileContentsResponse::new_data_response(request.stream_id, bytes)
+                        }
+                        None => FileContentsResponse::new_error(request.stream_id),
+                    };
+                    let msgs = self
+                        .stage
+                        .get_svc_processor_mut::<CliprdrClient>()
+                        .ok_or(ConnectionError::Unexpected)?
+                        .submit_file_contents(response)
+                        .map_err(|_| ConnectionError::Unexpected)?;
+                    self.send_svc(msgs)?;
+                }
+                ClipAction::FileData { stream_id, bytes } => {
+                    let step = clip
+                        .receiving
+                        .as_mut()
+                        .and_then(|rx| rx.on_data(stream_id, bytes.as_deref()));
+                    if let Some(step) = step {
+                        self.receive_step(step, events)?;
+                    }
+                }
             }
         }
         Ok(())
@@ -749,12 +927,65 @@ impl InputEvent {
 // ---------------------------------------------------------------------------
 // Connection helpers
 
+/// What a quality setting asks of the host: the connection type (Windows
+/// Remote Desktop tunes its own compression by it), the codecs offered, the
+/// colour depth and which visual effects to leave out.
+///
+/// - Best: also offers the lossless QOIZ codec, which Cipher Desk Host
+///   prefers (exact pixels). Windows Remote Desktop ignores it and uses RemoteFX.
+/// - Balanced: RemoteFX, 32-bit colour; Cipher Desk Host then uses its
+///   sharpest RemoteFX setting.
+/// - Speed: RemoteFX and 16-bit colour (Cipher Desk Host then compresses
+///   harder), and no wallpaper, themes or animations on Windows Remote Desktop.
+fn picture_settings(
+    quality: Quality,
+) -> (
+    ConnectionType,
+    ironrdp_connector::BitmapConfig,
+    PerformanceFlags,
+) {
+    let (connection_type, codec_list, color_depth, effects): (_, &[&str], u32, _) = match quality {
+        Quality::Best => (
+            ConnectionType::Lan,
+            &["qoiz:on", "qoi:on", "remotefx:on"],
+            32,
+            PerformanceFlags::default(),
+        ),
+        Quality::Balanced => (
+            ConnectionType::BroadbandHigh,
+            &["qoiz:off", "qoi:off", "remotefx:on"],
+            32,
+            PerformanceFlags::default(),
+        ),
+        Quality::Speed => (
+            ConnectionType::BroadbandLow,
+            &["qoiz:off", "qoi:off", "remotefx:on"],
+            16,
+            PerformanceFlags::DISABLE_WALLPAPER
+                | PerformanceFlags::DISABLE_FULLWINDOWDRAG
+                | PerformanceFlags::DISABLE_MENUANIMATIONS
+                | PerformanceFlags::DISABLE_THEMING
+                | PerformanceFlags::DISABLE_CURSOR_SHADOW,
+        ),
+    };
+    let codecs = ironrdp_pdu::rdp::capability_sets::client_codecs_capabilities(codec_list)
+        .unwrap_or_else(|_| ironrdp_pdu::rdp::capability_sets::BitmapCodecs(Vec::new()));
+    let bitmap = ironrdp_connector::BitmapConfig {
+        lossy_compression: !matches!(quality, Quality::Best),
+        color_depth,
+        codecs,
+    };
+    (connection_type, bitmap, effects)
+}
+
 fn connector_config(
     username: &Username,
     password: &SecretString,
     width: u16,
     height: u16,
+    quality: Quality,
 ) -> ironrdp_connector::Config {
+    let (connection_type, bitmap, performance_flags) = picture_settings(quality);
     // DOMAIN\user -> user + domain; user@domain (UPN) and plain names are passed as typed.
     let (user, domain) = match (&username.domain, username.upn) {
         (Some(d), false) => (username.user.clone(), Some(d.clone())),
@@ -775,7 +1006,7 @@ fn connector_config(
         keyboard_subtype: 0,
         keyboard_layout: 0,
         keyboard_functional_keys_count: 12,
-        connection_type: ConnectionType::Lan,
+        connection_type,
         ime_file_name: String::new(),
         dig_product_id: String::new(),
         desktop_size: DesktopSize {
@@ -789,7 +1020,9 @@ fn connector_config(
         device_scale_factor: None,
         monitor_extended_layout: None,
         relative_mouse_input: false,
-        bitmap: None,
+        // RemoteFX or lossless QOIZ: compact updates instead of large plain
+        // bitmaps. Falls back to bitmaps if the host offers neither.
+        bitmap: Some(bitmap),
         client_build: 0,
         // Privacy: a fixed name, so the device's own name is not sent to the host.
         client_name: "rdpv".to_owned(),
@@ -805,7 +1038,7 @@ fn connector_config(
         // S3: audio redirection off.
         enable_audio_playback: false,
         enable_audio_capture: false,
-        performance_flags: PerformanceFlags::default(),
+        performance_flags,
         license_cache: None,
         timezone_info: TimezoneInfo::default(),
         compression_type: None,
@@ -1060,6 +1293,10 @@ pub(crate) fn classify_disconnect_reason(text: &str) -> ConnectionError {
         ConnectionError::IdleTimeout
     } else if t.contains("another") || t.contains("replaced") || t.contains("other connection") {
         ConnectionError::SessionTakenOver
+    } else if t.contains("denied the connection") {
+        ConnectionError::AccessDeclined
+    } else if t.contains("enter their credentials") {
+        ConnectionError::CodeNeeded
     } else {
         ConnectionError::DisconnectedByHost
     }
@@ -1067,6 +1304,24 @@ pub(crate) fn classify_disconnect_reason(text: &str) -> ConnectionError {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn only_best_quality_offers_the_lossless_codec() {
+        use ironrdp_pdu::rdp::capability_sets::CodecProperty;
+        let offers = |q: Quality| {
+            let (_, bitmap, _) = picture_settings(q);
+            let has =
+                |f: fn(&CodecProperty) -> bool| bitmap.codecs.0.iter().any(|c| f(&c.property));
+            (
+                has(|p| matches!(p, CodecProperty::QoiZ)),
+                has(|p| matches!(p, CodecProperty::RemoteFx(_))),
+                bitmap.color_depth,
+            )
+        };
+        assert_eq!(offers(Quality::Best), (true, true, 32));
+        assert_eq!(offers(Quality::Balanced), (false, true, 32));
+        assert_eq!(offers(Quality::Speed), (false, true, 16));
+    }
+
     #[test]
     fn desktop_size_limits() {
         use super::check_desktop_size as ok;
@@ -1148,6 +1403,19 @@ mod tests {
             classify_disconnect_reason("server initiated disconnect"),
             ConnectionError::DisconnectedByHost
         );
+        assert_eq!(
+            classify_disconnect_reason(
+                "[Protocol independent error] The server denied the connection"
+            ),
+            ConnectionError::AccessDeclined
+        );
+        assert_eq!(
+            classify_disconnect_reason(
+                "[Protocol independent error] The server does not accept saved user credentials \
+                 and requires that the user enter their credentials for each connection"
+            ),
+            ConnectionError::CodeNeeded
+        );
     }
 
     #[test]
@@ -1172,7 +1440,7 @@ mod tests {
             upn: false,
         };
         let pw = SecretString::new(["a", "b", "c", "1"].concat());
-        let c = connector_config(&user, &pw, 1024, 768);
+        let c = connector_config(&user, &pw, 1024, 768, Quality::Balanced);
         assert!(c.enable_credssp);
         assert!(!c.enable_standard_rdp_security);
         assert!(!c.enable_audio_playback && !c.enable_audio_capture);
@@ -1183,7 +1451,7 @@ mod tests {
             domain: Some("example.com".into()),
             upn: true,
         };
-        let c = connector_config(&upn, &pw, 1024, 768);
+        let c = connector_config(&upn, &pw, 1024, 768, Quality::Balanced);
         assert!(c.domain.is_none());
         assert!(
             matches!(c.credentials, Credentials::UsernamePassword { ref username, .. } if username == "alice@example.com")

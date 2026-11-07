@@ -95,6 +95,34 @@ void main() {
     expect(await fieldError(tester, 'field-password'), 'This field is required.');
   });
 
+  testWidgets('the method helper suggests a method and VNC needs no username', (tester) async {
+    await start(tester);
+    await tester.tap(find.byKey(const Key('button-new')));
+    await tester.pumpAndSettle();
+    // Private Remote Desktop is the default.
+    expect(find.byKey(const Key('field-username')), findsOneWidget);
+
+    // Someone must see the screen, and Cipher Desk can be installed: Share screen.
+    await tapVisible(tester, find.byKey(const Key('button-method-helper')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(of: find.byKey(const Key('helper-q1')), matching: find.text('Yes')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(of: find.byKey(const Key('helper-q2')), matching: find.text('Yes')));
+    await tester.pumpAndSettle();
+    expect(find.text('Use Share screen'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('helper-use')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Cipher Desk running on the computer'), findsOneWidget);
+
+    // VNC: no username field, no clipboard choice, port 5900.
+    await tapVisible(tester, find.byKey(const Key('method-vnc')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('field-username')), findsNothing);
+    expect(find.byKey(const Key('field-clipboard')), findsNothing);
+    final port = tester.widget<TextField>(find.byKey(const Key('field-port')));
+    expect(port.decoration?.hintText, '5900');
+  });
+
   testWidgets('password is masked and can be revealed', (tester) async {
     await start(tester);
     await tester.tap(find.byKey(const Key('button-new')));
@@ -166,6 +194,32 @@ void main() {
     await tester.scrollUntilVisible(credit, 200);
     expect(find.text('Created by Bensal'), findsOneWidget);
   });
+
+  testWidgets('Share screen starts and stops on Windows', (tester) async {
+    await start(tester);
+    await tester.tap(find.text('Share screen').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Sharing is off'), findsOneWidget);
+    // A strong password is made on first use and shown only on request.
+    final shown = find.byKey(const Key('share-password-show'));
+    await reveal(tester, shown);
+    await tester.tap(shown);
+    await tester.pumpAndSettle();
+    expect(find.textContaining(RegExp(r'^\w{4}-\w{4}-\w{4}-\w{4}$')), findsOneWidget);
+    await tester.tap(shown);
+    await tester.pumpAndSettle();
+
+    final startButton = find.byKey(const Key('share-start'));
+    await reveal(tester, startButton);
+    await tester.tap(startButton);
+    for (var i = 0; i < 50 && find.text('Sharing is on: waiting for a viewer').evaluate().isEmpty; i++) {
+      await tester.pump(const Duration(milliseconds: 200));
+    }
+    expect(find.text('Sharing is on: waiting for a viewer'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('share-stop')));
+    await tester.pumpAndSettle();
+    expect(find.text('Sharing is off'), findsOneWidget);
+  }, skip: !Platform.isWindows);
 
   testWidgets('a bad Wake-on-LAN address is reported', (tester) async {
     await start(tester);

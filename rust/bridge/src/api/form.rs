@@ -1,6 +1,8 @@
 //! Connection-form validation for the UI (Stage 3).
 
-use rdpv_core::input::{self, Field};
+use rdpv_core::input::{self, Field, FieldError};
+
+use crate::api::store::{method_to_core, ConnectionMethod};
 
 /// One problem with one field, ready to show under that field.
 pub struct FieldProblem {
@@ -32,8 +34,12 @@ fn field_id(field: Field) -> &'static str {
 
 /// Checks every field. The password is only checked for length and
 /// forbidden characters; it is not stored or logged.
+///
+/// An empty port means the method's default port. VNC has no username, so an
+/// empty username is accepted for it.
 #[flutter_rust_bridge::frb(sync)]
 pub fn check_connection_form(
+    method: ConnectionMethod,
     profile_name: String,
     host: String,
     port: String,
@@ -41,8 +47,14 @@ pub fn check_connection_form(
     password: String,
     has_saved_password: bool,
 ) -> FormCheckResult {
+    let method = method_to_core(method);
     let password = rdpv_core::secret::SecretString::new(password);
-    let check = input::check_form(
+    let port = if port.trim().is_empty() {
+        method.default_port().to_string()
+    } else {
+        port
+    };
+    let mut check = input::check_form(
         &profile_name,
         &host,
         &port,
@@ -50,6 +62,11 @@ pub fn check_connection_form(
         password.expose(),
         has_saved_password,
     );
+    if !method.needs_username() && username.trim().is_empty() {
+        check
+            .errors
+            .retain(|(f, e)| !(*f == Field::Username && *e == FieldError::Required));
+    }
     FormCheckResult {
         valid: check.is_valid(),
         problems: check
@@ -80,6 +97,7 @@ mod tests {
     fn valid_form() {
         let pw = ["x", "y", "z", "9"].concat();
         let r = check_connection_form(
+            ConnectionMethod::PrivateRemoteDesktop,
             "Office".into(),
             "192.0.2.10".into(),
             String::new(),
@@ -95,6 +113,7 @@ mod tests {
     #[test]
     fn problems_name_their_fields() {
         let r = check_connection_form(
+            ConnectionMethod::PrivateRemoteDesktop,
             String::new(),
             String::new(),
             "0".into(),
@@ -106,5 +125,42 @@ mod tests {
         let fields: Vec<&str> = r.problems.iter().map(|p| p.field.as_str()).collect();
         assert_eq!(fields, vec!["host", "port", "username", "password"]);
         assert!(r.endpoint.is_none());
+    }
+
+    #[test]
+    fn each_method_has_its_own_default_port() {
+        let check = |m| {
+            check_connection_form(
+                m,
+                String::new(),
+                "pc.example.com".into(),
+                String::new(),
+                "alice".into(),
+                String::new(),
+                true,
+            )
+            .port
+        };
+        assert_eq!(check(ConnectionMethod::PrivateRemoteDesktop), Some(3389));
+        assert_eq!(check(ConnectionMethod::ShareScreen), Some(3395));
+        assert_eq!(check(ConnectionMethod::Vnc), Some(5900));
+    }
+
+    #[test]
+    fn vnc_needs_no_username_but_the_others_do() {
+        let r = |m| {
+            check_connection_form(
+                m,
+                String::new(),
+                "192.168.1.20".into(),
+                String::new(),
+                String::new(),
+                String::new(),
+                true,
+            )
+        };
+        assert!(r(ConnectionMethod::Vnc).valid);
+        assert!(!r(ConnectionMethod::ShareScreen).valid);
+        assert!(!r(ConnectionMethod::PrivateRemoteDesktop).valid);
     }
 }

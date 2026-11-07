@@ -22,6 +22,7 @@ use rdpv_core::session::{
     SessionEvent,
 };
 use rdpv_core::status::ConnectionError;
+use rdpv_core::vnc::{connect_vnc, VncParams, VncSession};
 
 use crate::api::errors::{error_info, ErrorInfo};
 use crate::frb_generated::StreamSink;
@@ -47,6 +48,11 @@ pub enum UpdateKind {
     RemoteClipboard,
     /// Text copied on the remote computer was larger than allowed and was dropped.
     RemoteClipboardTooLarge,
+    /// A file sent by the remote finished arriving (`text` = its name).
+    FileReceived,
+    /// Files copied on the remote started arriving; `text` says how many and
+    /// how big (e.g. "3 files, 1.2 GB").
+    FilesIncoming,
     /// The network dropped; reconnect attempt `x` of `y` is under way (`label`).
     /// Input is ignored until `Status` with `connected` arrives again.
     Reconnecting,
@@ -91,6 +97,16 @@ impl SessionUpdate {
         Self {
             text: Some(text),
             ..Self::new(UpdateKind::RemoteClipboard)
+        }
+    }
+
+    /// `text` is the file name, `label` the full path it was saved to (so
+    /// the UI can put the file on this device's clipboard).
+    fn file_received(name: String, path: String) -> Self {
+        Self {
+            text: Some(name),
+            label: Some(path),
+            ..Self::new(UpdateKind::FileReceived)
         }
     }
 
@@ -158,6 +174,7 @@ impl SessionUpdate {
 enum Command {
     Input(Vec<InputEvent>),
     OfferClipboard(String),
+    SendFiles(Vec<String>),
     ApproveCertificate(bool),
     /// End the session: `None` = the user disconnected; otherwise the reason
     /// shown (e.g. the Android background grace period ended).
@@ -197,7 +214,11 @@ impl RdpSession {
         height: u16,
         pins_path: String,
         clipboard_direction: ClipboardMode,
+        download_dir: String,
         idle_minutes: u32,
+        quality: PictureQuality,
+        share_screen: bool,
+        auth_code: String,
         sink: StreamSink<SessionUpdate>,
     ) {
         let target = Target {
@@ -208,7 +229,12 @@ impl RdpSession {
             height,
             pins_path,
             clipboard: clipboard_direction,
+            receive_dir: download_dir,
             idle_minutes,
+            vnc: false,
+            quality,
+            share_screen,
+            auth_code,
         };
         self.spawn(target, Some(SecretString::new(password)), None, sink);
     }
@@ -227,7 +253,11 @@ impl RdpSession {
         height: u16,
         pins_path: String,
         clipboard_direction: ClipboardMode,
+        download_dir: String,
         idle_minutes: u32,
+        quality: PictureQuality,
+        share_screen: bool,
+        auth_code: String,
         sink: StreamSink<SessionUpdate>,
     ) {
         let target = Target {
@@ -238,8 +268,40 @@ impl RdpSession {
             height,
             pins_path,
             clipboard: clipboard_direction,
+            receive_dir: download_dir,
             idle_minutes,
+            vnc: false,
+            quality,
+            share_screen,
+            auth_code,
         };
+        self.spawn(target, None, Some(connection_id), sink);
+    }
+
+    /// Connects with the VNC method (no username; no clipboard or certificate).
+    /// Only addresses on the own network or Tailscale are allowed.
+    pub fn start_vnc(
+        &self,
+        host: String,
+        port: u16,
+        password: String,
+        idle_minutes: u32,
+        sink: StreamSink<SessionUpdate>,
+    ) {
+        let target = Target::vnc(host, port, idle_minutes);
+        self.spawn(target, Some(SecretString::new(password)), None, sink);
+    }
+
+    /// Like [`RdpSession::start_vnc`], with the password saved in the OS vault.
+    pub fn start_vnc_with_saved_password(
+        &self,
+        connection_id: String,
+        host: String,
+        port: u16,
+        idle_minutes: u32,
+        sink: StreamSink<SessionUpdate>,
+    ) {
+        let target = Target::vnc(host, port, idle_minutes);
         self.spawn(target, None, Some(connection_id), sink);
     }
 
@@ -368,6 +430,13 @@ impl RdpSession {
         let _ = self.tx.send(Command::OfferClipboard(text));
     }
 
+    /// Sends local files to the remote computer, which downloads them. Sent
+    /// only if clipboard sharing to the remote is allowed for this connection.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn send_files(&self, paths: Vec<String>) {
+        let _ = self.tx.send(Command::SendFiles(paths));
+    }
+
     /// Answers the certificate prompt.
     #[flutter_rust_bridge::frb(sync)]
     pub fn approve_certificate(&self, approve: bool) {
@@ -421,6 +490,37 @@ impl ClipboardMode {
     }
 }
 
+/// Picture quality of a connection (like AnyDesk's display quality).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PictureQuality {
+    /// Exact pixels with Cipher Desk Host; uses the most data.
+    Best,
+    /// Sharp picture with compression; good for most links.
+    Balanced,
+    /// Least data and quickest response on slow links.
+    Speed,
+}
+
+impl PictureQuality {
+    pub(crate) fn to_core(self) -> rdpv_core::profiles::Quality {
+        use rdpv_core::profiles::Quality;
+        match self {
+            Self::Best => Quality::Best,
+            Self::Balanced => Quality::Balanced,
+            Self::Speed => Quality::Speed,
+        }
+    }
+
+    pub(crate) fn from_core(q: rdpv_core::profiles::Quality) -> Self {
+        use rdpv_core::profiles::Quality;
+        match q {
+            Quality::Best => Self::Best,
+            Quality::Balanced => Self::Balanced,
+            Quality::Speed => Self::Speed,
+        }
+    }
+}
+
 /// Where to connect (everything except the password).
 struct Target {
     host: String,
@@ -430,8 +530,96 @@ struct Target {
     height: u16,
     pins_path: String,
     clipboard: ClipboardMode,
+    /// Folder for files the remote sends; empty turns file receiving off.
+    receive_dir: String,
     /// Disconnect after this many minutes without input; 0 = never (S7).
     idle_minutes: u32,
+    /// The VNC method (no username, certificate or clipboard).
+    vnc: bool,
+    /// Picture quality (Remote Desktop and Share screen).
+    quality: PictureQuality,
+    /// The Share screen method: send this device's id (and `auth_code`) for
+    /// hosts with two-step verification.
+    share_screen: bool,
+    /// The 6-digit authenticator code the user typed, or empty.
+    auth_code: String,
+}
+
+impl Target {
+    fn vnc(host: String, port: u16, idle_minutes: u32) -> Self {
+        Self {
+            host,
+            port,
+            username: String::new(),
+            width: 0,
+            height: 0,
+            pins_path: String::new(),
+            clipboard: ClipboardMode::Off,
+            receive_dir: String::new(),
+            idle_minutes,
+            vnc: true,
+            quality: PictureQuality::Balanced,
+            share_screen: false,
+            auth_code: String::new(),
+        }
+    }
+}
+
+/// An open session of either kind; VNC has no clipboard and no certificate.
+enum Remote {
+    Rdp(Box<Session>),
+    Vnc(Box<VncSession>),
+}
+
+impl Remote {
+    fn size(&self) -> (u16, u16) {
+        match self {
+            Self::Rdp(s) => s.size(),
+            Self::Vnc(s) => s.size(),
+        }
+    }
+    fn poll(&mut self) -> (Vec<SessionEvent>, bool) {
+        match self {
+            Self::Rdp(s) => s.poll(),
+            Self::Vnc(s) => s.poll(),
+        }
+    }
+    fn send_input(&mut self, events: Vec<InputEvent>) -> Result<(), ConnectionError> {
+        match self {
+            Self::Rdp(s) => s.send_input(events),
+            Self::Vnc(s) => s.send_input(events),
+        }
+    }
+    fn offer_local_clipboard(&mut self, text: String) -> Result<(), ConnectionError> {
+        match self {
+            Self::Rdp(s) => s.offer_local_clipboard(text).map(|_| ()),
+            Self::Vnc(_) => Ok(()),
+        }
+    }
+    fn send_files(&mut self, paths: Vec<String>) -> Result<(), ConnectionError> {
+        match self {
+            Self::Rdp(s) => s.send_files(paths.into_iter().map(std::path::PathBuf::from).collect()),
+            Self::Vnc(_) => Ok(()),
+        }
+    }
+    fn clamped(&self, r: Region) -> Option<Region> {
+        match self {
+            Self::Rdp(s) => s.clamped(r),
+            Self::Vnc(s) => s.clamped(r),
+        }
+    }
+    fn region_pixels(&self, r: Region) -> Vec<u8> {
+        match self {
+            Self::Rdp(s) => s.region_pixels(r),
+            Self::Vnc(s) => s.region_pixels(r),
+        }
+    }
+    fn disconnect(self) {
+        match self {
+            Self::Rdp(s) => s.disconnect(),
+            Self::Vnc(s) => s.disconnect(),
+        }
+    }
 }
 
 /// Sends an update to the UI; `false` means the UI has gone away.
@@ -446,13 +634,46 @@ fn run(target: &Target, password: SecretString, send: Send<'_>, rx: &Receiver<Co
         height,
         pins_path,
         clipboard,
+        receive_dir,
         idle_minutes,
+        vnc,
+        quality,
+        share_screen,
+        auth_code,
     } = target;
     let (port, width, height) = (*port, *width, *height);
     let fail = |e: ConnectionError| {
         send(SessionUpdate::ended(Some(e)));
     };
     send(SessionUpdate::status("Connecting…", false));
+    let idle = (*idle_minutes > 0).then(|| Duration::from_secs(u64::from(*idle_minutes) * 60));
+    let policy = SecurityDefaults::secure();
+
+    if *vnc {
+        let Ok(endpoint) = parse_endpoint(host, &port.to_string()) else {
+            return fail(ConnectionError::Unexpected);
+        };
+        let connect_again = || {
+            connect_vnc(VncParams {
+                endpoint: endpoint.clone(),
+                password: SecretString::new(password.expose().to_owned()),
+                connect_timeout: policy.connect_timeout,
+            })
+            .map(|s| Remote::Vnc(Box::new(s)))
+            .map_err(ConnectFailure::Failed)
+        };
+        return match connect_again() {
+            Ok(session) => keep_running(
+                session,
+                &connect_again,
+                send,
+                rx,
+                idle,
+                policy.max_auto_reconnects,
+            ),
+            Err(f) => fail(f.error()),
+        };
+    }
 
     let (Ok(endpoint), Ok(user)) = (
         parse_endpoint(host, &port.to_string()),
@@ -465,8 +686,20 @@ fn run(target: &Target, password: SecretString, send: Send<'_>, rx: &Receiver<Co
         Err(_) => return fail(ConnectionError::Unexpected),
     };
     let key = endpoint.display();
-    let policy = SecurityDefaults::secure();
     let mut pin = pins.get(&key).map(str::to_owned);
+    // Share screen: this device's id (kept beside the pin file) and the code,
+    // for hosts with two-step verification.
+    let second_factor = if *share_screen {
+        std::path::Path::new(pins_path)
+            .parent()
+            .and_then(|dir| rdpv_core::second_factor::device_id(dir).ok())
+            .map(|device| rdpv_core::second_factor::SecondFactor {
+                device,
+                code: (!auth_code.trim().is_empty()).then(|| auth_code.trim().to_owned()),
+            })
+    } else {
+        None
+    };
     // The password stays in this thread (wiped when dropped) for the whole
     // session, so a dropped network can be reconnected without asking again.
     let params = |pin: Option<String>| ConnectParams {
@@ -478,9 +711,12 @@ fn run(target: &Target, password: SecretString, send: Send<'_>, rx: &Receiver<Co
         pinned_fingerprint: pin,
         connect_timeout: policy.connect_timeout,
         clipboard: clipboard.policy(),
+        receive_dir: (!receive_dir.is_empty()).then(|| std::path::PathBuf::from(receive_dir)),
+        quality: quality.to_core(),
+        second_factor: second_factor.clone(),
     };
 
-    let mut session = loop {
+    let session = loop {
         match connect(params(pin.clone())) {
             Ok(s) => break s,
             Err(ConnectFailure::CertificateNeedsApproval { fingerprint }) => {
@@ -508,8 +744,26 @@ fn run(target: &Target, password: SecretString, send: Send<'_>, rx: &Receiver<Co
             Err(ConnectFailure::Failed(e)) => return fail(e),
         }
     };
-    let idle = (*idle_minutes > 0).then(|| Duration::from_secs(u64::from(*idle_minutes) * 60));
+    let connect_again = || connect(params(pin.clone())).map(|s| Remote::Rdp(Box::new(s)));
+    keep_running(
+        Remote::Rdp(Box::new(session)),
+        &connect_again,
+        send,
+        rx,
+        idle,
+        policy.max_auto_reconnects,
+    );
+}
 
+/// Runs a session until it ends, reconnecting after network drops.
+fn keep_running(
+    mut session: Remote,
+    connect_again: &dyn Fn() -> Result<Remote, ConnectFailure>,
+    send: Send<'_>,
+    rx: &Receiver<Command>,
+    idle: Option<Duration>,
+    max_reconnects: u8,
+) {
     loop {
         match drive(session, send, rx, idle) {
             Drive::Ended(err) => {
@@ -519,10 +773,10 @@ fn run(target: &Target, password: SecretString, send: Send<'_>, rx: &Receiver<Co
             Drive::UiGone => return,
             Drive::Lost(err) => {
                 match reconnect(
-                    &|| connect(params(pin.clone())),
+                    connect_again,
                     send,
                     rx,
-                    policy.max_auto_reconnects,
+                    max_reconnects,
                     &ConnectionError::reconnect_delay,
                     err,
                 ) {
@@ -545,7 +799,7 @@ enum Drive {
 }
 
 enum Reconnect {
-    Connected(Box<Session>),
+    Connected(Box<Remote>),
     /// Gave up or the user disconnected; the final update was sent.
     Stopped,
 }
@@ -555,7 +809,7 @@ enum Reconnect {
 /// connection is pinned); a changed certificate or any password/account error
 /// stops at once. The user can disconnect during the pauses.
 fn reconnect(
-    connect_again: &dyn Fn() -> Result<Session, ConnectFailure>,
+    connect_again: &dyn Fn() -> Result<Remote, ConnectFailure>,
     send: Send<'_>,
     rx: &Receiver<Command>,
     max: u8,
@@ -637,14 +891,14 @@ fn wait_for_approval(rx: &Receiver<Command>) -> Option<bool> {
         match rx.recv() {
             Ok(Command::ApproveCertificate(a)) => return Some(a),
             Ok(Command::Disconnect(_)) | Err(_) => return None,
-            // Input and clipboard offers before the session exists are dropped.
-            Ok(Command::Input(_) | Command::OfferClipboard(_)) => {}
+            // Input, clipboard and file offers before the session exists are dropped.
+            Ok(Command::Input(_) | Command::OfferClipboard(_) | Command::SendFiles(_)) => {}
         }
     }
 }
 
 fn drive(
-    mut s: Session,
+    mut s: Remote,
     send: Send<'_>,
     rx: &Receiver<Command>,
     idle_limit: Option<Duration>,
@@ -659,10 +913,21 @@ fn drive(
     // Changed screen area not yet sent, and when pixels were last sent: at most
     // ~30 updates a second, so a busy screen (video, scrolling) cannot queue up
     // more pixels than the UI can draw, which would make the session lag.
-    let mut dirty: Option<Region> = None;
+    // The whole picture first: what arrived while connecting (VNC) or after
+    // a reconnect has not been sent yet.
+    let mut dirty: Option<Region> = (w > 0 && h > 0).then(|| Region {
+        left: 0,
+        top: 0,
+        right: w - 1,
+        bottom: h - 1,
+    });
     let mut last_frame = std::time::Instant::now()
         .checked_sub(FRAME_INTERVAL)
         .unwrap_or_else(std::time::Instant::now);
+    // When the oldest unsent change arrived. Changes are held until the host
+    // has finished sending (so a big update appears whole, not in bands), but
+    // never longer than MAX_FRAME_DELAY (so a busy screen keeps moving).
+    let mut dirty_since: Option<std::time::Instant> = dirty.map(|_| std::time::Instant::now());
     // A session error: network drops may be reconnected, the rest end it.
     let ended = |err: ConnectionError| {
         if err.auto_reconnect_allowed() {
@@ -688,6 +953,11 @@ fn drive(
                         return ended(e);
                     }
                 }
+                Ok(Command::SendFiles(paths)) => {
+                    if let Err(e) = s.send_files(paths) {
+                        return ended(e);
+                    }
+                }
                 Ok(Command::ApproveCertificate(_)) => {}
                 Ok(Command::Disconnect(reason)) => {
                     s.disconnect();
@@ -707,9 +977,13 @@ fn drive(
             return Drive::Ended(Some(ConnectionError::IdleTimeout));
         }
 
-        for ev in s.poll() {
+        let (events, caught_up) = s.poll();
+        for ev in events {
             match ev {
-                SessionEvent::Updated(r) => dirty = Some(union(dirty, r)),
+                SessionEvent::Updated(r) => {
+                    dirty = Some(union(dirty, r));
+                    dirty_since.get_or_insert_with(std::time::Instant::now);
+                }
                 SessionEvent::Resized { width, height } => {
                     if !send(SessionUpdate::resized(width, height)) {
                         s.disconnect();
@@ -722,6 +996,7 @@ fn drive(
                         bottom: height.saturating_sub(1),
                     };
                     dirty = Some(full);
+                    dirty_since.get_or_insert_with(std::time::Instant::now);
                 }
                 SessionEvent::RemoteClipboardText(text) => {
                     send(SessionUpdate::remote_clipboard(text));
@@ -729,12 +1004,30 @@ fn drive(
                 SessionEvent::RemoteClipboardTooLarge => {
                     send(SessionUpdate::new(UpdateKind::RemoteClipboardTooLarge));
                 }
+                SessionEvent::FilesIncoming { files, bytes } => {
+                    send(SessionUpdate {
+                        text: Some(describe_files(files, bytes)),
+                        ..SessionUpdate::new(UpdateKind::FilesIncoming)
+                    });
+                }
+                SessionEvent::FileReceived { name, path } => {
+                    send(SessionUpdate::file_received(
+                        name,
+                        path.to_string_lossy().into_owned(),
+                    ));
+                }
                 SessionEvent::Ended(None) => return Drive::Ended(None),
                 SessionEvent::Ended(Some(err)) => return ended(err),
             }
         }
         // The rectangle sent to the UI is the one the pixels were copied from.
-        if dirty.is_some() && last_frame.elapsed() >= FRAME_INTERVAL {
+        if frame_ready(
+            dirty.is_some(),
+            caught_up,
+            last_frame.elapsed(),
+            dirty_since.map(|t| t.elapsed()),
+        ) {
+            dirty_since = None;
             if let Some(r) = dirty.take().and_then(|r| s.clamped(r)) {
                 last_frame = std::time::Instant::now();
                 let update = SessionUpdate::frame(r, s.region_pixels(r));
@@ -748,8 +1041,80 @@ fn drive(
     }
 }
 
+/// "1 file, 12 KB" / "3 files, 1.2 GB".
+fn describe_files(files: usize, bytes: u64) -> String {
+    let count = if files == 1 {
+        "1 file".to_owned()
+    } else {
+        format!("{files} files")
+    };
+    #[allow(clippy::cast_precision_loss)]
+    let b = bytes as f64;
+    let size = if b >= 1e9 {
+        format!("{:.1} GB", b / 1e9)
+    } else if b >= 1e6 {
+        format!("{:.1} MB", b / 1e6)
+    } else {
+        format!("{} KB", bytes.div_ceil(1000))
+    };
+    format!("{count}, {size}")
+}
+
 /// Shortest time between two screen updates sent to the UI (about 30 per second).
 const FRAME_INTERVAL: Duration = Duration::from_millis(33);
+
+/// Longest a change is held back while the host is still sending more. Long
+/// enough for a big update (a window opening in lossless quality) to arrive
+/// whole, short enough that video and scrolling keep moving.
+const MAX_FRAME_DELAY: Duration = Duration::from_millis(150);
+
+/// Whether to paint now: something changed, the last paint was at least
+/// [`FRAME_INTERVAL`] ago, and either the host has finished sending or the
+/// oldest change has waited [`MAX_FRAME_DELAY`].
+fn frame_ready(
+    has_changes: bool,
+    host_caught_up: bool,
+    since_last_frame: Duration,
+    oldest_change_age: Option<Duration>,
+) -> bool {
+    has_changes
+        && since_last_frame >= FRAME_INTERVAL
+        && (host_caught_up || oldest_change_age.is_some_and(|age| age >= MAX_FRAME_DELAY))
+}
+
+#[cfg(test)]
+mod frame_pacing_tests {
+    use super::*;
+
+    const MS: fn(u64) -> Duration = Duration::from_millis;
+
+    #[test]
+    fn paints_once_the_host_has_finished_sending() {
+        assert!(frame_ready(true, true, MS(40), Some(MS(10))));
+    }
+
+    #[test]
+    fn holds_a_change_while_more_is_still_arriving() {
+        // Half of a big update is in: painting now would show it in bands.
+        assert!(!frame_ready(true, false, MS(40), Some(MS(60))));
+    }
+
+    #[test]
+    fn a_busy_screen_still_moves() {
+        // Video or scrolling never goes quiet: paint anyway after the cap.
+        assert!(frame_ready(true, false, MS(40), Some(MAX_FRAME_DELAY)));
+    }
+
+    #[test]
+    fn never_faster_than_the_frame_interval() {
+        assert!(!frame_ready(true, true, MS(10), Some(MS(500))));
+    }
+
+    #[test]
+    fn nothing_to_paint() {
+        assert!(!frame_ready(false, true, MS(500), None));
+    }
+}
 
 fn union(a: Option<Region>, b: Region) -> Region {
     match a {

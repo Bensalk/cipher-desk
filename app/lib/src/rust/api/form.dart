@@ -5,6 +5,7 @@
 
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
+import 'store.dart';
 
 
             // These functions are ignored because they are not marked as `pub`: `field_id`
@@ -12,7 +13,10 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
             /// Checks every field. The password is only checked for length and
 /// forbidden characters; it is not stored or logged.
-FormCheckResult  checkConnectionForm({required String profileName , required String host , required String port , required String username , required String password , required bool hasSavedPassword }) => RustLib.instance.api.crateApiFormCheckConnectionForm(profileName: profileName, host: host, port: port, username: username, password: password, hasSavedPassword: hasSavedPassword);
+///
+/// An empty port means the method's default port. VNC has no username, so an
+/// empty username is accepted for it.
+FormCheckResult  checkConnectionForm({required ConnectionMethod method , required String profileName , required String host , required String port , required String username , required String password , required bool hasSavedPassword }) => RustLib.instance.api.crateApiFormCheckConnectionForm(method: method, profileName: profileName, host: host, port: port, username: username, password: password, hasSavedPassword: hasSavedPassword);
 
 /// The default RDP port, for the port field hint.
 int  defaultPort() => RustLib.instance.api.crateApiFormDefaultPort();
