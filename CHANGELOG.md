@@ -2,6 +2,27 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.2.4 (7 Nov 2026, test release)
+
+Builds on v0.2.3. The About screen shows **0.2.4**.
+
+- **Picture quality** setting per connection, like AnyDesk: *Best quality*,
+  *Balanced* (the default) or *Speed*. Change it in the connection's settings or
+  from the quality button in the session toolbar (changing it reconnects).
+  - *Best quality* with Share screen is lossless: every pixel arrives exactly
+    as on the other computer, so small text is perfectly sharp. It uses the most
+    data, so it suits a fast connection.
+  - *Balanced* is much sharper than before.
+  - *Speed* sends the least data for slow connections; the picture is softer.
+- **Less lag** with Share screen: the host always sends the newest picture
+  instead of a queue of older ones, so a slow connection lowers the frame rate
+  rather than adding delay. Up to about 30 pictures a second.
+- **View modes** in the session toolbar: *Original size* (sharpest, one remote
+  pixel per screen pixel; move the mouse to an edge to see more), *Shrink to
+  fit* and *Stretch to fill*.
+- **Full screen** now really fills the screen: on Windows the taskbar is hidden,
+  and on Android the status and navigation bars are hidden.
+
 ## v0.2.3 (7 Nov 2026, test release)
 
 Builds on v0.2.2. The About screen shows **0.2.3**.
