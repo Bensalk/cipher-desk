@@ -2,6 +2,15 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.2.5 (7 Nov 2026, test release)
+
+Builds on v0.2.4. The About screen shows **0.2.5**.
+
+- **Smoother picture**: when a large part of the remote screen changes at once
+  (a window opening, a page loading), the change now appears in one go instead
+  of being drawn in bands from top to bottom. Most noticeable with *Best
+  quality*. Video and scrolling keep moving as before.
+
 ## v0.2.4 (7 Nov 2026, test release)
 
 Builds on v0.2.3. The About screen shows **0.2.4**.

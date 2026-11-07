@@ -31,7 +31,7 @@ fn wait_for_picture(s: &mut VncSession) -> Result<usize, String> {
     let deadline = Instant::now() + Duration::from_secs(10);
     let mut updates = 0;
     while Instant::now() < deadline && updates == 0 {
-        for e in s.poll() {
+        for e in s.poll().0 {
             match e {
                 SessionEvent::Updated(_) => updates += 1,
                 SessionEvent::Ended(err) => return Err(format!("ended: {err:?}")),
@@ -82,7 +82,7 @@ fn vnc_shows_the_screen_and_takes_input() -> Result<(), String> {
     // Still connected after input.
     let deadline = Instant::now() + Duration::from_secs(2);
     while Instant::now() < deadline {
-        for e in s.poll() {
+        for e in s.poll().0 {
             if let SessionEvent::Ended(err) = e {
                 return Err(format!("ended after input: {err:?}"));
             }

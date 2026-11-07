@@ -557,7 +557,7 @@ impl Remote {
             Self::Vnc(s) => s.size(),
         }
     }
-    fn poll(&mut self) -> Vec<SessionEvent> {
+    fn poll(&mut self) -> (Vec<SessionEvent>, bool) {
         match self {
             Self::Rdp(s) => s.poll(),
             Self::Vnc(s) => s.poll(),
@@ -887,6 +887,10 @@ fn drive(
     let mut last_frame = std::time::Instant::now()
         .checked_sub(FRAME_INTERVAL)
         .unwrap_or_else(std::time::Instant::now);
+    // When the oldest unsent change arrived. Changes are held until the host
+    // has finished sending (so a big update appears whole, not in bands), but
+    // never longer than MAX_FRAME_DELAY (so a busy screen keeps moving).
+    let mut dirty_since: Option<std::time::Instant> = dirty.map(|_| std::time::Instant::now());
     // A session error: network drops may be reconnected, the rest end it.
     let ended = |err: ConnectionError| {
         if err.auto_reconnect_allowed() {
@@ -936,9 +940,13 @@ fn drive(
             return Drive::Ended(Some(ConnectionError::IdleTimeout));
         }
 
-        for ev in s.poll() {
+        let (events, caught_up) = s.poll();
+        for ev in events {
             match ev {
-                SessionEvent::Updated(r) => dirty = Some(union(dirty, r)),
+                SessionEvent::Updated(r) => {
+                    dirty = Some(union(dirty, r));
+                    dirty_since.get_or_insert_with(std::time::Instant::now);
+                }
                 SessionEvent::Resized { width, height } => {
                     if !send(SessionUpdate::resized(width, height)) {
                         s.disconnect();
@@ -951,6 +959,7 @@ fn drive(
                         bottom: height.saturating_sub(1),
                     };
                     dirty = Some(full);
+                    dirty_since.get_or_insert_with(std::time::Instant::now);
                 }
                 SessionEvent::RemoteClipboardText(text) => {
                     send(SessionUpdate::remote_clipboard(text));
@@ -966,7 +975,13 @@ fn drive(
             }
         }
         // The rectangle sent to the UI is the one the pixels were copied from.
-        if dirty.is_some() && last_frame.elapsed() >= FRAME_INTERVAL {
+        if frame_ready(
+            dirty.is_some(),
+            caught_up,
+            last_frame.elapsed(),
+            dirty_since.map(|t| t.elapsed()),
+        ) {
+            dirty_since = None;
             if let Some(r) = dirty.take().and_then(|r| s.clamped(r)) {
                 last_frame = std::time::Instant::now();
                 let update = SessionUpdate::frame(r, s.region_pixels(r));
@@ -982,6 +997,59 @@ fn drive(
 
 /// Shortest time between two screen updates sent to the UI (about 30 per second).
 const FRAME_INTERVAL: Duration = Duration::from_millis(33);
+
+/// Longest a change is held back while the host is still sending more. Long
+/// enough for a big update (a window opening in lossless quality) to arrive
+/// whole, short enough that video and scrolling keep moving.
+const MAX_FRAME_DELAY: Duration = Duration::from_millis(150);
+
+/// Whether to paint now: something changed, the last paint was at least
+/// [`FRAME_INTERVAL`] ago, and either the host has finished sending or the
+/// oldest change has waited [`MAX_FRAME_DELAY`].
+fn frame_ready(
+    has_changes: bool,
+    host_caught_up: bool,
+    since_last_frame: Duration,
+    oldest_change_age: Option<Duration>,
+) -> bool {
+    has_changes
+        && since_last_frame >= FRAME_INTERVAL
+        && (host_caught_up || oldest_change_age.is_some_and(|age| age >= MAX_FRAME_DELAY))
+}
+
+#[cfg(test)]
+mod frame_pacing_tests {
+    use super::*;
+
+    const MS: fn(u64) -> Duration = Duration::from_millis;
+
+    #[test]
+    fn paints_once_the_host_has_finished_sending() {
+        assert!(frame_ready(true, true, MS(40), Some(MS(10))));
+    }
+
+    #[test]
+    fn holds_a_change_while_more_is_still_arriving() {
+        // Half of a big update is in: painting now would show it in bands.
+        assert!(!frame_ready(true, false, MS(40), Some(MS(60))));
+    }
+
+    #[test]
+    fn a_busy_screen_still_moves() {
+        // Video or scrolling never goes quiet: paint anyway after the cap.
+        assert!(frame_ready(true, false, MS(40), Some(MAX_FRAME_DELAY)));
+    }
+
+    #[test]
+    fn never_faster_than_the_frame_interval() {
+        assert!(!frame_ready(true, true, MS(10), Some(MS(500))));
+    }
+
+    #[test]
+    fn nothing_to_paint() {
+        assert!(!frame_ready(false, true, MS(500), None));
+    }
+}
 
 fn union(a: Option<Region>, b: Region) -> Region {
     match a {

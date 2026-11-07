@@ -126,7 +126,7 @@ fn viewer_sees_the_shared_screen_and_controls_it() {
     let deadline = Instant::now() + Duration::from_secs(10);
     let mut updates = 0;
     while updates < 3 && Instant::now() < deadline {
-        for e in s.poll() {
+        for e in s.poll().0 {
             match e {
                 SessionEvent::Updated(_) => updates += 1,
                 SessionEvent::Ended(err) => panic!("session ended: {err:?}"),
@@ -277,7 +277,7 @@ fn a_resolution_change_resizes_the_viewer() {
     let mut resized = false;
     let mut updated_after = false;
     while Instant::now() < deadline && !(resized && updated_after) {
-        for e in s.poll() {
+        for e in s.poll().0 {
             match e {
                 SessionEvent::Resized { width, height } => {
                     assert_eq!((width, height), (800, 600));
@@ -372,7 +372,7 @@ fn picture_error(quality: Quality) -> f64 {
     let mut last = f64::MAX;
     let mut steady = 0;
     while Instant::now() < deadline && steady < 5 {
-        for e in s.poll() {
+        for e in s.poll().0 {
             if let SessionEvent::Ended(err) = e {
                 panic!("session ended ({quality:?}): {err:?}");
             }

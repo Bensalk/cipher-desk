@@ -365,16 +365,26 @@ impl Session {
     /// Reads and processes what the server sent. Returns after about
     /// [`POLL_INTERVAL`] when nothing arrives, or after [`POLL_BUDGET`] when
     /// data keeps arriving.
-    pub fn poll(&mut self) -> Vec<SessionEvent> {
+    ///
+    /// The second value says whether the server has gone quiet (`true`) or
+    /// was cut off mid-stream by [`POLL_BUDGET`] while more was still
+    /// arriving (`false`). A caller that paints a picture from the pixels
+    /// this touches should wait for `true` where it can, so a big update
+    /// (e.g. a lossless frame) is shown whole instead of in visible bands.
+    pub fn poll(&mut self) -> (Vec<SessionEvent>, bool) {
         let mut events = Vec::new();
         if self.ended {
-            return events;
+            return (events, true);
         }
         let started = std::time::Instant::now();
+        let mut caught_up = false;
         while started.elapsed() < POLL_BUDGET {
             let (action, payload) = match self.framed.read_pdu() {
                 Ok(pdu) => pdu,
-                Err(e) if is_idle_read(&e) => break,
+                Err(e) if is_idle_read(&e) => {
+                    caught_up = true;
+                    break;
+                }
                 Err(e) => {
                     tracing::info!(kind = ?e.kind(), "session read failed");
                     // During a session every network failure is a lost connection,
@@ -384,6 +394,7 @@ impl Session {
                         other => other,
                     };
                     self.end(&mut events, Some(err));
+                    caught_up = true;
                     break;
                 }
             };
@@ -397,14 +408,17 @@ impl Session {
                 Err(e) => {
                     tracing::warn!(error = %e.report(), "session processing failed");
                     self.end(&mut events, Some(ConnectionError::Unexpected));
+                    caught_up = true;
                     break;
                 }
             };
             if let Err(err) = self.handle_outputs(outputs, &mut events) {
                 self.end(&mut events, Some(err));
+                caught_up = true;
                 break;
             }
             if self.ended {
+                caught_up = true;
                 break;
             }
         }
@@ -413,7 +427,7 @@ impl Session {
                 self.end(&mut events, Some(err));
             }
         }
-        events
+        (events, caught_up)
     }
 
     /// Offers this device's clipboard text to the host (if the policy allows).

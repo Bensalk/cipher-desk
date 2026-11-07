@@ -89,7 +89,7 @@ fn poll_until(
     let deadline = Instant::now() + Duration::from_secs(secs);
     let mut all = Vec::new();
     while Instant::now() < deadline {
-        let ev = s.poll();
+        let ev = s.poll().0;
         let hit = ev.iter().any(&mut pred);
         all.extend(ev);
         if hit || s.is_ended() {

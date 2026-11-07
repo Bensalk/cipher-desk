@@ -59,7 +59,7 @@ fn collect(
     let deadline = Instant::now() + Duration::from_secs(secs);
     let mut all = Vec::new();
     while Instant::now() < deadline && !s.is_ended() {
-        let ev = s.poll();
+        let ev = s.poll().0;
         let hit = ev.iter().any(&mut stop);
         all.extend(ev);
         if hit {

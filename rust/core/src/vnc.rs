@@ -340,14 +340,17 @@ impl VncSession {
     }
 
     /// Applies what the server sent. Waits up to [`POLL_INTERVAL`] for
-    /// something to arrive and works at most [`POLL_BUDGET`].
-    pub fn poll(&mut self) -> Vec<SessionEvent> {
+    /// something to arrive and works at most [`POLL_BUDGET`]. The second
+    /// value is `true` when nothing more is waiting (see
+    /// [`crate::session::Session::poll`]).
+    pub fn poll(&mut self) -> (Vec<SessionEvent>, bool) {
         let mut events = Vec::new();
         if self.ended {
-            return events;
+            return (events, true);
         }
         let started = Instant::now();
         let mut first = true;
+        let mut caught_up = false;
         while started.elapsed() < POLL_BUDGET {
             let msg = if first {
                 first = false;
@@ -362,13 +365,17 @@ impl VncSession {
             match msg {
                 Ok(m) => self.apply(m, &mut events),
                 Err(true) => self.end(&mut events, Some(ConnectionError::ConnectionLost)),
-                Err(false) => break,
+                Err(false) => {
+                    caught_up = true;
+                    break;
+                }
             }
             if self.ended {
+                caught_up = true;
                 break;
             }
         }
-        events
+        (events, caught_up)
     }
 
     fn apply(&mut self, msg: Msg, events: &mut Vec<SessionEvent>) {
