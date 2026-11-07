@@ -12,7 +12,10 @@ _Last updated: 7 Nov 2026._
   screen, VNC, plus the always-on Host service (sign-in screen / unattended).
 - Newest test build: **v0.2.8** (file copy/paste + Google Authenticator), built
   on top of v0.2.7 (Ask to connect). Test order: v0.2.6, then v0.2.8 (it
-  contains v0.2.7).
+  contains v0.2.7). v0.2.8 draft:
+  https://github.com/Bensalk/cipher-desk/releases/tag/untagged-16d8357fc1ec0eef551a
+- The loopback test `a_resolution_change_resizes_the_viewer` once timed out on
+  the Windows CI runner and passed on re-run (timing; passes locally).
 - Previous: **v0.2.7** (Ask to connect). Bensal should test **v0.2.6
   first** (window + smooth picture):
   https://github.com/Bensalk/cipher-desk/releases/tag/untagged-2e87d6a9eaa470bd8946
