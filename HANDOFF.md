@@ -10,9 +10,11 @@ _Last updated: 7 Nov 2026._
 - Work happens on branch **`connection-methods`** (PR #12, open, not merged to
   `main`). It adds three connection methods: Private Remote Desktop, Share
   screen, VNC, plus the always-on Host service (sign-in screen / unattended).
-- Newest test build: **v0.2.6**, built as a draft release by
-  `release.yml` ("Run workflow" with `make_release`). Give Bensal the exact
-  release link — see "Release drafts" below.
+- Newest test build: **v0.2.6** (commit `e33df8d`). Its release build
+  (Actions run `42374048174`) was **still running** at handoff: check it
+  finished, then give Bensal the exact v0.2.6 draft link (see "Release drafts").
+- Previous build v0.2.5 (commit `0d05486`) finished: draft
+  https://github.com/Bensalk/cipher-desk/releases/tag/untagged-944ba7ca4296b207802d
 - Bensal tests on two Windows 11 Pro PCs (desktop + laptop) over Tailscale,
   from different networks. `tailscale ping` between them: about 28 ms.
 
