@@ -2,6 +2,24 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.2.8 (7 Nov 2026, test release)
+
+Builds on v0.2.7. The About screen shows **0.2.8**.
+
+- **Copy and paste files, like AnyDesk** (Share screen, Windows): copy files in
+  File Explorer with **Ctrl+C** on either computer, then press **Ctrl+V** in a
+  folder on the other one. Works both ways while a session is open, also with
+  the Cipher Desk window minimised. The connection's *Clipboard* setting must
+  allow the direction (*Both ways* for both). Files only (not folders), up to
+  100 MB each; a copy of each file is also kept in the *Received* folder.
+- **Two-step verification with Google Authenticator** for always-on sharing:
+  on the computer being shared, open *Share screen* and turn on **Two-step
+  verification**, add the key to Google Authenticator, and confirm with a code.
+  After that, a device connecting with the password is asked once for the
+  6-digit code, then remembered for 30 days. Five wrong codes block code entry
+  for 15 minutes. *Ask to connect* is not affected (someone at the computer
+  accepts instead).
+
 ## v0.2.7 (7 Nov 2026, test release)
 
 Builds on v0.2.6. The About screen shows **0.2.7**.

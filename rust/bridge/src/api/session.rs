@@ -97,9 +97,12 @@ impl SessionUpdate {
         }
     }
 
-    fn file_received(name: String) -> Self {
+    /// `text` is the file name, `label` the full path it was saved to (so
+    /// the UI can put the file on this device's clipboard).
+    fn file_received(name: String, path: String) -> Self {
         Self {
             text: Some(name),
+            label: Some(path),
             ..Self::new(UpdateKind::FileReceived)
         }
     }
@@ -211,6 +214,8 @@ impl RdpSession {
         download_dir: String,
         idle_minutes: u32,
         quality: PictureQuality,
+        share_screen: bool,
+        auth_code: String,
         sink: StreamSink<SessionUpdate>,
     ) {
         let target = Target {
@@ -225,6 +230,8 @@ impl RdpSession {
             idle_minutes,
             vnc: false,
             quality,
+            share_screen,
+            auth_code,
         };
         self.spawn(target, Some(SecretString::new(password)), None, sink);
     }
@@ -246,6 +253,8 @@ impl RdpSession {
         download_dir: String,
         idle_minutes: u32,
         quality: PictureQuality,
+        share_screen: bool,
+        auth_code: String,
         sink: StreamSink<SessionUpdate>,
     ) {
         let target = Target {
@@ -260,6 +269,8 @@ impl RdpSession {
             idle_minutes,
             vnc: false,
             quality,
+            share_screen,
+            auth_code,
         };
         self.spawn(target, None, Some(connection_id), sink);
     }
@@ -524,6 +535,11 @@ struct Target {
     vnc: bool,
     /// Picture quality (Remote Desktop and Share screen).
     quality: PictureQuality,
+    /// The Share screen method: send this device's id (and `auth_code`) for
+    /// hosts with two-step verification.
+    share_screen: bool,
+    /// The 6-digit authenticator code the user typed, or empty.
+    auth_code: String,
 }
 
 impl Target {
@@ -540,6 +556,8 @@ impl Target {
             idle_minutes,
             vnc: true,
             quality: PictureQuality::Balanced,
+            share_screen: false,
+            auth_code: String::new(),
         }
     }
 }
@@ -617,6 +635,8 @@ fn run(target: &Target, password: SecretString, send: Send<'_>, rx: &Receiver<Co
         idle_minutes,
         vnc,
         quality,
+        share_screen,
+        auth_code,
     } = target;
     let (port, width, height) = (*port, *width, *height);
     let fail = |e: ConnectionError| {
@@ -664,6 +684,19 @@ fn run(target: &Target, password: SecretString, send: Send<'_>, rx: &Receiver<Co
     };
     let key = endpoint.display();
     let mut pin = pins.get(&key).map(str::to_owned);
+    // Share screen: this device's id (kept beside the pin file) and the code,
+    // for hosts with two-step verification.
+    let second_factor = if *share_screen {
+        std::path::Path::new(pins_path)
+            .parent()
+            .and_then(|dir| rdpv_core::second_factor::device_id(dir).ok())
+            .map(|device| rdpv_core::second_factor::SecondFactor {
+                device,
+                code: (!auth_code.trim().is_empty()).then(|| auth_code.trim().to_owned()),
+            })
+    } else {
+        None
+    };
     // The password stays in this thread (wiped when dropped) for the whole
     // session, so a dropped network can be reconnected without asking again.
     let params = |pin: Option<String>| ConnectParams {
@@ -677,6 +710,7 @@ fn run(target: &Target, password: SecretString, send: Send<'_>, rx: &Receiver<Co
         clipboard: clipboard.policy(),
         receive_dir: (!receive_dir.is_empty()).then(|| std::path::PathBuf::from(receive_dir)),
         quality: quality.to_core(),
+        second_factor: second_factor.clone(),
     };
 
     let session = loop {
@@ -967,8 +1001,11 @@ fn drive(
                 SessionEvent::RemoteClipboardTooLarge => {
                     send(SessionUpdate::new(UpdateKind::RemoteClipboardTooLarge));
                 }
-                SessionEvent::FileReceived { name } => {
-                    send(SessionUpdate::file_received(name));
+                SessionEvent::FileReceived { name, path } => {
+                    send(SessionUpdate::file_received(
+                        name,
+                        path.to_string_lossy().into_owned(),
+                    ));
                 }
                 SessionEvent::Ended(None) => return Drive::Ended(None),
                 SessionEvent::Ended(Some(err)) => return ended(err),

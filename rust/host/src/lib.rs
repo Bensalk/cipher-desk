@@ -22,6 +22,7 @@ pub mod frames;
 pub mod identity;
 pub mod input;
 mod limiter;
+pub mod totp;
 #[cfg(windows)]
 pub mod win;
 #[cfg(windows)]
@@ -85,6 +86,9 @@ pub struct HostConfig {
     /// before it sees the screen (attended mode). When false, a correct
     /// password is enough (unattended).
     pub require_approval: bool,
+    /// Two-step verification: when set, a viewer that passed the password
+    /// also needs a remembered device or a correct authenticator code.
+    pub second_factor: Option<Arc<totp::Gate>>,
 }
 
 /// How long to wait for the person at the computer to allow a viewer before
@@ -258,6 +262,7 @@ where
     };
     let username = config.username.trim().to_owned();
     let password = config.password;
+    let second_factor = config.second_factor;
     let limiter = limiter::Limiter::new(events.clone());
 
     // Text + file clipboard bridge (Windows only). Files the viewer sends land
@@ -296,6 +301,8 @@ where
             #[cfg(windows)]
             let builder = builder.with_cliprdr_factory(Some(Box::new(host_clip)));
             let mut server = builder.build();
+            server
+                .set_cookie_check(second_factor.map(|g| g as Arc<dyn ironrdp_server::CookieCheck>));
             server.set_credentials(Some(Credentials {
                 username,
                 password: password.expose().to_owned(),

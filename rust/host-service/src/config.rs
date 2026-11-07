@@ -94,3 +94,63 @@ pub fn ensure_password() -> anyhow::Result<SecretString> {
     save_password(&p)?;
     Ok(p)
 }
+
+// ------------------------------------------------- two-step verification
+
+fn twostep_file() -> anyhow::Result<PathBuf> {
+    Ok(data_dir()?.join("twostep.bin"))
+}
+
+fn twostep_pending_file() -> anyhow::Result<PathBuf> {
+    Ok(data_dir()?.join("twostep-pending.bin"))
+}
+
+/// Devices remembered after a correct code (hashes and expiry dates only).
+pub fn twostep_devices_file() -> anyhow::Result<PathBuf> {
+    Ok(data_dir()?.join("twostep-devices.txt"))
+}
+
+fn load_secret(path: &std::path::Path) -> Option<rdpv_host::totp::Totp> {
+    let bytes = std::fs::read(path).ok()?;
+    let plain = rdpv_host::winsecret::machine_unprotect(&bytes).ok()?;
+    Some(rdpv_host::totp::Totp::new(plain))
+}
+
+fn save_secret(path: &std::path::Path, totp: &rdpv_host::totp::Totp) -> anyhow::Result<()> {
+    let bytes = rdpv_host::winsecret::machine_protect(totp.secret())?;
+    std::fs::write(path, bytes).context("write the two-step secret")
+}
+
+/// The active two-step secret, if two-step verification is on.
+pub fn load_twostep() -> Option<rdpv_host::totp::Totp> {
+    twostep_file().ok().and_then(|p| load_secret(&p))
+}
+
+/// A secret being set up (shown to the user, not yet confirmed with a code).
+pub fn load_twostep_pending() -> Option<rdpv_host::totp::Totp> {
+    twostep_pending_file().ok().and_then(|p| load_secret(&p))
+}
+
+pub fn save_twostep_pending(totp: &rdpv_host::totp::Totp) -> anyhow::Result<()> {
+    save_secret(&twostep_pending_file()?, totp)
+}
+
+/// Makes the pending secret the active one; forgets remembered devices.
+pub fn activate_twostep(totp: &rdpv_host::totp::Totp) -> anyhow::Result<()> {
+    save_secret(&twostep_file()?, totp)?;
+    let _ = std::fs::remove_file(twostep_pending_file()?);
+    let _ = std::fs::remove_file(twostep_devices_file()?);
+    Ok(())
+}
+
+/// Turns two-step verification off and forgets remembered devices.
+pub fn remove_twostep() -> anyhow::Result<()> {
+    for f in [
+        twostep_file()?,
+        twostep_pending_file()?,
+        twostep_devices_file()?,
+    ] {
+        let _ = std::fs::remove_file(f);
+    }
+    Ok(())
+}

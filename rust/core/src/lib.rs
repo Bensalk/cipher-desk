@@ -30,6 +30,7 @@ pub mod pins;
 pub mod policy;
 pub mod portable;
 pub mod profiles;
+pub mod second_factor;
 pub mod secret;
 pub mod session;
 pub mod settings;

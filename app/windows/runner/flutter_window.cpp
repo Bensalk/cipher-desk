@@ -8,6 +8,7 @@
 #define WDA_EXCLUDEFROMCAPTURE 0x00000011
 #endif
 
+#include "file_clipboard.h"
 #include "flutter/generated_plugin_registrant.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
@@ -83,6 +84,8 @@ bool FlutterWindow::OnCreate() {
         SetFullScreen(*on);
         result->Success();
       });
+  file_clipboard_channel_ =
+      CreateFileClipboardChannel(flutter_controller_->engine()->messenger());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {

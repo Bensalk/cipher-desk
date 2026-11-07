@@ -107,13 +107,13 @@ void crateApiSessionRdpSessionOfferClipboardText({required RdpSession that , req
 
 void crateApiSessionRdpSessionSendFiles({required RdpSession that , required List<String> paths });
 
-Stream<SessionUpdate> crateApiSessionRdpSessionStart({required RdpSession that , required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality });
+Stream<SessionUpdate> crateApiSessionRdpSessionStart({required RdpSession that , required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality , required bool shareScreen , required String authCode });
 
 Stream<SessionUpdate> crateApiSessionRdpSessionStartVnc({required RdpSession that , required String host , required int port , required String password , required int idleMinutes });
 
 Stream<SessionUpdate> crateApiSessionRdpSessionStartVncWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required int idleMinutes });
 
-Stream<SessionUpdate> crateApiSessionRdpSessionStartWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality });
+Stream<SessionUpdate> crateApiSessionRdpSessionStartWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality , required bool shareScreen , required String authCode });
 
 void crateApiSessionRdpSessionTypeText({required RdpSession that , required String text });
 
@@ -479,7 +479,7 @@ sse_encode_list_String(paths, serializer);
         );
         
 
-@override Stream<SessionUpdate> crateApiSessionRdpSessionStart({required RdpSession that , required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality })  { 
+@override Stream<SessionUpdate> crateApiSessionRdpSessionStart({required RdpSession that , required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality , required bool shareScreen , required String authCode })  { 
             final sink = RustStreamSink<SessionUpdate>();
             unawaited(handler.executeNormal(NormalTask(
             callFfi: (port_) {
@@ -496,6 +496,8 @@ sse_encode_clipboard_mode(clipboardDirection, serializer);
 sse_encode_String(downloadDir, serializer);
 sse_encode_u_32(idleMinutes, serializer);
 sse_encode_picture_quality(quality, serializer);
+sse_encode_bool(shareScreen, serializer);
+sse_encode_String(authCode, serializer);
 sse_encode_StreamSink_session_update_Sse(sink, serializer);
             pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11, port: port_);
             
@@ -507,7 +509,7 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
         )
         ,
             constMeta: kCrateApiSessionRdpSessionStartConstMeta,
-            argValues: [that, host, port, username, password, width, height, pinsPath, clipboardDirection, downloadDir, idleMinutes, quality, sink],
+            argValues: [that, host, port, username, password, width, height, pinsPath, clipboardDirection, downloadDir, idleMinutes, quality, shareScreen, authCode, sink],
             apiImpl: this,
         )));
             return sink.stream;
@@ -516,7 +518,7 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
 
         TaskConstMeta get kCrateApiSessionRdpSessionStartConstMeta => const TaskConstMeta(
             debugName: "RdpSession_start",
-            argNames: ["that", "host", "port", "username", "password", "width", "height", "pinsPath", "clipboardDirection", "downloadDir", "idleMinutes", "quality", "sink"],
+            argNames: ["that", "host", "port", "username", "password", "width", "height", "pinsPath", "clipboardDirection", "downloadDir", "idleMinutes", "quality", "shareScreen", "authCode", "sink"],
         );
         
 
@@ -588,7 +590,7 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
         );
         
 
-@override Stream<SessionUpdate> crateApiSessionRdpSessionStartWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality })  { 
+@override Stream<SessionUpdate> crateApiSessionRdpSessionStartWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality , required bool shareScreen , required String authCode })  { 
             final sink = RustStreamSink<SessionUpdate>();
             unawaited(handler.executeNormal(NormalTask(
             callFfi: (port_) {
@@ -605,6 +607,8 @@ sse_encode_clipboard_mode(clipboardDirection, serializer);
 sse_encode_String(downloadDir, serializer);
 sse_encode_u_32(idleMinutes, serializer);
 sse_encode_picture_quality(quality, serializer);
+sse_encode_bool(shareScreen, serializer);
+sse_encode_String(authCode, serializer);
 sse_encode_StreamSink_session_update_Sse(sink, serializer);
             pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14, port: port_);
             
@@ -616,7 +620,7 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
         )
         ,
             constMeta: kCrateApiSessionRdpSessionStartWithSavedPasswordConstMeta,
-            argValues: [that, connectionId, host, port, username, width, height, pinsPath, clipboardDirection, downloadDir, idleMinutes, quality, sink],
+            argValues: [that, connectionId, host, port, username, width, height, pinsPath, clipboardDirection, downloadDir, idleMinutes, quality, shareScreen, authCode, sink],
             apiImpl: this,
         )));
             return sink.stream;
@@ -625,7 +629,7 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
 
         TaskConstMeta get kCrateApiSessionRdpSessionStartWithSavedPasswordConstMeta => const TaskConstMeta(
             debugName: "RdpSession_start_with_saved_password",
-            argNames: ["that", "connectionId", "host", "port", "username", "width", "height", "pinsPath", "clipboardDirection", "downloadDir", "idleMinutes", "quality", "sink"],
+            argNames: ["that", "connectionId", "host", "port", "username", "width", "height", "pinsPath", "clipboardDirection", "downloadDir", "idleMinutes", "quality", "shareScreen", "authCode", "sink"],
         );
         
 
@@ -2486,7 +2490,7 @@ sse_encode_i_32(self.index, serializer); }
 /// The password is used for this connection only and never stored here.
 /// `pins_path` is the certificate pin file in the app's private data folder.
 /// Can be called once per handle.
- Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality })=>RustLib.instance.api.crateApiSessionRdpSessionStart(that: this, host: host, port: port, username: username, password: password, width: width, height: height, pinsPath: pinsPath, clipboardDirection: clipboardDirection, downloadDir: downloadDir, idleMinutes: idleMinutes, quality: quality);
+ Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality , required bool shareScreen , required String authCode })=>RustLib.instance.api.crateApiSessionRdpSessionStart(that: this, host: host, port: port, username: username, password: password, width: width, height: height, pinsPath: pinsPath, clipboardDirection: clipboardDirection, downloadDir: downloadDir, idleMinutes: idleMinutes, quality: quality, shareScreen: shareScreen, authCode: authCode);
 
 
 /// Connects with the VNC method (no username; no clipboard or certificate).
@@ -2501,7 +2505,7 @@ sse_encode_i_32(self.index, serializer); }
 /// Like [`RdpSession::start`], but reads the saved password from the OS
 /// vault inside Rust, so it never passes through the UI (Windows, Linux).
 /// The caller must have confirmed the user's identity first (S5).
- Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality })=>RustLib.instance.api.crateApiSessionRdpSessionStartWithSavedPassword(that: this, connectionId: connectionId, host: host, port: port, username: username, width: width, height: height, pinsPath: pinsPath, clipboardDirection: clipboardDirection, downloadDir: downloadDir, idleMinutes: idleMinutes, quality: quality);
+ Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality , required bool shareScreen , required String authCode })=>RustLib.instance.api.crateApiSessionRdpSessionStartWithSavedPassword(that: this, connectionId: connectionId, host: host, port: port, username: username, width: width, height: height, pinsPath: pinsPath, clipboardDirection: clipboardDirection, downloadDir: downloadDir, idleMinutes: idleMinutes, quality: quality, shareScreen: shareScreen, authCode: authCode);
 
 
 /// Types text (on-screen keyboards, IMEs, pasted text is NOT sent this way).

@@ -10,7 +10,10 @@ _Last updated: 7 Nov 2026._
 - Work happens on branch **`connection-methods`** (PR #12, open, not merged to
   `main`). It adds three connection methods: Private Remote Desktop, Share
   screen, VNC, plus the always-on Host service (sign-in screen / unattended).
-- Newest test build: **v0.2.7** (Ask to connect). Bensal should test **v0.2.6
+- Newest test build: **v0.2.8** (file copy/paste + Google Authenticator), built
+  on top of v0.2.7 (Ask to connect). Test order: v0.2.6, then v0.2.8 (it
+  contains v0.2.7).
+- Previous: **v0.2.7** (Ask to connect). Bensal should test **v0.2.6
   first** (window + smooth picture):
   https://github.com/Bensalk/cipher-desk/releases/tag/untagged-2e87d6a9eaa470bd8946
   then v0.2.7 (give him its exact draft link; see "Release drafts").
@@ -27,6 +30,7 @@ _Last updated: 7 Nov 2026._
 | v0.2.4 | Picture quality per connection (Best = lossless QOIZ, Balanced, Speed); host always sends the newest picture (less lag); view modes Original / Shrink / Stretch; real full screen (taskbar hidden); Cipher Desk window on the shared PC visible to the viewer (capture-hiding only while *viewing*). |
 | v0.2.5 | Viewer holds a big change until the host has finished sending it (max 150 ms), so Best quality appears whole instead of in bands. `Session::poll` now returns `(events, caught_up)`. |
 | v0.2.6 | Host window no longer hidden from capture at startup (startup race lost the "show" call). |
+| v0.2.8 | **File copy/paste like AnyDesk**: host `clipboard.rs` sends files on a *new* CF_HDROP copy and puts a received batch on the clipboard (own-seq + "inside Received folder" checks stop echoes); viewer: C++ channel `rdpv/file_clipboard` (`app/windows/runner/file_clipboard.cpp`) + `session_screen.dart` `_offerCopiedFiles` / `_putReceivedOnClipboard`; `FileReceived` now carries the saved path (in `SessionUpdate.label`). **Two-step (TOTP)**: viewer sends device id + code as a Client Info password *cookie* (`rdpv_core::second_factor`, magic starts with a lone surrogate so it isn't text); vendored server `CookieCheck` runs after CredSSP, refuses with `ServerFreshCredentialsRequired` → `ConnectionError::CodeNeeded` → app asks for the code and reconnects. Host `rdpv_host::totp::Gate` (RFC 6238 tested; ±1 step; device remembered 30 days as sha256 hash; 5 wrong → 15 min lock). Service: `twostep-begin/finish/off`, status `TWOSTEP`; worker reads the secret at each sign-in. Bridge `start*` gained `share_screen`, `auth_code` (frb regenerated). Loopback test covers code needed / right code / remembered / other device. |
 | v0.2.7 | **Ask to connect (no password)**: the always-on worker (`rust/host-service/src/worker.rs`) also listens on port+1 with public sign-in `ask` / `ask-to-connect`, `require_approval = true`; popup via `WTSSendMessageW` (Yes/No, 30 s timeout = refuse). Declines are sent as `ServerDeniedConnection` (vendored `server.rs`), shown as new `ConnectionError::AccessDeclined`, never auto-reconnected. App: ⋮ menu "Ask to connect" on Share screen connections (`home_screen.dart` `_ask`). Loopback tests cover allow and decline. |
 
 ## Waiting for Bensal's test results
@@ -51,11 +55,13 @@ _Last updated: 7 Nov 2026._
 2. **Unattended access password** remembered on his own viewer PC (he must never
    retype it). Saved password in the OS vault mostly covers this; make sure it
    works for the always-on service too.
-3. **2FA with Google Authenticator (TOTP)** on top of the unattended password.
-   Bensal's choice: one code per viewer PC, remembered for 30 days. Not started.
-4. **File transfer window, both directions** (not clipboard). A basic "send
-   files" already exists in both `session_screen.dart` and `share_screen.dart`
-   (files land in a Received folder); he wants a proper two-pane transfer window.
+3. **2FA with Google Authenticator** — done in v0.2.8 (always-on sharing
+   only; setup by typing the key, no QR code yet). Possible next: QR code,
+   2FA for manual sharing too.
+4. **File transfer** — Bensal clarified he wants AnyDesk-style Ctrl+C/Ctrl+V
+   of files: done in v0.2.8 (Windows; files up to 100 MB each, no folders,
+   whole file in memory). Possible next: folders, bigger files (stream in
+   ranges), progress display.
 5. Backlog: auto-adapt the host resolution to the viewer window.
 
 "Admin-level / full control" = the always-on Host service (runs as system,

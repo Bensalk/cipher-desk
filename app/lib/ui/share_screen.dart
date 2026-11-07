@@ -230,6 +230,48 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
     }
   }
 
+  /// Turns on two-step verification: shows the key to add to Google
+  /// Authenticator, then asks for a code to confirm it works.
+  Future<void> _setUpTwoStep() async {
+    (String, String)? setup;
+    try {
+      setup = await HostService.beginTwoStep();
+    } on ElevationCancelled {
+      _snack('Two-step verification was not turned on (the admin prompt was declined).');
+      return;
+    }
+    if (setup == null || !mounted) {
+      _snack('Two-step verification could not be set up. Please try again.');
+      return;
+    }
+    final (key, account) = setup;
+    while (mounted) {
+      final code = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => _TwoStepSetupDialog(setupKey: key, account: account),
+      );
+      if (code == null) return;
+      bool ok;
+      try {
+        ok = await HostService.finishTwoStep(code);
+      } on ElevationCancelled {
+        _snack('The admin prompt was declined.');
+        return;
+      }
+      if (ok) {
+        await _refreshService();
+        _snack('Two-step verification is on. Each new device asks for a code once.');
+        return;
+      }
+      _snack('That code did not match. Check the phone\'s time and try the new code.');
+    }
+  }
+
+  Future<void> _turnOffTwoStep() async {
+    await _runService(HostService.twoStepOff, 'The admin prompt was declined.');
+  }
+
   Future<void> _installService() async {
     // Sharing on the same port in this window would clash with the service.
     if (widget.share.isOn) widget.share.stop();
@@ -390,6 +432,18 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
               }, 'The admin prompt was declined.'),
             ),
           ]),
+        ),
+        SwitchListTile(
+          key: const Key('service-two-step'),
+          contentPadding: EdgeInsets.zero,
+          secondary: const Icon(Icons.phonelink_lock_outlined),
+          title: const Text('Two-step verification (Google Authenticator)'),
+          subtitle: Text(_service.twoStep
+              ? 'On — a new device also needs the 6-digit code from your phone '
+                  '(then it is remembered for 30 days).'
+              : 'Off — the password is enough.'),
+          value: _service.twoStep,
+          onChanged: (on) => on ? _setUpTwoStep() : _turnOffTwoStep(),
         ),
         if (_serviceFingerprint != null)
           ListTile(
@@ -777,6 +831,85 @@ class SharingBanner extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Step 1: add the key to Google Authenticator. Step 2: type the code it shows.
+class _TwoStepSetupDialog extends StatefulWidget {
+  const _TwoStepSetupDialog({required this.setupKey, required this.account});
+
+  final String setupKey;
+  final String account;
+
+  @override
+  State<_TwoStepSetupDialog> createState() => _TwoStepSetupDialogState();
+}
+
+class _TwoStepSetupDialogState extends State<_TwoStepSetupDialog> {
+  final _code = TextEditingController();
+
+  bool get _valid => RegExp(r'^\d{6}$').hasMatch(_code.text.trim());
+
+  @override
+  void dispose() {
+    _code.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const mono = TextStyle(fontFamily: 'monospace', fontSize: 18, letterSpacing: 1);
+    return AlertDialog(
+      title: const Text('Set up Google Authenticator'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('1. In Google Authenticator tap +, then "Enter a setup key".'),
+            const SizedBox(height: 8),
+            Text('2. Account name: Cipher Desk ${widget.account}'),
+            const SizedBox(height: 8),
+            const Text('3. Key (time based):'),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(child: SelectableText(widget.setupKey, style: mono)),
+                IconButton(
+                  tooltip: 'Copy key',
+                  icon: const Icon(Icons.copy),
+                  onPressed: () => Clipboard.setData(ClipboardData(text: widget.setupKey.replaceAll(' ', ''))),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text('4. Type the 6-digit code the app now shows:'),
+            TextField(
+              key: const Key('field-two-step-code'),
+              controller: _code,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) {
+                if (_valid) Navigator.pop(context, _code.text.trim());
+              },
+            ),
+            Text(
+              'Keep this key private. Anyone with it and the password can sign in.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        FilledButton(
+          onPressed: _valid ? () => Navigator.pop(context, _code.text.trim()) : null,
+          child: const Text('Turn on'),
+        ),
+      ],
     );
   }
 }

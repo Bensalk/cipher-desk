@@ -39,6 +39,9 @@ class FlutterWindow : public Win32Window {
   // (Windows then hides the taskbar), and back to the saved size and place.
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> window_channel_;
   void SetFullScreen(bool on);
+
+  // Copy and paste of files with Explorer (see file_clipboard.h).
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> file_clipboard_channel_;
   bool fullscreen_ = false;
   LONG_PTR saved_style_ = 0;
   WINDOWPLACEMENT saved_placement_ = {sizeof(WINDOWPLACEMENT)};

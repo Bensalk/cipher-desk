@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../platform/app_window.dart';
+import '../platform/file_clipboard.dart';
 import '../platform/remote_clipboard.dart';
 import '../platform/secure_window.dart';
 import '../platform/session_service.dart';
@@ -59,6 +60,8 @@ class SessionScreen extends StatefulWidget {
     this.idleMinutes = 30,
     this.onOutcome,
     this.onQualityChanged,
+    this.authCode = '',
+    this.onAuthCode,
   });
 
   final ConnectionProfile profile;
@@ -76,6 +79,14 @@ class SessionScreen extends StatefulWidget {
   /// Saves a new picture quality for this connection. The screen then closes
   /// with `true`, so the caller connects again with the new setting.
   final void Function(PictureQuality quality)? onQualityChanged;
+
+  /// Share screen with two-step verification: the 6-digit code the user
+  /// typed for this attempt (empty if none).
+  final String authCode;
+
+  /// Called with a code the user typed after the host asked for one; the
+  /// screen then closes with `true`, so the caller connects again with it.
+  final void Function(String code)? onAuthCode;
 
   /// Typed (or, on Android, vault-read) password. Used once, never stored here.
   final String? password;
@@ -147,6 +158,16 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   // Clipboard (S6).
   Timer? _clipTimer;
   String? _lastLocalClip;
+
+  // Copy and paste of files with Explorer, like AnyDesk (Windows).
+  // Files copied here go to the remote; files from the remote are put on
+  // this computer's clipboard. `_fileSeq` is the last clipboard change seen,
+  // `_ownFileSeq` the one made by putting received files there.
+  int? _fileSeq;
+  int? _ownFileSeq;
+  String _receiveDir = '';
+  final List<String> _receivedBatch = [];
+  DateTime? _lastReceived;
   bool get _sendsClipboard =>
       widget.profile.method.supportsClipboard &&
       (widget.profile.clipboardMode == ClipboardMode.both ||
@@ -174,7 +195,59 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     _lastLocalClip = null;
     _offerLocalClipboard();
     if (!_isAndroid) {
-      _clipTimer = Timer.periodic(const Duration(seconds: 1), (_) => _offerLocalClipboard());
+      // Files already copied before connecting are not sent: only a new copy.
+      _fileSeq = null;
+      FileClipboard.sequence().then((seq) => _fileSeq ??= seq);
+      _clipTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        _offerLocalClipboard();
+        _offerCopiedFiles();
+      });
+    }
+  }
+
+  /// Files copied in Explorer on this computer are sent to the remote, which
+  /// puts them on its clipboard (Ctrl+V there pastes them).
+  Future<void> _offerCopiedFiles() async {
+    if (_ended || !_sendsClipboard || !FileClipboard.supported) return;
+    final seq = await FileClipboard.sequence();
+    if (seq == null) return;
+    if (_fileSeq == null) {
+      _fileSeq = seq;
+      return;
+    }
+    if (seq == _fileSeq) return;
+    _fileSeq = seq;
+    if (seq == _ownFileSeq) return;
+    final files = await FileClipboard.readFiles();
+    if (files.isEmpty || _ended) return;
+    // Files that just came from the remote: don't send them back.
+    if (_receiveDir.isNotEmpty && files.every((f) => f.startsWith(_receiveDir))) return;
+    _session.sendFiles(paths: files);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(files.length == 1
+          ? 'Copying "${files.first.split(Platform.pathSeparator).last}" to the remote computer. '
+              'Paste it there with Ctrl+V.'
+          : 'Copying ${files.length} files to the remote computer. Paste them there with Ctrl+V.'),
+    ));
+  }
+
+  /// Puts files received from the remote on this computer's clipboard, so
+  /// Ctrl+V in a folder pastes them. Files arriving close together form one
+  /// batch, pasted together.
+  Future<void> _putReceivedOnClipboard(String path) async {
+    if (!FileClipboard.supported) return;
+    final now = DateTime.now();
+    final last = _lastReceived;
+    if (last == null || now.difference(last) > const Duration(seconds: 5)) {
+      _receivedBatch.clear();
+    }
+    _lastReceived = now;
+    _receivedBatch.add(path);
+    final seq = await FileClipboard.writeFiles(List.of(_receivedBatch));
+    if (seq != null) {
+      _ownFileSeq = seq;
+      _fileSeq = seq;
     }
   }
 
@@ -232,6 +305,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     final downloadDir = clipboard == ClipboardMode.off
         ? ''
         : '${File(pinsPath).parent.path}${Platform.pathSeparator}Received';
+    _receiveDir = downloadDir;
     final vnc = widget.profile.method == ConnectionMethod.vnc;
     final stream = vnc
         ? (widget.useSavedPassword
@@ -260,6 +334,8 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
             downloadDir: downloadDir,
             idleMinutes: widget.idleMinutes,
             quality: widget.profile.quality,
+            shareScreen: widget.profile.method == ConnectionMethod.shareScreen,
+            authCode: widget.authCode,
           )
         : _session.start(
             host: widget.profile.host,
@@ -273,6 +349,8 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
             downloadDir: downloadDir,
             idleMinutes: widget.idleMinutes,
             quality: widget.profile.quality,
+            shareScreen: widget.profile.method == ConnectionMethod.shareScreen,
+            authCode: widget.authCode,
           );
     _sub = stream.listen(_onUpdate, onError: (_) => _onEnded(null));
   }
@@ -336,8 +414,12 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
       case UpdateKind.fileReceived:
         if (!mounted) return;
         final name = u.text ?? 'a file';
+        final path = u.label;
+        if (path != null && path.isNotEmpty) _putReceivedOnClipboard(path);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Received "$name" into the Received folder.'),
+          content: Text(FileClipboard.supported
+              ? 'Received "$name". Paste it in any folder with Ctrl+V.'
+              : 'Received "$name" into the Received folder.'),
         ));
     }
   }
@@ -406,6 +488,22 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
       _state = error == null ? RdpConnectionState.disconnected : RdpConnectionState.failed;
       _statusLabel = _state.label;
     });
+    // Two-step verification: ask for the authenticator code at once.
+    if (error?.id == 'CodeNeeded' && widget.onAuthCode != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _askCode());
+    }
+  }
+
+  /// Asks for the 6-digit authenticator code, then connects again with it.
+  Future<void> _askCode() async {
+    if (!mounted) return;
+    final code = await showDialog<String>(
+      context: context,
+      builder: (_) => const _CodeDialog(),
+    );
+    if (code == null || !mounted) return;
+    widget.onAuthCode?.call(code);
+    Navigator.of(context).pop(true);
   }
 
   Future<void> _askApproval(String fingerprint) async {
@@ -1130,6 +1228,16 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: _FingerprintCompare(pinned: changed.$1, presented: changed.$2),
             ),
+          if (_ended && _error?.id == 'CodeNeeded' && widget.onAuthCode != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: FilledButton.icon(
+                key: const Key('button-enter-code'),
+                onPressed: _askCode,
+                icon: const Icon(Icons.pin_outlined),
+                label: const Text('Enter authenticator code'),
+              ),
+            ),
           if (changed != null && _ended && _error?.id == 'CertificateChanged')
             Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -1293,4 +1401,60 @@ enum _ViewMode {
         _ViewMode.shrink => Icons.fit_screen_outlined,
         _ViewMode.stretch => Icons.aspect_ratio_outlined,
       };
+}
+
+/// Asks for the 6-digit code from the authenticator app.
+class _CodeDialog extends StatefulWidget {
+  const _CodeDialog();
+
+  @override
+  State<_CodeDialog> createState() => _CodeDialogState();
+}
+
+class _CodeDialogState extends State<_CodeDialog> {
+  final _controller = TextEditingController();
+
+  bool get _valid => RegExp(r'^\d{6}$').hasMatch(_controller.text.trim());
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_valid) Navigator.pop(context, _controller.text.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Authenticator code'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Open Google Authenticator on your phone and type the '
+              '6-digit code for Cipher Desk. This computer is then remembered '
+              'for 30 days.'),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('field-auth-code'),
+            controller: _controller,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: const InputDecoration(labelText: '6-digit code'),
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) => _submit(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        FilledButton(onPressed: _valid ? _submit : null, child: const Text('Connect')),
+      ],
+    );
+  }
 }

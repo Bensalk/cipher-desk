@@ -37,6 +37,7 @@ fn open(direction: ClipboardDirection, max_bytes: usize) -> Result<Session, Stri
             clipboard: ClipboardPolicy::from_direction(direction, max_bytes),
             receive_dir: None,
             quality: rdpv_core::profiles::Quality::Balanced,
+            second_factor: None,
         })
     };
     let fp = match connect(params(None)?) {

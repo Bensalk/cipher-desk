@@ -190,6 +190,13 @@ pub trait CredentialValidator: Send + Sync {
     async fn validate(&self, credentials: &Credentials) -> Result<CredentialDecision, CredentialValidationError>;
 }
 
+/// Cipher Desk: checks the cookie a client sends in its Client Info PDU (the
+/// password field, when it is not text), after the password was accepted.
+pub trait CookieCheck: Send + Sync {
+    /// `true` lets the client in.
+    fn check(&self, cookie: Option<&[u8]>) -> bool;
+}
+
 /// A built-in [`CredentialValidator`] that accepts exactly one fixed set of credentials.
 ///
 /// This is the validation-policy equivalent of the acceptor's pre-loaded
@@ -448,6 +455,7 @@ pub struct RdpServer {
     ev_receiver: Arc<Mutex<mpsc::UnboundedReceiver<ServerEvent>>>,
     creds: Option<Credentials>,
     credential_validator: Option<Arc<dyn CredentialValidator>>,
+    cookie_check: Option<Arc<dyn CookieCheck>>,
     local_addr: Option<SocketAddr>,
     autodetect: Option<AutoDetectManager>,
     connection_handler: Option<Box<dyn ConnectionHandler>>,
@@ -546,6 +554,7 @@ impl RdpServer {
             ev_receiver: Arc::new(Mutex::new(ev_receiver)),
             creds: None,
             credential_validator: None,
+            cookie_check: None,
             local_addr: None,
             autodetect: None,
             connection_handler,
@@ -580,6 +589,13 @@ impl RdpServer {
     /// Not used for CredSSP/Hybrid connections (those use pre-loaded credentials).
     pub fn set_credential_validator(&mut self, validator: Option<Arc<dyn CredentialValidator>>) {
         self.credential_validator = validator;
+    }
+
+    /// Cipher Desk: a check of the client's sign-in cookie, run after the
+    /// password (CredSSP) has been accepted — two-step verification. A
+    /// refused client is told `ServerFreshCredentialsRequired` and closed.
+    pub fn set_cookie_check(&mut self, check: Option<Arc<dyn CookieCheck>>) {
+        self.cookie_check = check;
     }
 
     pub fn event_sender(&self) -> &mpsc::UnboundedSender<ServerEvent> {
@@ -1252,7 +1268,13 @@ impl RdpServer {
         let mut display_updates = match self.display.lock().await.updates().await {
             Ok(updates) => updates,
             Err(e) => {
-                let _ = send_denied_share_data(io_channel_id, user_channel_id, writer).await;
+                let _ = send_error_share_data(
+                    io_channel_id,
+                    user_channel_id,
+                    ProtocolIndependentCode::ServerDeniedConnection,
+                    writer,
+                )
+                .await;
                 return Err(e);
             }
         };
@@ -1393,6 +1415,22 @@ impl RdpServer {
                 }
             } else {
                 debug!("Skipping credential validation (no credentials in AcceptorResult)");
+            }
+        }
+
+        // Cipher Desk: two-step verification, after the password.
+        if let Some(check) = self.cookie_check.clone() {
+            let cookie = result.password_cookie.as_ref().map(|c| c.0.as_slice());
+            if !check.check(cookie) {
+                warn!("Sign-in cookie check refused the client");
+                let _ = send_error_share_data(
+                    result.io_channel_id,
+                    result.user_channel_id,
+                    ProtocolIndependentCode::ServerFreshCredentialsRequired,
+                    writer,
+                )
+                .await;
+                bail!("second factor refused");
             }
         }
 
@@ -1866,17 +1904,18 @@ async fn send_access_denied(
     Ok(())
 }
 
-/// Cipher Desk: sends `ServerSetErrorInfoPdu(ServerDeniedConnection)` as a
-/// Share Data PDU on the I/O channel, the form a viewer in the active stage
-/// reads as a graceful disconnect with a reason.
-async fn send_denied_share_data(
+/// Cipher Desk: sends `ServerSetErrorInfoPdu(code)` as a Share Data PDU on
+/// the I/O channel, the form a viewer in the active stage reads as a graceful
+/// disconnect with a reason.
+async fn send_error_share_data(
     io_channel_id: u16,
     user_channel_id: u16,
+    code: ProtocolIndependentCode,
     writer: &mut impl FramedWrite,
 ) -> Result<(), anyhow::Error> {
     let data = rdp::headers::ShareDataHeader {
         share_data_pdu: rdp::headers::ShareDataPdu::ServerSetErrorInfo(ServerSetErrorInfoPdu(
-            ErrorInfo::ProtocolIndependentCode(ProtocolIndependentCode::ServerDeniedConnection),
+            ErrorInfo::ProtocolIndependentCode(code),
         )),
         stream_priority: rdp::headers::StreamPriority::Medium,
         compression_flags: rdp::headers::CompressionFlags::empty(),

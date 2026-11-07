@@ -81,6 +81,9 @@ pub struct ConnectParams {
     /// Picture quality: which codecs the viewer offers and how the host
     /// should compress (see [`picture_settings`]).
     pub quality: Quality,
+    /// Share screen: this device's id and the authenticator code, for hosts
+    /// with two-step verification. `None` for other computers.
+    pub second_factor: Option<crate::second_factor::SecondFactor>,
 }
 
 /// Why [`connect`] did not produce a session.
@@ -129,7 +132,8 @@ pub enum SessionEvent {
     /// Text copied on the host was larger than the policy allows and was dropped.
     RemoteClipboardTooLarge,
     /// A file sent by the remote finished arriving in the receive folder.
-    FileReceived { name: String },
+    /// `path` is where it was saved (the name may have " (1)" added).
+    FileReceived { name: String, path: PathBuf },
 }
 
 /// Result of offering this device's clipboard text to the host.
@@ -216,6 +220,7 @@ pub fn connect(params: ConnectParams) -> Result<Session, ConnectFailure> {
         clipboard,
         receive_dir,
         quality,
+        second_factor,
     } = params;
 
     let addr = resolve(&endpoint).map_err(ConnectFailure::Failed)?;
@@ -231,6 +236,9 @@ pub fn connect(params: ConnectParams) -> Result<Session, ConnectFailure> {
     // The connector holds its own copy of the password until CredSSP is done.
     drop(password);
     let mut connector = ClientConnector::new(config, client_addr);
+    if let Some(f) = &second_factor {
+        connector = connector.with_redirection_password_cookie(f.encode());
+    }
     let clip = if clipboard.is_enabled() {
         let queue = ClipQueue::default();
         connector = connector.with_static_channel(CliprdrClient::new(Box::new(QueueBackend::new(
@@ -691,7 +699,7 @@ impl Session {
                             if std::fs::create_dir_all(&dir).is_ok() {
                                 let path = crate::xfer::unique_path(&dir, &name);
                                 if std::fs::write(&path, &bytes).is_ok() {
-                                    events.push(SessionEvent::FileReceived { name });
+                                    events.push(SessionEvent::FileReceived { name, path });
                                 }
                             }
                         }
@@ -1303,6 +1311,8 @@ pub(crate) fn classify_disconnect_reason(text: &str) -> ConnectionError {
         ConnectionError::SessionTakenOver
     } else if t.contains("denied the connection") {
         ConnectionError::AccessDeclined
+    } else if t.contains("enter their credentials") {
+        ConnectionError::CodeNeeded
     } else {
         ConnectionError::DisconnectedByHost
     }
@@ -1414,6 +1424,13 @@ mod tests {
                 "[Protocol independent error] The server denied the connection"
             ),
             ConnectionError::AccessDeclined
+        );
+        assert_eq!(
+            classify_disconnect_reason(
+                "[Protocol independent error] The server does not accept saved user credentials \
+                 and requires that the user enter their credentials for each connection"
+            ),
+            ConnectionError::CodeNeeded
         );
     }
 

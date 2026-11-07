@@ -176,6 +176,14 @@ pub fn status() -> anyhow::Result<()> {
             if let Ok(fp) = rdpv_host::fingerprint(&crate::config::data_dir()?) {
                 r.set("FINGERPRINT", &fp);
             }
+            r.set(
+                "TWOSTEP",
+                if crate::config::load_twostep().is_some() {
+                    "1"
+                } else {
+                    "0"
+                },
+            );
         }
         Err(_) => r.set("INSTALLED", "0"),
     }
@@ -216,5 +224,46 @@ pub fn show_password() -> anyhow::Result<()> {
         None => r.set("PASSWORD", ""),
     }
     r.finish("");
+    Ok(())
+}
+
+/// Starts setting up two-step verification: makes a new secret (kept pending
+/// until confirmed) and reports the setup key and link for the authenticator
+/// app. Nothing changes for viewers yet.
+pub fn twostep_begin() -> anyhow::Result<()> {
+    let totp = rdpv_host::totp::Totp::generate()?;
+    crate::config::save_twostep_pending(&totp)?;
+    let account = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "this computer".to_owned());
+    let mut r = Report::default();
+    r.set("TWOSTEP_KEY", &totp.setup_key());
+    r.set("TWOSTEP_URI", &totp.uri(&account));
+    r.set("TWOSTEP_ACCOUNT", &account);
+    r.finish("Add the key to your authenticator app, then confirm with a code.");
+    Ok(())
+}
+
+/// Confirms the pending secret with a code from the app and turns two-step
+/// verification on. The code is a short-lived number, not a secret to keep.
+pub fn twostep_finish(code: Option<String>) -> anyhow::Result<()> {
+    let code = code.context("missing code")?;
+    let pending = crate::config::load_twostep_pending().context("no two-step setup in progress")?;
+    let mut r = Report::default();
+    if pending.verify(&code, std::time::SystemTime::now()) {
+        crate::config::activate_twostep(&pending)?;
+        r.set("TWOSTEP", "1");
+    } else {
+        r.set("TWOSTEP", "0");
+        r.set("TWOSTEP_WRONG_CODE", "1");
+    }
+    r.finish("");
+    Ok(())
+}
+
+/// Turns two-step verification off.
+pub fn twostep_off() -> anyhow::Result<()> {
+    crate::config::remove_twostep()?;
+    let mut r = Report::default();
+    r.set("TWOSTEP", "0");
+    r.finish("Two-step verification is off.");
     Ok(())
 }

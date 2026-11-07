@@ -62,6 +62,7 @@ fn params(
         clipboard: rdpv_core::clipboard::ClipboardPolicy::off(),
         receive_dir: None,
         quality: rdpv_core::profiles::Quality::Balanced,
+        second_factor: None,
     })
 }
 

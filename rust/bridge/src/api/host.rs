@@ -250,6 +250,8 @@ impl ShareHost {
             password,
             data_dir: data_dir.into(),
             require_approval,
+            // Two-step verification is set up for always-on sharing only.
+            second_factor: None,
         };
         match rdpv_host::start(
             config,

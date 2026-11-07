@@ -576,6 +576,8 @@ fn wire__crate__api__session__RdpSession_start_impl(
             let api_download_dir = <String>::sse_decode(&mut deserializer);
             let api_idle_minutes = <u32>::sse_decode(&mut deserializer);
             let api_quality = <crate::api::session::PictureQuality>::sse_decode(&mut deserializer);
+            let api_share_screen = <bool>::sse_decode(&mut deserializer);
+            let api_auth_code = <String>::sse_decode(&mut deserializer);
             let api_sink = <StreamSink<
                 crate::api::session::SessionUpdate,
                 flutter_rust_bridge::for_generated::SseCodec,
@@ -611,6 +613,8 @@ fn wire__crate__api__session__RdpSession_start_impl(
                             api_download_dir,
                             api_idle_minutes,
                             api_quality,
+                            api_share_screen,
+                            api_auth_code,
                             api_sink,
                         );
                     })?;
@@ -789,6 +793,8 @@ fn wire__crate__api__session__RdpSession_start_with_saved_password_impl(
             let api_download_dir = <String>::sse_decode(&mut deserializer);
             let api_idle_minutes = <u32>::sse_decode(&mut deserializer);
             let api_quality = <crate::api::session::PictureQuality>::sse_decode(&mut deserializer);
+            let api_share_screen = <bool>::sse_decode(&mut deserializer);
+            let api_auth_code = <String>::sse_decode(&mut deserializer);
             let api_sink = <StreamSink<
                 crate::api::session::SessionUpdate,
                 flutter_rust_bridge::for_generated::SseCodec,
@@ -824,6 +830,8 @@ fn wire__crate__api__session__RdpSession_start_with_saved_password_impl(
                             api_download_dir,
                             api_idle_minutes,
                             api_quality,
+                            api_share_screen,
+                            api_auth_code,
                             api_sink,
                         );
                     })?;

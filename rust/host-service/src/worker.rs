@@ -42,6 +42,12 @@ pub fn run() -> anyhow::Result<()> {
             password,
             data_dir: data_dir.clone(),
             require_approval: false,
+            // Two-step verification (read at each sign-in, so turning it on
+            // or off applies at once).
+            second_factor: Some(std::sync::Arc::new(rdpv_host::totp::Gate::with_source(
+                Box::new(crate::config::load_twostep),
+                crate::config::twostep_devices_file()?,
+            ))),
         },
         &tx,
     )
@@ -55,6 +61,8 @@ pub fn run() -> anyhow::Result<()> {
             password: SecretString::new(rdpv_host::REQUEST_PASSWORD.to_owned()),
             data_dir,
             require_approval: true,
+            // The person at the computer decides; no code is asked here.
+            second_factor: None,
         },
         &tx,
     ) {

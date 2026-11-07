@@ -52,6 +52,7 @@ fn params_with(port: u16, password: &str, pin: Option<String>, quality: Quality)
         clipboard: rdpv_core::clipboard::ClipboardPolicy::off(),
         receive_dir: None,
         quality,
+        second_factor: None,
     }
 }
 
@@ -77,6 +78,14 @@ fn start_full<S: rdpv_host::FrameSource + Send + 'static>(
     source: S,
     require_approval: bool,
 ) -> Running {
+    start_gated(source, require_approval, None)
+}
+
+fn start_gated<S: rdpv_host::FrameSource + Send + 'static>(
+    source: S,
+    require_approval: bool,
+    second_factor: Option<Arc<rdpv_host::totp::Gate>>,
+) -> Running {
     let dir = tempfile::tempdir().expect("temp dir");
     let port = free_port();
     let password = test_password();
@@ -89,6 +98,7 @@ fn start_full<S: rdpv_host::FrameSource + Send + 'static>(
             password: SecretString::new(password.clone()),
             data_dir: dir.path().to_path_buf(),
             require_approval,
+            second_factor,
         },
         "127.0.0.1".parse().expect("ip"),
         source,
@@ -480,4 +490,61 @@ fn a_declined_request_is_reported_as_declined() {
     }
     // Declined is final: the viewer must not reconnect (and ask again) by itself.
     assert!(!ConnectionError::AccessDeclined.auto_reconnect_allowed());
+}
+
+/// Two-step verification end to end: the right password alone is refused
+/// with "code needed"; with the right code it connects; afterwards the same
+/// device is remembered and needs no code; another device still does.
+#[test]
+fn two_step_verification_asks_once_per_device() {
+    use rdpv_core::second_factor::SecondFactor;
+    use rdpv_host::totp::{Gate, Totp};
+
+    let gate_dir = tempfile::tempdir().expect("dir");
+    let totp = Totp::generate().expect("secret");
+    let gate = Arc::new(Gate::new(totp.clone(), gate_dir.path().join("devices.txt")));
+    let r = start_gated(SyntheticSource::new(640, 480), false, Some(gate));
+
+    let attempt = |device: u8, code: Option<String>| {
+        let mut p = params(r.port, &r.password, Some(r.fingerprint.clone()));
+        p.second_factor = Some(SecondFactor {
+            device: [device; rdpv_core::second_factor::DEVICE_ID_LEN],
+            code,
+        });
+        let mut s = connect(p).unwrap_or_else(|f| panic!("connect failed: {f:?}"));
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut updates = 0;
+        while Instant::now() < deadline && updates < 2 {
+            for e in s.poll().0 {
+                match e {
+                    SessionEvent::Updated(_) => updates += 1,
+                    SessionEvent::Ended(err) => return Err(err),
+                    _ => {}
+                }
+            }
+        }
+        Ok(updates)
+    };
+    let now_code = || {
+        let secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs());
+        totp.code_at_step(secs / 30)
+    };
+
+    assert_eq!(attempt(1, None), Err(Some(ConnectionError::CodeNeeded)));
+    assert!(
+        matches!(attempt(1, Some(now_code())), Ok(n) if n >= 2),
+        "right code connects"
+    );
+    assert!(
+        matches!(attempt(1, None), Ok(n) if n >= 2),
+        "the device is remembered"
+    );
+    assert_eq!(
+        attempt(2, None),
+        Err(Some(ConnectionError::CodeNeeded)),
+        "other device"
+    );
+    assert!(!ConnectionError::CodeNeeded.auto_reconnect_allowed());
 }

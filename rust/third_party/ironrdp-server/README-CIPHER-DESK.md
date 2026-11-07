@@ -26,3 +26,7 @@ Changes from 0.13.0:
   `ServerSetErrorInfo(ServerDeniedConnection)` as a Share Data PDU, so the
   viewer reports a refusal instead of a lost connection and does not
   reconnect by itself.
+- `server.rs`, `lib.rs`: `CookieCheck` / `set_cookie_check`: after the
+  password (CredSSP) is accepted, the client's Client Info cookie is checked
+  (two-step verification); a refused client gets
+  `ServerSetErrorInfo(ServerFreshCredentialsRequired)` and is closed.

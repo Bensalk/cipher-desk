@@ -112,9 +112,92 @@ pub fn unique_path(dir: &Path, name: &str) -> PathBuf {
     dir.join(name)
 }
 
+/// Size of the DROPFILES header that starts a CF_HDROP block.
+const DROPFILES_HEADER: usize = 20;
+
+/// Builds a CF_HDROP block: the DROPFILES header (file list right after it,
+/// wide characters) and the paths, each NUL-terminated, then a final NUL.
+pub fn build_dropfiles(paths: &[PathBuf]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(DROPFILES_HEADER + 64 * paths.len());
+    out.extend_from_slice(&(DROPFILES_HEADER as u32).to_le_bytes()); // pFiles
+    out.extend_from_slice(&0i32.to_le_bytes()); // pt.x
+    out.extend_from_slice(&0i32.to_le_bytes()); // pt.y
+    out.extend_from_slice(&0i32.to_le_bytes()); // fNC
+    out.extend_from_slice(&1i32.to_le_bytes()); // fWide
+    for p in paths {
+        for u in p.to_string_lossy().encode_utf16() {
+            out.extend_from_slice(&u.to_le_bytes());
+        }
+        out.extend_from_slice(&[0, 0]);
+    }
+    out.extend_from_slice(&[0, 0]);
+    out
+}
+
+/// Reads the paths from a CF_HDROP block (wide or ANSI), at most `max`.
+/// Damaged blocks give the paths read so far.
+pub fn parse_dropfiles(bytes: &[u8], max: usize) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    if bytes.len() < DROPFILES_HEADER {
+        return out;
+    }
+    let field = |i: usize| u32::from_le_bytes([bytes[i], bytes[i + 1], bytes[i + 2], bytes[i + 3]]);
+    let start = usize::try_from(field(0)).unwrap_or(usize::MAX);
+    let wide = field(16) != 0;
+    let Some(list) = bytes.get(start..) else {
+        return out;
+    };
+    if wide {
+        let units: Vec<u16> = list
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .collect();
+        for name in units.split(|&u| u == 0) {
+            if name.is_empty() || out.len() >= max {
+                break;
+            }
+            if let Ok(s) = String::from_utf16(name) {
+                out.push(PathBuf::from(s));
+            }
+        }
+    } else {
+        for name in list.split(|&b| b == 0) {
+            if name.is_empty() || out.len() >= max {
+                break;
+            }
+            out.push(PathBuf::from(String::from_utf8_lossy(name).into_owned()));
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn file_lists_round_trip() {
+        let paths = vec![
+            PathBuf::from(r"C:\Users\me\Report é.pdf"),
+            PathBuf::from(r"D:\data\b.xlsx"),
+        ];
+        let block = build_dropfiles(&paths);
+        assert_eq!(parse_dropfiles(&block, 100), paths);
+        assert_eq!(parse_dropfiles(&block, 1), paths[..1].to_vec());
+        assert!(parse_dropfiles(&block[..10], 100).is_empty());
+    }
+
+    #[test]
+    fn reads_ansi_file_lists() {
+        let mut block = vec![0u8; 20];
+        block[0] = 20; // pFiles
+        block.extend_from_slice(b"C:\\a.txt\0C:\\b.txt\0\0");
+        assert_eq!(
+            parse_dropfiles(&block, 100),
+            vec![PathBuf::from("C:\\a.txt"), PathBuf::from("C:\\b.txt")]
+        );
+    }
 
     #[test]
     fn rejects_unsafe_names() {

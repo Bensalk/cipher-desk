@@ -7,6 +7,10 @@
 //!   only, CF_UNICODETEXT, with a size cap).
 //! - Files the viewer sends arrive in a "Received" folder; files offered here
 //!   with [`ClipHandle::offer_files`] are downloaded by the viewer.
+//! - Copy and paste of files, like AnyDesk: files copied in Explorer here
+//!   (while a viewer is connected) are sent to the viewer and put on its
+//!   clipboard; files the viewer copies arrive here and are put on this
+//!   computer's clipboard, so Ctrl+V in Explorer pastes them.
 //!
 //! This is a `unsafe` module like [`crate::win`]: the Windows clipboard has no
 //! safe wrapper. Every call says why it is sound. File reads and writes use
@@ -16,7 +20,7 @@
 use std::collections::HashMap;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -60,6 +64,11 @@ struct Inner {
     incoming: Mutex<HashMap<u32, IncomingFile>>,
     /// Largest text accepted from the viewer, in bytes of UTF-16.
     max_bytes: usize,
+    /// Clipboard sequence number right after we put received files on it, so
+    /// the poller does not send them straight back.
+    own_seq: AtomicU32,
+    /// Files of the current incoming batch already written, for the clipboard.
+    batch: Mutex<Vec<PathBuf>>,
 }
 
 impl HostClipboard {
@@ -80,6 +89,8 @@ impl HostClipboard {
                 outgoing: Mutex::new(Vec::new()),
                 incoming: Mutex::new(HashMap::new()),
                 max_bytes,
+                own_seq: AtomicU32::new(0),
+                batch: Mutex::new(Vec::new()),
             }),
         }
     }
@@ -151,6 +162,29 @@ impl CliprdrBackendFactory for HostClipboard {
 
 impl CliprdrServerFactory for HostClipboard {}
 
+/// Sends the files copied here (Explorer) to the viewer, if the clipboard
+/// holds files. Returns whether it did.
+fn offer_copied_files(inner: &Inner) -> bool {
+    let Some(paths) = winclip::read_files() else {
+        return false;
+    };
+    // Files we received from the viewer and put there ourselves: not a new
+    // copy (sending them back would duplicate them on the viewer).
+    if paths.iter().all(|p| p.starts_with(&inner.receive_dir)) {
+        return true;
+    }
+    let files = xfer::offer(&paths);
+    if files.is_empty() {
+        return false;
+    }
+    let descriptors: Vec<FileDescriptor> = files.iter().map(|o| o.descriptor.clone()).collect();
+    if let Ok(mut out) = inner.outgoing.lock() {
+        *out = files;
+    }
+    inner.send(ClipboardMessage::SendInitiateFileCopy(descriptors));
+    true
+}
+
 /// Advertises to the viewer whether this computer's clipboard holds text.
 fn advertise(inner: &Inner) {
     let formats = if winclip::has_text() {
@@ -201,7 +235,16 @@ fn spawn_poller(inner: Arc<Inner>) -> Poller {
                 let seq = winclip::sequence_number();
                 if seq != prev {
                     prev = seq;
-                    advertise(&inner);
+                    // Files we just received and placed there: not a new copy.
+                    if seq == inner.own_seq.load(Ordering::Relaxed) {
+                        continue;
+                    }
+                    // Files copied here go to the viewer; otherwise text (or
+                    // nothing). Files already on the clipboard when the viewer
+                    // connected are not sent: only a new copy is.
+                    if !offer_copied_files(&inner) {
+                        advertise(&inner);
+                    }
                 }
             }
         })
@@ -302,6 +345,12 @@ impl CliprdrBackend for Backend {
                 continue;
             };
             if let Ok(mut map) = self.inner.incoming.lock() {
+                if map.is_empty() {
+                    // A new batch: what the clipboard gets once it has arrived.
+                    if let Ok(mut b) = self.inner.batch.lock() {
+                        b.clear();
+                    }
+                }
                 map.insert(stream_id, IncomingFile { name });
             }
             let requested_size = u32::try_from(size).unwrap_or(u32::MAX);
@@ -372,9 +421,12 @@ impl CliprdrBackend for Backend {
         if response.is_error() {
             return;
         }
-        let file = match self.inner.incoming.lock() {
-            Ok(mut map) => map.remove(&response.stream_id()),
-            Err(_) => None,
+        let (file, batch_done) = match self.inner.incoming.lock() {
+            Ok(mut map) => {
+                let f = map.remove(&response.stream_id());
+                (f, map.is_empty())
+            }
+            Err(_) => (None, false),
         };
         let Some(file) = file else {
             return;
@@ -384,10 +436,28 @@ impl CliprdrBackend for Backend {
         }
         let path = xfer::unique_path(&self.inner.receive_dir, &file.name);
         if std::fs::write(&path, response.data()).is_ok() {
+            if let Ok(mut b) = self.inner.batch.lock() {
+                b.push(path);
+            }
             let _ = self
                 .inner
                 .events
                 .send(HostEvent::FileReceived { name: file.name });
+        }
+        // The whole batch is here: put it on this computer's clipboard, so
+        // Ctrl+V in Explorer pastes the files.
+        if batch_done {
+            let paths = self
+                .inner
+                .batch
+                .lock()
+                .map(|b| b.clone())
+                .unwrap_or_default();
+            if !paths.is_empty() && winclip::write_files(&paths).is_ok() {
+                self.inner
+                    .own_seq
+                    .store(winclip::sequence_number(), Ordering::Relaxed);
+            }
         }
     }
 
@@ -422,6 +492,10 @@ mod winclip {
     };
 
     const CF_UNICODETEXT: u32 = 13;
+    /// A list of files (what Explorer puts there on Ctrl+C).
+    const CF_HDROP: u32 = 15;
+    /// Most files read from one copy (a guard against huge selections).
+    const MAX_FILES: usize = 1000;
 
     /// Opens the clipboard and closes it on drop.
     struct Guard;
@@ -487,6 +561,58 @@ mod winclip {
             }
             String::from_utf16(&buf).ok()
         }
+    }
+
+    /// The files on the clipboard (copied in Explorer), or `None` if it holds
+    /// no files.
+    pub fn read_files() -> Option<Vec<std::path::PathBuf>> {
+        // SAFETY: queries format availability only.
+        if unsafe { IsClipboardFormatAvailable(CF_HDROP).is_err() } {
+            return None;
+        }
+        let _guard = Guard::open().ok()?;
+        // SAFETY: the handle is owned by the clipboard and only read while it
+        // is open; the bytes are copied out (bounded by GlobalSize) before the
+        // lock is released, and parsed from the copy.
+        let bytes = unsafe {
+            let handle = GetClipboardData(CF_HDROP).ok()?;
+            if handle.is_invalid() {
+                return None;
+            }
+            let hg = HGLOBAL(handle.0);
+            let size = GlobalSize(hg);
+            let ptr = GlobalLock(hg) as *const u8;
+            if ptr.is_null() || size == 0 {
+                return None;
+            }
+            let v = core::slice::from_raw_parts(ptr, size).to_vec();
+            let _ = GlobalUnlock(hg);
+            v
+        };
+        let files = rdpv_core::xfer::parse_dropfiles(&bytes, MAX_FILES);
+        (!files.is_empty()).then_some(files)
+    }
+
+    /// Replaces the clipboard's contents with these files, so Ctrl+V in
+    /// Explorer copies them.
+    pub fn write_files(paths: &[std::path::PathBuf]) -> anyhow::Result<()> {
+        let bytes = rdpv_core::xfer::build_dropfiles(paths);
+        let _guard = Guard::open()?;
+        // SAFETY: as in `write_text`: fill a moveable block while locked, then
+        // hand it to the clipboard, which owns it on success.
+        unsafe {
+            EmptyClipboard().context("empty clipboard")?;
+            let hg =
+                GlobalAlloc(GMEM_MOVEABLE, bytes.len()).context("allocate clipboard memory")?;
+            let dst = GlobalLock(hg) as *mut u8;
+            if dst.is_null() {
+                anyhow::bail!("lock clipboard memory");
+            }
+            core::ptr::copy_nonoverlapping(bytes.as_ptr(), dst, bytes.len());
+            let _ = GlobalUnlock(hg);
+            SetClipboardData(CF_HDROP, Some(HANDLE(hg.0))).context("set clipboard data")?;
+        }
+        Ok(())
     }
 
     /// Replaces the clipboard's contents with `text`.

@@ -96,6 +96,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Authenticator codes typed after a host asked for one, used once by the
+  /// next connection to that profile.
+  final Map<String, String> _authCodes = {};
+
   Future<void> _connect(ConnectionProfile p) async {
     String? password;
     var useSaved = false;
@@ -144,6 +148,8 @@ class _HomeScreenState extends State<HomeScreen> {
           pinsPath: paths.pins,
           idleMinutes: widget.settings.idleMinutes,
           onOutcome: (outcome) => widget.store.addHistory(p.id, outcome, DateTime.now()),
+          authCode: _authCodes.remove(p.id) ?? '',
+          onAuthCode: (code) => _authCodes[p.id] = code,
           onQualityChanged: (quality) {
             final current = widget.store.byId(p.id);
             if (current != null) widget.store.upsert(current.copyWith(quality: quality));

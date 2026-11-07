@@ -11,6 +11,7 @@ class HostServiceStatus {
     this.username,
     this.port,
     this.fingerprint,
+    this.twoStep = false,
   });
 
   final bool installed;
@@ -18,6 +19,9 @@ class HostServiceStatus {
   final String? username;
   final int? port;
   final String? fingerprint;
+
+  /// Two-step verification (authenticator app) is on.
+  final bool twoStep;
 
   static const none = HostServiceStatus(installed: false, running: false);
 }
@@ -80,6 +84,7 @@ class HostService {
       username: m['USERNAME'],
       port: int.tryParse(m['PORT'] ?? ''),
       fingerprint: m['FINGERPRINT'],
+      twoStep: m['TWOSTEP'] == '1',
     );
   }
 
@@ -152,6 +157,30 @@ class HostService {
   static Future<String?> showPassword() async {
     await _elevated('show-password');
     return (await _readResult())['PASSWORD'];
+  }
+
+  /// Starts two-step verification setup: returns the setup key to type into
+  /// the authenticator app (and the account name it shows), or null.
+  static Future<(String key, String account)?> beginTwoStep() async {
+    await _elevated('twostep-begin');
+    final m = await _readResult();
+    final key = m['TWOSTEP_KEY'];
+    if (key == null || key.isEmpty) return null;
+    return (key, m['TWOSTEP_ACCOUNT'] ?? 'this computer');
+  }
+
+  /// Confirms setup with a code from the app; true when two-step is now on.
+  static Future<bool> finishTwoStep(String code) async {
+    final digits = code.replaceAll(RegExp(r'\D'), '');
+    if (digits.length != 6) return false;
+    await _elevated('twostep-finish $digits');
+    return (await _readResult())['TWOSTEP'] == '1';
+  }
+
+  /// Turns two-step verification off.
+  static Future<void> twoStepOff() async {
+    await _elevated('twostep-off');
+    await _readResult();
   }
 
   /// Sets a password the user typed. The app machine-encrypts it to a pending
