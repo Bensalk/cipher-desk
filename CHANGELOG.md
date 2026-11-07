@@ -2,6 +2,14 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.2.6 (7 Nov 2026, test release)
+
+Builds on v0.2.5. The About screen shows **0.2.6**.
+
+- Share screen on Windows: the Cipher Desk window on the shared computer now
+  really shows up for the viewer. In v0.2.4 and v0.2.5 it could still stay
+  hidden from the picture (while taking clicks) when the app had just started.
+
 ## v0.2.5 (7 Nov 2026, test release)
 
 Builds on v0.2.4. The About screen shows **0.2.5**.

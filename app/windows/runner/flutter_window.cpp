@@ -32,8 +32,10 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
 
-  // Protected until Dart says otherwise (same default as the setting).
-  SetWindowDisplayAffinity(GetHandle(), WDA_EXCLUDEFROMCAPTURE);
+  // Visible to screen capture until Dart turns protection on (only while a
+  // remote session is shown). Not protected by default: Dart's first call can
+  // arrive before the handler below exists and be lost, and a protected window
+  // on a shared computer is invisible to the viewer but still takes clicks.
   secure_channel_ =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           flutter_controller_->engine()->messenger(), "rdpv/secure_window",
