@@ -8,7 +8,7 @@ import 'errors.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 
-            // These functions are ignored because they are not marked as `pub`: `approval`, `changed`, `clamped`, `disconnect`, `drive`, `ended`, `file_received`, `frame_ready`, `frame`, `from_core`, `keep_running`, `new`, `offer_local_clipboard`, `pause`, `pending_disconnect`, `policy`, `poll`, `reconnect`, `reconnecting`, `region_pixels`, `remote_clipboard`, `resized`, `run`, `send_files`, `send_input`, `send`, `size`, `spawn`, `status`, `to_core`, `union`, `vnc`, `wait_for_approval`
+            // These functions are ignored because they are not marked as `pub`: `approval`, `changed`, `clamped`, `describe_files`, `disconnect`, `drive`, `ended`, `file_received`, `frame_ready`, `frame`, `from_core`, `keep_running`, `new`, `offer_local_clipboard`, `pause`, `pending_disconnect`, `policy`, `poll`, `reconnect`, `reconnecting`, `region_pixels`, `remote_clipboard`, `resized`, `run`, `send_files`, `send_input`, `send`, `size`, `spawn`, `status`, `to_core`, `union`, `vnc`, `wait_for_approval`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Command`, `Drive`, `Reconnect`, `Remote`, `Target`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`
 
@@ -180,6 +180,9 @@ remoteClipboard,
 remoteClipboardTooLarge,
 /// A file sent by the remote finished arriving (`text` = its name).
 fileReceived,
+/// Files copied on the remote started arriving; `text` says how many and
+/// how big (e.g. "3 files, 1.2 GB").
+filesIncoming,
 /// The network dropped; reconnect attempt `x` of `y` is under way (`label`).
 /// Input is ignored until `Status` with `connected` arrives again.
 reconnecting,

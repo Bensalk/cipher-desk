@@ -2773,7 +2773,8 @@ impl SseDecode for crate::api::session::UpdateKind {
             6 => crate::api::session::UpdateKind::RemoteClipboard,
             7 => crate::api::session::UpdateKind::RemoteClipboardTooLarge,
             8 => crate::api::session::UpdateKind::FileReceived,
-            9 => crate::api::session::UpdateKind::Reconnecting,
+            9 => crate::api::session::UpdateKind::FilesIncoming,
+            10 => crate::api::session::UpdateKind::Reconnecting,
             _ => unreachable!("Invalid variant for UpdateKind: {}", inner),
         };
     }
@@ -3331,7 +3332,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::session::UpdateKind {
             Self::RemoteClipboard => 6.into_dart(),
             Self::RemoteClipboardTooLarge => 7.into_dart(),
             Self::FileReceived => 8.into_dart(),
-            Self::Reconnecting => 9.into_dart(),
+            Self::FilesIncoming => 9.into_dart(),
+            Self::Reconnecting => 10.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -3868,7 +3870,8 @@ impl SseEncode for crate::api::session::UpdateKind {
                 crate::api::session::UpdateKind::RemoteClipboard => 6,
                 crate::api::session::UpdateKind::RemoteClipboardTooLarge => 7,
                 crate::api::session::UpdateKind::FileReceived => 8,
-                crate::api::session::UpdateKind::Reconnecting => 9,
+                crate::api::session::UpdateKind::FilesIncoming => 9,
+                crate::api::session::UpdateKind::Reconnecting => 10,
                 _ => {
                     unimplemented!("");
                 }

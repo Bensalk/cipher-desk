@@ -13,15 +13,14 @@
 //!   ([`ConnectionError`]); raw library text is only used for classification.
 
 use core::time::Duration;
-use std::collections::HashMap;
 use std::io::{self, Write as _};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs as _};
 use std::path::PathBuf;
 
 use ironrdp_blocking::Framed;
 use ironrdp_cliprdr::pdu::{
-    ClipboardFormat, ClipboardFormatId, FileContentsFlags, FileContentsRequest,
-    FileContentsResponse, FileDescriptor, OwnedFormatDataResponse,
+    ClipboardFormat, ClipboardFormatId, FileContentsResponse, FileDescriptor,
+    OwnedFormatDataResponse,
 };
 use ironrdp_cliprdr::CliprdrClient;
 use ironrdp_connector::connection_activation::{
@@ -131,8 +130,11 @@ pub enum SessionEvent {
     RemoteClipboardText(String),
     /// Text copied on the host was larger than the policy allows and was dropped.
     RemoteClipboardTooLarge,
-    /// A file sent by the remote finished arriving in the receive folder.
-    /// `path` is where it was saved (the name may have " (1)" added).
+    /// Files or a folder copied on the remote started arriving.
+    FilesIncoming { files: usize, bytes: u64 },
+    /// A file or folder copied on the remote finished arriving in the
+    /// receive folder (one event per top-level item). `path` is where it was
+    /// saved (the name may have " (1)" added).
     FileReceived { name: String, path: PathBuf },
 }
 
@@ -149,26 +151,6 @@ pub enum ClipboardOffer {
     Unchanged,
 }
 
-/// Reads up to `len` bytes of `path` from `position`, for serving a file the
-/// remote is downloading. `None` if the file cannot be read.
-fn read_file_range(path: &std::path::Path, position: u64, len: u64) -> Option<Vec<u8>> {
-    use std::io::{Read as _, Seek as _, SeekFrom};
-    let mut f = std::fs::File::open(path).ok()?;
-    f.seek(SeekFrom::Start(position)).ok()?;
-    let cap = len.min(crate::xfer::MAX_FILE_BYTES);
-    let mut buf = vec![0u8; usize::try_from(cap).ok()?];
-    let mut read = 0usize;
-    while read < buf.len() {
-        match f.read(&mut buf[read..]) {
-            Ok(0) => break,
-            Ok(n) => read += n,
-            Err(_) => return None,
-        }
-    }
-    buf.truncate(read);
-    Some(buf)
-}
-
 /// Clipboard state for one session.
 struct ClipState {
     policy: ClipboardPolicy,
@@ -182,8 +164,8 @@ struct ClipState {
     receive_dir: Option<PathBuf>,
     /// Files this device currently offers to the remote, as advertised.
     outgoing: Vec<crate::xfer::Outgoing>,
-    /// Files arriving from the remote, keyed by stream id → name.
-    incoming: HashMap<u32, String>,
+    /// Files arriving from the remote (one copy at a time, in pieces).
+    receiving: Option<crate::xfer::Receiver>,
 }
 
 /// An open RDP session.
@@ -252,7 +234,7 @@ pub fn connect(params: ConnectParams) -> Result<Session, ConnectFailure> {
             ready: false,
             receive_dir,
             outgoing: Vec::new(),
-            incoming: HashMap::new(),
+            receiving: None,
         })
     } else {
         None
@@ -497,6 +479,41 @@ impl Session {
         self.send_svc(msgs)
     }
 
+    /// Carries out a step of receiving files: ask for the next piece, or
+    /// report the finished items.
+    fn receive_step(
+        &mut self,
+        step: crate::xfer::Step,
+        events: &mut Vec<SessionEvent>,
+    ) -> Result<(), ConnectionError> {
+        match step {
+            crate::xfer::Step::Request(req) => {
+                let msgs = self
+                    .stage
+                    .get_svc_processor_mut::<CliprdrClient>()
+                    .ok_or(ConnectionError::Unexpected)?
+                    .request_file_contents(req)
+                    .map_err(|_| ConnectionError::Unexpected)?;
+                self.send_svc(msgs)
+            }
+            crate::xfer::Step::Done(top_level) => {
+                if let Some(clip) = self.clip.as_mut() {
+                    clip.receiving = None;
+                }
+                for path in top_level {
+                    if path.exists() {
+                        let name = path
+                            .file_name()
+                            .map(|n| n.to_string_lossy().into_owned())
+                            .unwrap_or_default();
+                        events.push(SessionEvent::FileReceived { name, path });
+                    }
+                }
+                Ok(())
+            }
+        }
+    }
+
     /// Tells the host which formats this device offers (plain text or nothing).
     fn advertise_local(&mut self) -> Result<(), ConnectionError> {
         let offer_text = self
@@ -623,64 +640,36 @@ impl Session {
                     clip_data_id,
                 } => {
                     if policy.host_to_local {
-                        // Record each file and build its request while `clip` is
-                        // borrowed; send the requests afterwards.
-                        let mut requests = Vec::new();
-                        for (i, (name, size)) in files.iter().enumerate() {
-                            let Some(name) = crate::xfer::safe_file_name(name) else {
-                                continue;
-                            };
-                            if *size > crate::xfer::MAX_FILE_BYTES {
-                                continue;
+                        if let Some(dir) = clip.receive_dir.clone() {
+                            // A new copy replaces one still arriving.
+                            clip.receiving = None;
+                            let (rx, step) =
+                                crate::xfer::Receiver::start(files, clip_data_id, &dir);
+                            let count = rx.file_count();
+                            if count > 0 {
+                                events.push(SessionEvent::FilesIncoming {
+                                    files: count,
+                                    bytes: rx.total_bytes,
+                                });
                             }
-                            let (Ok(stream_id), Ok(index)) = (u32::try_from(i), i32::try_from(i))
-                            else {
-                                continue;
-                            };
-                            clip.incoming.insert(stream_id, name);
-                            requests.push(FileContentsRequest {
-                                stream_id,
-                                index,
-                                flags: FileContentsFlags::RANGE,
-                                position: 0,
-                                requested_size: u32::try_from(*size).unwrap_or(u32::MAX),
-                                data_id: clip_data_id,
-                            });
-                        }
-                        for req in requests {
-                            let msgs = self
-                                .stage
-                                .get_svc_processor_mut::<CliprdrClient>()
-                                .ok_or(ConnectionError::Unexpected)?
-                                .request_file_contents(req)
-                                .map_err(|_| ConnectionError::Unexpected)?;
-                            self.send_svc(msgs)?;
+                            clip.receiving = Some(rx);
+                            self.receive_step(step, events)?;
                         }
                     }
                 }
                 ClipAction::FileRequest(request) => {
-                    let found = if policy.local_to_host {
-                        usize::try_from(request.index)
-                            .ok()
-                            .and_then(|i| clip.outgoing.get(i))
-                            .map(|o| (o.path.clone(), o.size))
+                    let answer = if policy.local_to_host {
+                        crate::xfer::answer(&clip.outgoing, &request)
                     } else {
                         None
                     };
-                    let response = match found {
-                        Some((_path, size)) if request.flags.contains(FileContentsFlags::SIZE) => {
+                    let response = match answer {
+                        Some(crate::xfer::FileContentsAnswer::Size(size)) => {
                             FileContentsResponse::new_size_response(request.stream_id, size)
                         }
-                        Some((path, _)) => match read_file_range(
-                            &path,
-                            request.position,
-                            u64::from(request.requested_size),
-                        ) {
-                            Some(bytes) => {
-                                FileContentsResponse::new_data_response(request.stream_id, bytes)
-                            }
-                            None => FileContentsResponse::new_error(request.stream_id),
-                        },
+                        Some(crate::xfer::FileContentsAnswer::Data(bytes)) => {
+                            FileContentsResponse::new_data_response(request.stream_id, bytes)
+                        }
                         None => FileContentsResponse::new_error(request.stream_id),
                     };
                     let msgs = self
@@ -692,17 +681,12 @@ impl Session {
                     self.send_svc(msgs)?;
                 }
                 ClipAction::FileData { stream_id, bytes } => {
-                    if policy.host_to_local {
-                        let name = clip.incoming.remove(&stream_id);
-                        let dir = clip.receive_dir.clone();
-                        if let (Some(name), Some(dir), Some(bytes)) = (name, dir, bytes) {
-                            if std::fs::create_dir_all(&dir).is_ok() {
-                                let path = crate::xfer::unique_path(&dir, &name);
-                                if std::fs::write(&path, &bytes).is_ok() {
-                                    events.push(SessionEvent::FileReceived { name, path });
-                                }
-                            }
-                        }
+                    let step = clip
+                        .receiving
+                        .as_mut()
+                        .and_then(|rx| rx.on_data(stream_id, bytes.as_deref()));
+                    if let Some(step) = step {
+                        self.receive_step(step, events)?;
                     }
                 }
             }

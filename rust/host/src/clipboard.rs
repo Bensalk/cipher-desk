@@ -17,8 +17,6 @@
 //! plain `std::fs`.
 #![allow(unsafe_code)]
 
-use std::collections::HashMap;
-use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
@@ -28,8 +26,8 @@ use std::time::Duration;
 use ironrdp_cliprdr::backend::{ClipboardMessage, CliprdrBackend, CliprdrBackendFactory};
 use ironrdp_cliprdr::pdu::{
     ClipboardFormat, ClipboardFormatId, ClipboardFormatName, ClipboardGeneralCapabilityFlags,
-    FileContentsFlags, FileContentsRequest, FileContentsResponse, FileDescriptor,
-    FormatDataRequest, FormatDataResponse, LockDataId, OwnedFormatDataResponse,
+    FileContentsRequest, FileContentsResponse, FileDescriptor, FormatDataRequest,
+    FormatDataResponse, LockDataId, OwnedFormatDataResponse,
 };
 use ironrdp_server::{CliprdrServerFactory, ServerEvent, ServerEventSender};
 use rdpv_core::xfer;
@@ -46,11 +44,6 @@ pub struct HostClipboard {
     inner: Arc<Inner>,
 }
 
-/// A file the viewer is sending, mid-arrival.
-struct IncomingFile {
-    name: String,
-}
-
 struct Inner {
     sender: Mutex<Option<UnboundedSender<ServerEvent>>>,
     events: std::sync::mpsc::Sender<HostEvent>,
@@ -60,15 +53,13 @@ struct Inner {
     receive_dir_str: String,
     /// Files currently offered to the viewer, indexed as advertised.
     outgoing: Mutex<Vec<xfer::Outgoing>>,
-    /// Files arriving from the viewer, keyed by stream id.
-    incoming: Mutex<HashMap<u32, IncomingFile>>,
+    /// Files and folders arriving from the viewer, in pieces.
+    receiving: Mutex<Option<xfer::Receiver>>,
     /// Largest text accepted from the viewer, in bytes of UTF-16.
     max_bytes: usize,
     /// Clipboard sequence number right after we put received files on it, so
     /// the poller does not send them straight back.
     own_seq: AtomicU32,
-    /// Files of the current incoming batch already written, for the clipboard.
-    batch: Mutex<Vec<PathBuf>>,
 }
 
 impl HostClipboard {
@@ -87,10 +78,9 @@ impl HostClipboard {
                 receive_dir,
                 receive_dir_str,
                 outgoing: Mutex::new(Vec::new()),
-                incoming: Mutex::new(HashMap::new()),
+                receiving: Mutex::new(None),
                 max_bytes,
                 own_seq: AtomicU32::new(0),
-                batch: Mutex::new(Vec::new()),
             }),
         }
     }
@@ -135,11 +125,33 @@ impl Inner {
         }
     }
 
-    /// Path and size of the file offered at `index`, if any.
-    fn offered(&self, index: i32) -> Option<(PathBuf, u64)> {
-        let i = usize::try_from(index).ok()?;
-        let out = self.outgoing.lock().ok()?;
-        out.get(i).map(|o| (o.path.clone(), o.size))
+    /// Carries out a step of receiving: ask for the next piece, or, when
+    /// everything is here, put it on this computer's clipboard (Ctrl+V in
+    /// Explorer pastes it) and tell the app.
+    fn receive_step(&self, step: xfer::Step) {
+        match step {
+            xfer::Step::Request(req) => self.send(ClipboardMessage::SendFileContentsRequest(req)),
+            xfer::Step::Done(top_level) => {
+                if let Ok(mut r) = self.receiving.lock() {
+                    *r = None;
+                }
+                let done: Vec<PathBuf> = top_level.into_iter().filter(|p| p.exists()).collect();
+                if done.is_empty() {
+                    return;
+                }
+                if winclip::write_files(&done).is_ok() {
+                    self.own_seq
+                        .store(winclip::sequence_number(), Ordering::Relaxed);
+                }
+                for p in done {
+                    let name = p
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_default();
+                    let _ = self.events.send(HostEvent::FileReceived { name });
+                }
+            }
+        }
     }
 }
 
@@ -193,24 +205,6 @@ fn advertise(inner: &Inner) {
         Vec::new()
     };
     inner.send(ClipboardMessage::SendInitiateCopy(formats));
-}
-
-/// Reads up to `len` bytes of `path` starting at `position`.
-fn read_range(path: &std::path::Path, position: u64, len: u64) -> Option<Vec<u8>> {
-    let mut f = std::fs::File::open(path).ok()?;
-    f.seek(SeekFrom::Start(position)).ok()?;
-    let cap = len.min(xfer::MAX_FILE_BYTES);
-    let mut buf = vec![0u8; usize::try_from(cap).ok()?];
-    let mut read = 0usize;
-    while read < buf.len() {
-        match f.read(&mut buf[read..]) {
-            Ok(0) => break,
-            Ok(n) => read += n,
-            Err(_) => return None,
-        }
-    }
-    buf.truncate(read);
-    Some(buf)
 }
 
 /// Watches this computer's clipboard and re-advertises when it changes, so a
@@ -329,42 +323,22 @@ impl CliprdrBackend for Backend {
     }
 
     fn on_remote_file_list(&mut self, files: &[FileDescriptor], clip_data_id: Option<u32>) {
-        // The viewer is sending files: request each one's bytes in one range.
-        for (i, fd) in files.iter().enumerate() {
-            let Some(name) = xfer::safe_file_name(&fd.name) else {
-                continue;
+        // The viewer is sending files and folders: receive them in pieces.
+        let items = files
+            .iter()
+            .map(xfer::RemoteItem::from_descriptor)
+            .collect();
+        let step = {
+            let Ok(mut r) = self.inner.receiving.lock() else {
+                return;
             };
-            let size = fd.file_size.unwrap_or(0);
-            if size > xfer::MAX_FILE_BYTES {
-                continue;
-            }
-            let Ok(stream_id) = u32::try_from(i) else {
-                continue;
-            };
-            let Ok(index) = i32::try_from(i) else {
-                continue;
-            };
-            if let Ok(mut map) = self.inner.incoming.lock() {
-                if map.is_empty() {
-                    // A new batch: what the clipboard gets once it has arrived.
-                    if let Ok(mut b) = self.inner.batch.lock() {
-                        b.clear();
-                    }
-                }
-                map.insert(stream_id, IncomingFile { name });
-            }
-            let requested_size = u32::try_from(size).unwrap_or(u32::MAX);
-            self.inner.send(ClipboardMessage::SendFileContentsRequest(
-                FileContentsRequest {
-                    stream_id,
-                    index,
-                    flags: FileContentsFlags::RANGE,
-                    position: 0,
-                    requested_size,
-                    data_id: clip_data_id,
-                },
-            ));
-        }
+            // A new copy replaces one still arriving.
+            *r = None;
+            let (rx, step) = xfer::Receiver::start(items, clip_data_id, &self.inner.receive_dir);
+            *r = Some(rx);
+            step
+        };
+        self.inner.receive_step(step);
     }
 
     fn on_format_data_request(&mut self, request: FormatDataRequest) {
@@ -397,18 +371,19 @@ impl CliprdrBackend for Backend {
     }
 
     fn on_file_contents_request(&mut self, request: FileContentsRequest) {
-        // The viewer is downloading a file we offered.
-        let response = match self.inner.offered(request.index) {
-            Some((_path, size)) if request.flags.contains(FileContentsFlags::SIZE) => {
+        // The viewer is downloading (a piece of) a file we offered.
+        let answer = self
+            .inner
+            .outgoing
+            .lock()
+            .ok()
+            .and_then(|out| xfer::answer(&out, &request));
+        let response = match answer {
+            Some(xfer::FileContentsAnswer::Size(size)) => {
                 FileContentsResponse::new_size_response(request.stream_id, size)
             }
-            Some((path, _)) => {
-                match read_range(&path, request.position, u64::from(request.requested_size)) {
-                    Some(bytes) => {
-                        FileContentsResponse::new_data_response(request.stream_id, bytes)
-                    }
-                    None => FileContentsResponse::new_error(request.stream_id),
-                }
+            Some(xfer::FileContentsAnswer::Data(bytes)) => {
+                FileContentsResponse::new_data_response(request.stream_id, bytes)
             }
             None => FileContentsResponse::new_error(request.stream_id),
         };
@@ -417,47 +392,16 @@ impl CliprdrBackend for Backend {
     }
 
     fn on_file_contents_response(&mut self, response: FileContentsResponse<'_>) {
-        // A file we requested from the viewer arrived whole; write it.
-        if response.is_error() {
-            return;
-        }
-        let (file, batch_done) = match self.inner.incoming.lock() {
-            Ok(mut map) => {
-                let f = map.remove(&response.stream_id());
-                (f, map.is_empty())
-            }
-            Err(_) => (None, false),
+        // A piece of a file we asked the viewer for.
+        let data = (!response.is_error()).then(|| response.data());
+        let step = match self.inner.receiving.lock() {
+            Ok(mut r) => r
+                .as_mut()
+                .and_then(|rx| rx.on_data(response.stream_id(), data)),
+            Err(_) => None,
         };
-        let Some(file) = file else {
-            return;
-        };
-        if std::fs::create_dir_all(&self.inner.receive_dir).is_err() {
-            return;
-        }
-        let path = xfer::unique_path(&self.inner.receive_dir, &file.name);
-        if std::fs::write(&path, response.data()).is_ok() {
-            if let Ok(mut b) = self.inner.batch.lock() {
-                b.push(path);
-            }
-            let _ = self
-                .inner
-                .events
-                .send(HostEvent::FileReceived { name: file.name });
-        }
-        // The whole batch is here: put it on this computer's clipboard, so
-        // Ctrl+V in Explorer pastes the files.
-        if batch_done {
-            let paths = self
-                .inner
-                .batch
-                .lock()
-                .map(|b| b.clone())
-                .unwrap_or_default();
-            if !paths.is_empty() && winclip::write_files(&paths).is_ok() {
-                self.inner
-                    .own_seq
-                    .store(winclip::sequence_number(), Ordering::Relaxed);
-            }
+        if let Some(step) = step {
+            self.inner.receive_step(step);
         }
     }
 
@@ -641,7 +585,7 @@ mod winclip {
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_unicode_text, read_range};
+    use super::decode_unicode_text;
 
     #[test]
     fn decodes_utf16_with_terminator() {
@@ -653,18 +597,5 @@ mod tests {
         assert_eq!(decode_unicode_text(&bytes).as_deref(), Some("héllo 😀"));
         assert_eq!(decode_unicode_text(&[0x41]), None); // odd length
         assert_eq!(decode_unicode_text(&[0x00, 0xD8]), None); // lone surrogate
-    }
-
-    #[test]
-    fn read_range_reads_a_slice() {
-        let dir = std::env::temp_dir().join(format!("cd-clip-{}", std::process::id()));
-        let _ = std::fs::create_dir_all(&dir);
-        let p = dir.join("f.bin");
-        if std::fs::write(&p, b"0123456789").is_err() {
-            return;
-        }
-        assert_eq!(read_range(&p, 2, 3).as_deref(), Some(&b"234"[..]));
-        assert_eq!(read_range(&p, 8, 100).as_deref(), Some(&b"89"[..]));
-        let _ = std::fs::remove_dir_all(&dir);
     }
 }

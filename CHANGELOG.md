@@ -2,6 +2,17 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.2.9 (7 Nov 2026, test release)
+
+Builds on v0.2.8. The About screen shows **0.2.9**.
+
+- File copy and paste now handles **folders** (with everything inside them)
+  and **files of any size**. Files travel in small pieces written straight to
+  disk, like AnyDesk, so large downloads and .zip files work too. The viewer
+  shows "Receiving … from the remote computer" with the number and size of the
+  files; paste with Ctrl+V once they have arrived. An unfinished file is never
+  left behind if the copy stops half-way.
+
 ## v0.2.8 (7 Nov 2026, test release)
 
 Builds on v0.2.7. The About screen shows **0.2.8**.

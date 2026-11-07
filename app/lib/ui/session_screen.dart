@@ -227,8 +227,9 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(files.length == 1
           ? 'Copying "${files.first.split(Platform.pathSeparator).last}" to the remote computer. '
-              'Paste it there with Ctrl+V.'
-          : 'Copying ${files.length} files to the remote computer. Paste them there with Ctrl+V.'),
+              'Paste it there with Ctrl+V when it has arrived.'
+          : 'Copying ${files.length} items to the remote computer. '
+              'Paste them there with Ctrl+V when they have arrived.'),
     ));
   }
 
@@ -410,6 +411,12 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Text copied on the remote computer was larger than 1 MB and was not copied.'),
+        ));
+      case UpdateKind.filesIncoming:
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Receiving ${u.text ?? 'files'} from the remote computer…'),
+          duration: const Duration(seconds: 6),
         ));
       case UpdateKind.fileReceived:
         if (!mounted) return;

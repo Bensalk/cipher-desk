@@ -82,9 +82,9 @@ pub(crate) enum ClipAction {
     DataReceived(Option<Vec<u8>>),
     /// The host offered files; pull the list from this format id.
     RemoteFiles(ClipboardFormatId),
-    /// A parsed file list arrived: (name, size) per file, with an optional lock id.
+    /// A parsed file list arrived (files and folders), with an optional lock id.
     FileList {
-        files: Vec<(String, u64)>,
+        files: Vec<crate::xfer::RemoteItem>,
         clip_data_id: Option<u32>,
     },
     /// The host wants the bytes of a file we offered.
@@ -164,7 +164,7 @@ impl CliprdrBackend for QueueBackend {
     fn on_remote_file_list(&mut self, files: &[FileDescriptor], clip_data_id: Option<u32>) {
         let list = files
             .iter()
-            .map(|f| (f.name.clone(), f.file_size.unwrap_or(0)))
+            .map(crate::xfer::RemoteItem::from_descriptor)
             .collect();
         self.push(ClipAction::FileList {
             files: list,

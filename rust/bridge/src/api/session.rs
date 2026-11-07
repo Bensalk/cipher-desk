@@ -50,6 +50,9 @@ pub enum UpdateKind {
     RemoteClipboardTooLarge,
     /// A file sent by the remote finished arriving (`text` = its name).
     FileReceived,
+    /// Files copied on the remote started arriving; `text` says how many and
+    /// how big (e.g. "3 files, 1.2 GB").
+    FilesIncoming,
     /// The network dropped; reconnect attempt `x` of `y` is under way (`label`).
     /// Input is ignored until `Status` with `connected` arrives again.
     Reconnecting,
@@ -1001,6 +1004,12 @@ fn drive(
                 SessionEvent::RemoteClipboardTooLarge => {
                     send(SessionUpdate::new(UpdateKind::RemoteClipboardTooLarge));
                 }
+                SessionEvent::FilesIncoming { files, bytes } => {
+                    send(SessionUpdate {
+                        text: Some(describe_files(files, bytes)),
+                        ..SessionUpdate::new(UpdateKind::FilesIncoming)
+                    });
+                }
                 SessionEvent::FileReceived { name, path } => {
                     send(SessionUpdate::file_received(
                         name,
@@ -1030,6 +1039,25 @@ fn drive(
             }
         }
     }
+}
+
+/// "1 file, 12 KB" / "3 files, 1.2 GB".
+fn describe_files(files: usize, bytes: u64) -> String {
+    let count = if files == 1 {
+        "1 file".to_owned()
+    } else {
+        format!("{files} files")
+    };
+    #[allow(clippy::cast_precision_loss)]
+    let b = bytes as f64;
+    let size = if b >= 1e9 {
+        format!("{:.1} GB", b / 1e9)
+    } else if b >= 1e6 {
+        format!("{:.1} MB", b / 1e6)
+    } else {
+        format!("{} KB", bytes.div_ceil(1000))
+    };
+    format!("{count}, {size}")
 }
 
 /// Shortest time between two screen updates sent to the UI (about 30 per second).
