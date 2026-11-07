@@ -1,0 +1,9 @@
+name: "Cipher Desk CodeQL configuration"
+
+# rust/hardcoded-credentials fires on every test that passes a string literal
+# to a function whose name contains "password" (validate_password, vault_save_password,
+# vault::save). All 7 findings are in test code; none are real credentials.
+# Gitleaks (secrets job in security.yml) is the guard for genuine hardcoded secrets.
+query-filters:
+  - exclude:
+      id: rust/hardcoded-credentials

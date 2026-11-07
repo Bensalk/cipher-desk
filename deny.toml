@@ -17,6 +17,7 @@ ignore = [
   # performs no RSA private-key operations.
   # Re-review when smart-card/certificate login is added or when a patched rsa ships.
   { id = "RUSTSEC-2023-0071", reason = "Client performs RSA public-key ops only; no private keys. See docs/SECURITY_REVIEW.md." },
+  { crate = "async-executor@1.14.0", reason = "Yanked without a security advisory (no CVE/RUSTSEC). Transitive dep via zbus; fix needs cargo update." },
 ]
 
 [licenses]
@@ -40,7 +41,6 @@ multiple-versions = "warn"
 wildcards = "deny"
 # The workspace's own path dependencies have no version requirement.
 allow-wildcard-paths = true
-
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
