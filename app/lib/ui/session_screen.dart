@@ -174,6 +174,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   String _receiveDir = '';
   final List<String> _receivedBatch = [];
   DateTime? _lastReceived;
+  Timer? _receivedBatchTimer;
   bool get _sendsClipboard =>
       widget.profile.method.supportsClipboard &&
       (widget.profile.clipboardMode == ClipboardMode.both ||
@@ -254,10 +255,18 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     ));
   }
 
+  /// How long to wait, after the last file of a batch lands, before putting
+  /// the batch on the clipboard. Several files (or a folder) arrive as
+  /// separate events close together; writing the clipboard again for each one
+  /// can land mid-paste if the user is quick, which Explorer shows as
+  /// "The object invoked has disconnected from its clients." Waiting for the
+  /// batch to go quiet first means Explorer only ever sees one, complete write.
+  static const _receivedBatchSettle = Duration(milliseconds: 600);
+
   /// Puts files received from the remote on this computer's clipboard, so
   /// Ctrl+V in a folder pastes them. Files arriving close together form one
-  /// batch, pasted together.
-  Future<void> _putReceivedOnClipboard(String path) async {
+  /// batch, pasted together once no more have arrived for a short while.
+  void _putReceivedOnClipboard(String path) {
     if (!FileClipboard.supported) return;
     final now = DateTime.now();
     final last = _lastReceived;
@@ -266,11 +275,15 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     }
     _lastReceived = now;
     _receivedBatch.add(path);
-    final seq = await FileClipboard.writeFiles(List.of(_receivedBatch));
-    if (seq != null) {
-      _ownFileSeq = seq;
-      _fileSeq = seq;
-    }
+    _receivedBatchTimer?.cancel();
+    _receivedBatchTimer = Timer(_receivedBatchSettle, () async {
+      if (!mounted) return;
+      final seq = await FileClipboard.writeFiles(List.of(_receivedBatch));
+      if (seq != null) {
+        _ownFileSeq = seq;
+        _fileSeq = seq;
+      }
+    });
   }
 
   Future<void> _offerLocalClipboard() async {
@@ -626,6 +639,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     WidgetsBinding.instance.removeObserver(this);
     _clipTimer?.cancel();
     _backgroundTimer?.cancel();
+    _receivedBatchTimer?.cancel();
     if (_serviceStarted) SessionService.stop();
     if (!_ended) {
       // Leaving the screen ends the session; record it before the stream is cancelled.
