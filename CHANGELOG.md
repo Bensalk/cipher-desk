@@ -2,6 +2,16 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.1 (8 Nov 2026, test release)
+
+Builds on v0.3.0. The About screen shows **0.3.1**.
+
+- **Keyboard shortcuts and full-screen controls no longer sit fixed on top of
+  the screen.** Each is now a small round button you can drag anywhere;
+  tap it to open the keys (or the full-screen/view buttons), tap again to
+  close them. The button itself always stays reachable, so full screen and
+  disconnect are never blocked off.
+
 ## v0.3.0 (8 Nov 2026, test release)
 
 Builds on v0.2.9. The About screen shows **0.3.0**.

@@ -1303,14 +1303,23 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
             ),
           if (!_ended)
             Expanded(
-              child: _immersive
-                  ? Stack(
-                      children: [
-                        Positioned.fill(child: _remoteView()),
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: SafeArea(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final bounds = constraints.biggest;
+                  return Stack(
+                    children: [
+                      Positioned.fill(child: _remoteView()),
+                      // Full-screen controls: a small draggable button so you can
+                      // move it off whatever it's covering; tap to show the view
+                      // and exit-full-screen buttons, tap again to hide them.
+                      if (_immersive)
+                        _FloatingToggle(
+                          icon: Icons.more_horiz,
+                          tooltip: 'Full-screen controls',
+                          bounds: bounds,
+                          initial: Offset(bounds.width - 56, 16),
+                          panelAbove: false,
+                          panelBuilder: (context) => SafeArea(
                             child: Material(
                               color: Colors.black54,
                               shape: const StadiumBorder(),
@@ -1332,11 +1341,30 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
                             ),
                           ),
                         ),
-                      ],
-                    )
-                  : _remoteView(),
+                      // Keyboard shortcuts: same idea — a draggable button instead
+                      // of a bar that always takes up space across the bottom.
+                      if (!_immersive && _state == RdpConnectionState.connected)
+                        _FloatingToggle(
+                          icon: Icons.keyboard_outlined,
+                          tooltip: 'Keyboard shortcuts',
+                          bounds: bounds,
+                          // Lines the button up so the panel (up to 560 wide) opens
+                          // roughly centred above it instead of running off-screen.
+                          initial: Offset((bounds.width - 560).clamp(0.0, double.infinity) / 2, bounds.height - 64),
+                          panelAbove: true,
+                          // A horizontal scroller needs a bounded width; give it
+                          // most of the screen width, capped so it isn't huge on a
+                          // big monitor.
+                          panelBuilder: (context) => SizedBox(
+                            width: (bounds.width - 32).clamp(200, 560),
+                            child: _keysBar(),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
             ),
-          if (!_ended && !_immersive && _state == RdpConnectionState.connected) _keysBar(),
         ],
       ),
     ),
@@ -1345,6 +1373,94 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
 }
 
 enum _TwoFinger { undecided, zoom, scroll }
+
+/// A small round button that floats over the remote picture. Drag it
+/// anywhere so it isn't covering something on the remote screen. Tap it to
+/// open a panel next to it (the keyboard shortcuts, or the full-screen
+/// controls); tap again to close the panel. The button itself always stays
+/// on screen — only the panel can be closed — so full screen and disconnect
+/// are never out of reach.
+class _FloatingToggle extends StatefulWidget {
+  const _FloatingToggle({
+    required this.icon,
+    required this.tooltip,
+    required this.bounds,
+    required this.initial,
+    required this.panelBuilder,
+    required this.panelAbove,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final Size bounds;
+  final Offset initial;
+  final Widget Function(BuildContext context) panelBuilder;
+
+  /// Whether the panel opens above the button (for a button near the bottom
+  /// of the screen) or below it (for a button near the top).
+  final bool panelAbove;
+
+  @override
+  State<_FloatingToggle> createState() => _FloatingToggleState();
+}
+
+class _FloatingToggleState extends State<_FloatingToggle> {
+  static const double _size = 44;
+
+  late Offset _pos = _clamp(widget.initial, widget.bounds);
+  bool _open = false;
+
+  static Offset _clamp(Offset p, Size bounds) {
+    final maxX = (bounds.width - _size).clamp(0.0, double.infinity);
+    final maxY = (bounds.height - _size).clamp(0.0, double.infinity);
+    return Offset(p.dx.clamp(0.0, maxX), p.dy.clamp(0.0, maxY));
+  }
+
+  @override
+  void didUpdateWidget(covariant _FloatingToggle old) {
+    super.didUpdateWidget(old);
+    // The window was resized or rotated: keep the button on screen.
+    if (old.bounds != widget.bounds) _pos = _clamp(_pos, widget.bounds);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final button = GestureDetector(
+      onPanUpdate: (d) => setState(() => _pos = _clamp(_pos + d.delta, widget.bounds)),
+      onTap: () => setState(() => _open = !_open),
+      child: Tooltip(
+        message: widget.tooltip,
+        child: Material(
+          color: Colors.black54,
+          shape: const CircleBorder(),
+          elevation: 4,
+          child: SizedBox(
+            width: _size,
+            height: _size,
+            child: Icon(_open ? Icons.close : widget.icon, color: Colors.white, size: 22),
+          ),
+        ),
+      ),
+    );
+    return Positioned(
+      left: _pos.dx,
+      top: _pos.dy,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: widget.panelAbove
+            ? [
+                if (_open) Padding(padding: const EdgeInsets.only(bottom: 6), child: widget.panelBuilder(context)),
+                button,
+              ]
+            : [
+                button,
+                if (_open) Padding(padding: const EdgeInsets.only(top: 6), child: widget.panelBuilder(context)),
+              ],
+      ),
+    );
+  }
+}
 
 class _ModifierButton extends StatelessWidget {
   const _ModifierButton(this.label, {required this.held, required this.onPressed});
