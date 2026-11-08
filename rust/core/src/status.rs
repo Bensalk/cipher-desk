@@ -144,12 +144,19 @@ impl ConnectionError {
         )
     }
 
-    /// Wait before reconnect attempt `attempt` (1-based): 2 s, 5 s, then 10 s.
+    /// Wait before reconnect attempt `attempt` (1-based): 2 s, 5 s, 10 s,
+    /// 15 s, 20 s, then 30 s. Grown from the original 2/5/10 s (3 tries, under
+    /// 20 s total) because a VPN relay (e.g. Tailscale routed through a relay
+    /// instead of a direct connection) can take longer than that to come back
+    /// after a brief drop, while other tools kept reconnecting through it.
     pub const fn reconnect_delay(attempt: u8) -> core::time::Duration {
         core::time::Duration::from_secs(match attempt {
             0 | 1 => 2,
             2 => 5,
-            _ => 10,
+            3 => 10,
+            4 => 15,
+            5 => 20,
+            _ => 30,
         })
     }
 
@@ -540,9 +547,9 @@ mod tests {
 
     #[test]
     fn reconnect_delays_grow() {
-        let d: Vec<u64> = (1..=4)
+        let d: Vec<u64> = (1..=7)
             .map(|a| ConnectionError::reconnect_delay(a).as_secs())
             .collect();
-        assert_eq!(d, [2, 5, 10, 10]);
+        assert_eq!(d, [2, 5, 10, 15, 20, 30, 30]);
     }
 }
