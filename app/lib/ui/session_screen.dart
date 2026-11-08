@@ -60,6 +60,7 @@ class SessionScreen extends StatefulWidget {
     this.idleMinutes = 30,
     this.onOutcome,
     this.onQualityChanged,
+    this.onClipboardModeChanged,
     this.authCode = '',
     this.onAuthCode,
   });
@@ -79,6 +80,11 @@ class SessionScreen extends StatefulWidget {
   /// Saves a new picture quality for this connection. The screen then closes
   /// with `true`, so the caller connects again with the new setting.
   final void Function(PictureQuality quality)? onQualityChanged;
+
+  /// Saves a new clipboard mode for this connection (from the "Turn on"
+  /// button on the copy-and-paste-is-off notice). The screen then closes
+  /// with `true`, so the caller connects again with the new setting.
+  final void Function(ClipboardMode mode)? onClipboardModeChanged;
 
   /// Share screen with two-step verification: the 6-digit code the user
   /// typed for this attempt (empty if none).
@@ -322,13 +328,24 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
         ? ''
         : '${File(pinsPath).parent.path}${Platform.pathSeparator}Received';
     _receiveDir = downloadDir;
-    // Copy and paste is off for this connection: say how to turn it on, since
-    // copying text or files would otherwise silently do nothing.
+    // Copy and paste is off for this connection: offer to turn it on right
+    // here, since copying text or files would otherwise silently do nothing.
+    // (The global Settings default only applies to new connections, so an
+    // already-saved one like this can still be off even after that is
+    // turned on — this button fixes THIS connection, with no settings menu.)
     if (clipboard == ClipboardMode.off && widget.profile.method.supportsClipboard) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        duration: Duration(seconds: 10),
-        content: Text('Copy and paste is off for this connection. To turn it on, disconnect, '
-            'edit the connection and set "Copy and paste (text and files)" to Both directions.'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(seconds: 20),
+        content: const Text('Copy and paste is off for this connection.'),
+        action: widget.onClipboardModeChanged == null
+            ? null
+            : SnackBarAction(
+                label: 'Turn on',
+                onPressed: () {
+                  widget.onClipboardModeChanged?.call(ClipboardMode.both);
+                  Navigator.of(context).pop(true);
+                },
+              ),
       ));
     }
     final vnc = widget.profile.method == ConnectionMethod.vnc;

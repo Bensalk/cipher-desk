@@ -2,6 +2,18 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.2 (8 Nov 2026, test release)
+
+Builds on v0.3.1. The About screen shows **0.3.2**.
+
+- **Fixed: turning on "Copy and paste for new connections" in Settings did
+  nothing for a connection you had saved earlier.** That setting only
+  applies to connections created after it — each existing connection keeps
+  its own copy-and-paste setting. If it's off when you connect, there's
+  now a **"Turn on"** button right on the notice, which turns it on for
+  that connection and reconnects immediately — no need to find the
+  connection's edit screen.
+
 ## v0.3.1 (8 Nov 2026, test release)
 
 Builds on v0.3.0. The About screen shows **0.3.1**.

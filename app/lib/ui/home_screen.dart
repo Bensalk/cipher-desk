@@ -154,6 +154,10 @@ class _HomeScreenState extends State<HomeScreen> {
             final current = widget.store.byId(p.id);
             if (current != null) widget.store.upsert(current.copyWith(quality: quality));
           },
+          onClipboardModeChanged: (mode) {
+            final current = widget.store.byId(p.id);
+            if (current != null) widget.store.upsert(current.copyWith(clipboardMode: mode));
+          },
         ),
       ),
     );

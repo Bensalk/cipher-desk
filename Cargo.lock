@@ -553,7 +553,7 @@ dependencies = [
 
 [[package]]
 name = "cipher-desk-host-service"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "rdpv-core",
@@ -2908,7 +2908,7 @@ dependencies = [
 
 [[package]]
 name = "rdpv-core"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "bytes",
  "ironrdp-blocking",
@@ -2941,7 +2941,7 @@ dependencies = [
 
 [[package]]
 name = "rdpv-host"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3080,7 +3080,7 @@ dependencies = [
 
 [[package]]
 name = "rust_lib_cipher_desk"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "flutter_rust_bridge",
  "rdpv-core",
