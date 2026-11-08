@@ -27,6 +27,11 @@ Secure, open-source Remote Desktop (RDP) viewer by Bensal for Windows, Linux and
 - Android signing: secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. The owner keeps the keystore offline. **Never create or replace the signing key**: updates would no longer install over the app. Tag builds refuse a debug-signed APK.
 - Windows files are unsigned until a code-signing certificate is added (`WINDOWS_CERT_*` secrets).
 - Commit identity: `Bensal <Bensalk@users.noreply.github.com>`. Never a personal email.
+- `rust/bridge/src/api/session/live_tests.rs` hardcodes exact numbers from
+  `rust/core/src/policy.rs`'s defaults (e.g. `max_auto_reconnects`, the
+  `(attempt, max)` pair in `live_l1_reconnects_after_the_connection_is_cut`).
+  Changing a `SecurityDefaults` value needs a matching check here too, or
+  the "Live RDP host tests" CI job fails with a stale assertion.
 
 ## Security rules (see CONTRIBUTING.md)
 

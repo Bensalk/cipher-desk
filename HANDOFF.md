@@ -3,7 +3,7 @@
 Read this with `CLAUDE.md` at the start of a new chat. Update it at the end of
 every working session (newest state first; drop what is no longer true).
 
-_Last updated: 8 Nov 2026._
+_Last updated: 9 Nov 2026._
 
 ## Current branch and build
 
@@ -91,8 +91,6 @@ _Last updated: 8 Nov 2026._
   on top of v0.2.7 (Ask to connect). Test order: v0.2.6, then v0.2.8 (it
   contains v0.2.7). v0.2.8 draft:
   https://github.com/Bensalk/cipher-desk/releases/tag/untagged-16d8357fc1ec0eef551a
-- The loopback test `a_resolution_change_resizes_the_viewer` once timed out on
-  the Windows CI runner and passed on re-run (timing; passes locally).
 - Previous: **v0.2.7** (Ask to connect). Bensal should test **v0.2.6
   first** (window + smooth picture):
   https://github.com/Bensalk/cipher-desk/releases/tag/untagged-2e87d6a9eaa470bd8946
@@ -196,6 +194,8 @@ reaches sign-in and lock screens). Already done; explain, don't rebuild.
   `cargo metadata --locked --offline`.
 - The Android emulator CI job sometimes times out (exit 124); re-run only the
   failed job before suspecting the code.
+- The loopback test `a_resolution_change_resizes_the_viewer` once timed out on
+  the Windows CI runner and passed on re-run (timing; passes locally).
 
 ## Release drafts
 
