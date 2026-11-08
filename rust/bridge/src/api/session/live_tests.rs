@@ -251,7 +251,7 @@ fn live_l1_reconnects_after_the_connection_is_cut() -> TestResult {
 
     relay.cut();
     let r = s.wait_for("reconnecting", Duration::from_secs(15), is_reconnecting)?;
-    assert_eq!((r.x, r.y), (1, 3), "first of three attempts");
+    assert_eq!((r.x, r.y), (1, 6), "first of six attempts");
     // Same computer, same certificate: reconnects without asking anything.
     s.wait_for("resized after reconnect", Duration::from_secs(30), |u| {
         u.kind == UpdateKind::Resized
