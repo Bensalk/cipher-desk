@@ -10,7 +10,8 @@ _Last updated: 7 Nov 2026._
 - Work happens on branch **`connection-methods`** (PR #12, open, not merged to
   `main`). It adds three connection methods: Private Remote Desktop, Share
   screen, VNC, plus the always-on Host service (sign-in screen / unattended).
-- Newest test build: **v0.2.9** (folders + files of any size in copy/paste;
+- **v0.3.0** (commit `1122d0d`): host service DPI-aware (`win::make_dpi_aware`, fixes cut-off picture/wrong clicks at 125–150 % scale); clipboard setting renamed "Copy and paste (text and files)", on by default for new Share screen connections, snackbar when off; clipboard opens retried 20×25 ms + 150 ms settle after a change (host Rust + viewer C++/Dart) because Explorer holds the clipboard right after Ctrl+C. Release run 42463588907: Windows/Linux built, Android failed 3× on GitHub 504 downloads (Kotlin/Gradle), retry scheduled; no draft yet. Bensal's test 8 Nov (v0.2.9): file copy did NOT work either way, text did; lag was Tailscale relay (DERP, hard NAT `MappingVariesByDestIP: true`, no UPnP), parked by him.
+- Previous test build: **v0.2.9** (folders + files of any size in copy/paste;
   contains v0.2.7 and v0.2.8). Test order: v0.2.6, then v0.2.9.
   v0.2.9 draft (commit `3d42b05`, also has the Google Authenticator QR code):
   https://github.com/Bensalk/cipher-desk/releases/tag/untagged-c32792b832d1967ae919
