@@ -13,6 +13,11 @@ Builds on v0.3.1. The About screen shows **0.3.2**.
   now a **"Turn on"** button right on the notice, which turns it on for
   that connection and reconnects immediately — no need to find the
   connection's edit screen.
+- **Online / offline dot on each saved connection.** A small green dot on
+  its icon means the computer answers right now; red means it doesn't
+  (off, asleep, not sharing, or not reachable from here). Checked every
+  15 seconds; nothing is sent to the computer besides the same quick
+  connection check "Check readiness" already did.
 
 ## v0.3.1 (8 Nov 2026, test release)
 

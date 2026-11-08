@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../platform/password_vault.dart';
@@ -285,6 +287,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       : ListView.builder(
                           itemCount: items.length,
                           itemBuilder: (context, i) => _ProfileTile(
+                            key: ValueKey(items[i].id),
                             profile: items[i],
                             onConnect: () => _connect(items[i]),
                             onEdit: () => _openForm(items[i]),
@@ -370,8 +373,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _ProfileTile extends StatelessWidget {
+class _ProfileTile extends StatefulWidget {
   const _ProfileTile({
+    super.key,
     required this.profile,
     required this.onConnect,
     required this.onEdit,
@@ -390,19 +394,90 @@ class _ProfileTile extends StatelessWidget {
   final VoidCallback onAsk;
 
   @override
+  State<_ProfileTile> createState() => _ProfileTileState();
+}
+
+/// How often each tile re-checks whether its computer is online. A short TCP
+/// connect attempt (see `checkReachable`), nothing is sent to the computer.
+const _statusRecheck = Duration(seconds: 15);
+
+class _ProfileTileState extends State<_ProfileTile> {
+  // null = still checking (first time, or a re-check in progress).
+  bool? _online;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+    _timer = Timer.periodic(_statusRecheck, (_) => _check());
+  }
+
+  @override
+  void didUpdateWidget(_ProfileTile old) {
+    super.didUpdateWidget(old);
+    // The host or port changed (edited elsewhere): check again right away.
+    if (old.profile.endpoint != widget.profile.endpoint) _check();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _check() {
+    checkReachable(host: widget.profile.host, port: widget.profile.port, timeoutMs: 2500).then((ok) {
+      if (mounted) setState(() => _online = ok);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final profile = widget.profile;
     final details = [
       profile.endpoint,
       if (profile.username.isNotEmpty) profile.username,
       profile.method.label,
     ].join(' · ');
+    final statusColor = switch (_online) {
+      true => Colors.green,
+      false => Colors.red,
+      null => Theme.of(context).colorScheme.outline,
+    };
+    final statusLabel = switch (_online) {
+      true => 'Online',
+      false => 'Offline',
+      null => 'Checking…',
+    };
     return ListTile(
-      leading: CircleAvatar(
-        child: Tooltip(message: profile.method.label, child: Icon(profile.method.icon)),
+      leading: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          CircleAvatar(
+            child: Tooltip(message: profile.method.label, child: Icon(profile.method.icon)),
+          ),
+          Positioned(
+            right: -2,
+            bottom: -2,
+            child: Tooltip(
+              message: statusLabel,
+              child: Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: statusColor,
+                  border: Border.all(color: Theme.of(context).colorScheme.surface, width: 2),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       title: Text(profile.displayName),
       subtitle: Text(details),
-      onTap: onConnect,
+      onTap: widget.onConnect,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -416,11 +491,11 @@ class _ProfileTile extends StatelessWidget {
           PopupMenuButton<String>(
             tooltip: 'More',
             onSelected: (v) => switch (v) {
-              'edit' => onEdit(),
-              'wake' => onWake(),
-              'check' => onCheck(),
-              'ask' => onAsk(),
-              _ => onDelete(),
+              'edit' => widget.onEdit(),
+              'wake' => widget.onWake(),
+              'check' => widget.onCheck(),
+              'ask' => widget.onAsk(),
+              _ => widget.onDelete(),
             },
             itemBuilder: (_) => [
               if (profile.method == ConnectionMethod.shareScreen)

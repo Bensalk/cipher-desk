@@ -3,14 +3,43 @@
 Read this with `CLAUDE.md` at the start of a new chat. Update it at the end of
 every working session (newest state first; drop what is no longer true).
 
-_Last updated: 7 Nov 2026._
+_Last updated: 8 Nov 2026._
 
 ## Current branch and build
 
 - Work happens on branch **`connection-methods`** (PR #12, open, not merged to
   `main`). It adds three connection methods: Private Remote Desktop, Share
   screen, VNC, plus the always-on Host service (sign-in screen / unattended).
-- **v0.3.0** (commit `1122d0d`): host service DPI-aware (`win::make_dpi_aware`, fixes cut-off picture/wrong clicks at 125–150 % scale); clipboard setting renamed "Copy and paste (text and files)", on by default for new Share screen connections, snackbar when off; clipboard opens retried 20×25 ms + 150 ms settle after a change (host Rust + viewer C++/Dart) because Explorer holds the clipboard right after Ctrl+C. Release run 42463588907: all platforms built on the 4th Android retry (GitHub-side 504 downloads, not our code). Draft: https://github.com/Bensalk/cipher-desk/releases/tag/untagged-bb40b1733a7b6d7ba824 — sent to Bensal. Bensal's test 8 Nov (v0.2.9): file copy did NOT work either way, text did; lag was Tailscale relay (DERP, hard NAT `MappingVariesByDestIP: true`, no UPnP), parked by him.
+- **v0.3.2** (commit `337a591`, not yet released as a build — CI green on
+  this commit, release.yml not yet dispatched): fixes the trap where
+  enabling Settings → "Copy and paste for new connections" did nothing for
+  a connection saved *before* that toggle was turned on. Root cause: that
+  Settings toggle (`settings.clipboardDefault`) only seeds the default for
+  brand-new connections; each `ConnectionProfile`'s own `clipboardMode` is a
+  separate persisted field (defaults to `off`, `app/lib/state/profiles.dart`)
+  and is never touched retroactively. Fix: the in-session "Copy and paste is
+  off for this connection" notice now has a **"Turn on"** button
+  (`session_screen.dart`) that sets this connection's own clipboard mode to
+  Both and reconnects immediately — same mechanism as changing picture
+  quality mid-session (`onClipboardModeChanged`, mirrors `onQualityChanged`
+  in `home_screen.dart`). This is very likely why Bensal's file copy-paste
+  still failed in v0.3.0 even after he "enabled copy and paste for new
+  connections from settings" — he was reconnecting to an existing saved
+  connection, not a new one. **Next: tell Bensal to retest with this build
+  — tap "Turn on" on the notice (or edit the connection and set "Copy and
+  paste (text and files)" to Both directions) — before assuming there's a
+  deeper bug in the file-transfer code itself.** If it still fails after
+  that, the next place to look is `rust/core/src/session.rs`'s
+  `ClipAction::FileList` handler (already traced and looks correct) and
+  whether `receive_dir` is actually `Some` at that point on his machine.
+- **v0.3.1** (commit `f020ce1`): the keyboard-shortcuts toolbar and the
+  full-screen view/exit button are no longer fixed on top of the remote
+  screen (Bensal: "it block some of the screen... blocking me to close
+  file sometimes"). Both are now a small round `_FloatingToggle` button you
+  can drag anywhere; tap to open the panel (keys, or full-screen controls),
+  tap again to close it. Not yet built as a release — do that together
+  with v0.3.2 below.
+- **v0.3.0** (commit `1122d0d`): host service DPI-aware (`win::make_dpi_aware`, fixes cut-off picture/wrong clicks at 125–150 % scale); clipboard setting renamed "Copy and paste (text and files)", on by default for new Share screen connections, snackbar when off; clipboard opens retried 20×25 ms + 150 ms settle after a change (host Rust + viewer C++/Dart) because Explorer holds the clipboard right after Ctrl+C. Release run 42463588907: all platforms built on the 4th Android retry (GitHub-side 504 downloads, not our code). Draft: https://github.com/Bensalk/cipher-desk/releases/tag/untagged-bb40b1733a7b6d7ba824 — sent to Bensal. Bensal's test 8 Nov (v0.2.9): file copy did NOT work either way, text did; lag was Tailscale relay (DERP, hard NAT `MappingVariesByDestIP: true`, no UPnP), parked by him. Bensal's test 8 Nov (v0.3.0): picture/stutter much improved; file copy-paste **still** didn't work even after enabling the global clipboard default from Settings — this is what v0.3.2 above fixes/targets.
 - Previous test build: **v0.2.9** (folders + files of any size in copy/paste;
   contains v0.2.7 and v0.2.8). Test order: v0.2.6, then v0.2.9.
   v0.2.9 draft (commit `3d42b05`, also has the Google Authenticator QR code):
