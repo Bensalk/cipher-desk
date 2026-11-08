@@ -10,28 +10,36 @@ _Last updated: 8 Nov 2026._
 - Work happens on branch **`connection-methods`** (PR #12, open, not merged to
   `main`). It adds three connection methods: Private Remote Desktop, Share
   screen, VNC, plus the always-on Host service (sign-in screen / unattended).
-- **v0.3.2** (commit `337a591`, not yet released as a build — CI green on
-  this commit, release.yml not yet dispatched): fixes the trap where
-  enabling Settings → "Copy and paste for new connections" did nothing for
-  a connection saved *before* that toggle was turned on. Root cause: that
-  Settings toggle (`settings.clipboardDefault`) only seeds the default for
-  brand-new connections; each `ConnectionProfile`'s own `clipboardMode` is a
-  separate persisted field (defaults to `off`, `app/lib/state/profiles.dart`)
-  and is never touched retroactively. Fix: the in-session "Copy and paste is
-  off for this connection" notice now has a **"Turn on"** button
-  (`session_screen.dart`) that sets this connection's own clipboard mode to
-  Both and reconnects immediately — same mechanism as changing picture
-  quality mid-session (`onClipboardModeChanged`, mirrors `onQualityChanged`
-  in `home_screen.dart`). This is very likely why Bensal's file copy-paste
-  still failed in v0.3.0 even after he "enabled copy and paste for new
-  connections from settings" — he was reconnecting to an existing saved
-  connection, not a new one. **Next: tell Bensal to retest with this build
-  — tap "Turn on" on the notice (or edit the connection and set "Copy and
-  paste (text and files)" to Both directions) — before assuming there's a
-  deeper bug in the file-transfer code itself.** If it still fails after
-  that, the next place to look is `rust/core/src/session.rs`'s
-  `ClipAction::FileList` handler (already traced and looks correct) and
-  whether `receive_dir` is actually `Some` at that point on his machine.
+- **v0.3.2** (commit `17c3264`, built and released as a draft, link below):
+  two things.
+  1. Fixes the trap where enabling Settings → "Copy and paste for new
+     connections" did nothing for a connection saved *before* that toggle was
+     turned on. Root cause: that Settings toggle (`settings.clipboardDefault`)
+     only seeds the default for brand-new connections; each
+     `ConnectionProfile`'s own `clipboardMode` is a separate persisted field
+     (defaults to `off`, `app/lib/state/profiles.dart`) and is never touched
+     retroactively. Fix: the in-session "Copy and paste is off for this
+     connection" notice now has a **"Turn on"** button (`session_screen.dart`)
+     that sets this connection's own clipboard mode to Both and reconnects
+     immediately — same mechanism as changing picture quality mid-session
+     (`onClipboardModeChanged`, mirrors `onQualityChanged` in
+     `home_screen.dart`). This is very likely why Bensal's file copy-paste
+     still failed in v0.3.0 even after he "enabled copy and paste for new
+     connections from settings" — he was reconnecting to an existing saved
+     connection, not a new one. Also confirmed by his report that right-click
+     on the receiver PC showed no Paste option at all — consistent with
+     `receive_dir` being `None` (nothing ever reached the clipboard) rather
+     than a wire-protocol bug. **Next: get Bensal's retest result — tap
+     "Turn on" on the notice, then retry the file copy — before assuming
+     there's a deeper bug in the file-transfer code itself.** If it still
+     fails after that, the next place to look is
+     `rust/core/src/session.rs`'s `ClipAction::FileList` handler (already
+     traced and looks correct).
+  2. Online/offline dot on each saved connection in the list (green =
+     answers now, red = doesn't), checked every 15 s via the existing
+     `checkReachable` (`home_screen.dart` `_ProfileTile`/`_ProfileTileState`).
+  Draft: https://github.com/Bensalk/cipher-desk/releases/tag/untagged-d22b3d53c33083209760
+  — sent to Bensal 8 Nov, not yet tested.
 - **v0.3.1** (commit `f020ce1`): the keyboard-shortcuts toolbar and the
   full-screen view/exit button are no longer fixed on top of the remote
   screen (Bensal: "it block some of the screen... blocking me to close
