@@ -207,8 +207,19 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
 
   /// Files copied in Explorer on this computer are sent to the remote, which
   /// puts them on its clipboard (Ctrl+V there pastes them).
+  bool _checkingFiles = false;
+
   Future<void> _offerCopiedFiles() async {
-    if (_ended || !_sendsClipboard || !FileClipboard.supported) return;
+    if (_ended || !_sendsClipboard || !FileClipboard.supported || _checkingFiles) return;
+    _checkingFiles = true;
+    try {
+      await _checkCopiedFiles();
+    } finally {
+      _checkingFiles = false;
+    }
+  }
+
+  Future<void> _checkCopiedFiles() async {
     final seq = await FileClipboard.sequence();
     if (seq == null) return;
     if (_fileSeq == null) {
@@ -216,8 +227,12 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
       return;
     }
     if (seq == _fileSeq) return;
-    _fileSeq = seq;
-    if (seq == _ownFileSeq) return;
+    // Explorer puts several formats on the clipboard one after another: let it
+    // finish before reading the file list, or the copy could be missed.
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    final settled = await FileClipboard.sequence() ?? seq;
+    _fileSeq = settled;
+    if (settled == _ownFileSeq) return;
     final files = await FileClipboard.readFiles();
     if (files.isEmpty || _ended) return;
     // Files that just came from the remote: don't send them back.

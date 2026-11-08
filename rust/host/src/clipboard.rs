@@ -37,6 +37,9 @@ use crate::HostEvent;
 
 /// How often the host clipboard is checked for a change, to tell the viewer.
 const POLL_INTERVAL: Duration = Duration::from_millis(400);
+/// Wait after a clipboard change before reading it (the copying program may
+/// still be adding formats).
+const SETTLE: Duration = Duration::from_millis(150);
 
 /// Supplies a clipboard backend to the server and holds the shared state the
 /// backend and the app both use.
@@ -226,8 +229,12 @@ fn spawn_poller(inner: Arc<Inner>) -> Poller {
                 if !flag.load(Ordering::Relaxed) {
                     break;
                 }
-                let seq = winclip::sequence_number();
+                let mut seq = winclip::sequence_number();
                 if seq != prev {
+                    // Explorer puts several formats on the clipboard one after
+                    // another: let it finish before reading the file list.
+                    std::thread::sleep(SETTLE);
+                    seq = winclip::sequence_number();
                     prev = seq;
                     // Files we just received and placed there: not a new copy.
                     if seq == inner.own_seq.load(Ordering::Relaxed) {
@@ -446,9 +453,19 @@ mod winclip {
 
     impl Guard {
         fn open() -> anyhow::Result<Self> {
-            // SAFETY: opens the clipboard with no owner window; Drop closes it.
-            unsafe { OpenClipboard(None).context("open clipboard")? };
-            Ok(Self)
+            // Another program (Explorer, right after Ctrl+C) may still hold the
+            // clipboard for a moment: try again briefly instead of giving up,
+            // which would silently lose that copy.
+            let mut last = None;
+            for _ in 0..20 {
+                // SAFETY: opens the clipboard with no owner window; Drop closes it.
+                match unsafe { OpenClipboard(None) } {
+                    Ok(()) => return Ok(Self),
+                    Err(e) => last = Some(e),
+                }
+                std::thread::sleep(std::time::Duration::from_millis(25));
+            }
+            Err(anyhow::anyhow!("open clipboard: {last:?}"))
         }
     }
 

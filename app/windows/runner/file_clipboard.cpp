@@ -37,11 +37,21 @@ std::wstring ToWide(const std::string& utf8) {
   return out;
 }
 
+// Opens the clipboard. Another program (Explorer, right after Ctrl+C) may
+// still hold it for a moment, so try again briefly before giving up.
+bool OpenClipboardPatiently() {
+  for (int i = 0; i < 20; ++i) {
+    if (OpenClipboard(nullptr)) return true;
+    Sleep(25);
+  }
+  return false;
+}
+
 // Paths of the files on the clipboard; empty if it holds none.
 flutter::EncodableList ReadFiles() {
   flutter::EncodableList out;
   if (!IsClipboardFormatAvailable(CF_HDROP)) return out;
-  if (!OpenClipboard(nullptr)) return out;
+  if (!OpenClipboardPatiently()) return out;
   HANDLE data = GetClipboardData(CF_HDROP);
   if (data != nullptr) {
     HDROP drop = static_cast<HDROP>(GlobalLock(data));
@@ -86,7 +96,7 @@ bool WriteFiles(const std::vector<std::wstring>& paths) {
   *list = L'\0';
   GlobalUnlock(block);
 
-  if (!OpenClipboard(nullptr)) {
+  if (!OpenClipboardPatiently()) {
     GlobalFree(block);
     return false;
   }

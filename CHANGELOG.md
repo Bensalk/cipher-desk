@@ -14,6 +14,9 @@ Builds on v0.2.9. The About screen shows **0.3.0**.
   now called *Copy and paste (text and files)* (it was "Share clipboard (text
   only)", although it also controls files). A new *Share screen* connection
   starts with it on, and a connection that has it off says how to turn it on.
+- **More reliable file copy.** Right after Ctrl+C, File Explorer can hold the
+  clipboard for a moment; Cipher Desk now waits for it instead of missing the
+  copy, on both computers.
 
 ## v0.2.9 (7 Nov 2026, test release)
 
