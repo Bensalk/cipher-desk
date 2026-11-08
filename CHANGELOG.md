@@ -2,6 +2,23 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.3 (8 Nov 2026, test release)
+
+Builds on v0.3.2. The About screen shows **0.3.3**.
+
+- **The app now stays with it for longer when the network drops**, instead
+  of giving up after about 17 seconds. A relayed connection (for example
+  over Tailscale when it can't connect the two computers directly) can take
+  longer than that to recover, even though the computer is reachable a
+  moment later by other means. Now retries for about 1.5 minutes before
+  showing "Connection lost."
+- **Fixed a file copy-paste error:** pasting a folder or several files
+  copied from the host could show Windows' own "Error Copying File or
+  Folder: The object invoked has disconnected from its clients." Each file
+  was being put on the clipboard separately as it arrived, which could land
+  mid-paste. Now waits for the whole batch to finish arriving before
+  putting it on the clipboard once.
+
 ## v0.3.2 (8 Nov 2026, test release)
 
 Builds on v0.3.1. The About screen shows **0.3.2**.
