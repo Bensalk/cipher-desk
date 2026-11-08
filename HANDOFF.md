@@ -10,6 +10,41 @@ _Last updated: 8 Nov 2026._
 - Work happens on branch **`connection-methods`** (PR #12, open, not merged to
   `main`). It adds three connection methods: Private Remote Desktop, Share
   screen, VNC, plus the always-on Host service (sign-in screen / unattended).
+- **v0.3.3** (commit `8051c80`, built and released as a draft, link below):
+  two fixes, both from Bensal's live testing of v0.3.2 on 8 Nov.
+  1. **More patient auto-reconnect.** `max_auto_reconnects` 3 → 6 and the
+     backoff curve 2/5/10s → 2/5/10/15/20/30s (`rust/core/src/policy.rs`,
+     `rust/core/src/status.rs`) — about 1.5 minutes of retrying instead of
+     ~17 seconds. Bensal's "Connection lost" screenshots were over a
+     Tailscale path that goes through a relay rather than a direct
+     connection (confirmed earlier with `tailscale netcheck`: hard NAT,
+     `MappingVariesByDestIP: true`); AnyDesk kept working the same moment
+     Cipher Desk gave up, which is what pointed at "retries too briefly"
+     rather than "can't reach the computer at all" (Check readiness also
+     stayed green throughout). Caught and fixed a stale live-test
+     assertion this broke (`live_l1_reconnects_after_the_connection_is_cut`
+     expected "attempt 1 of 3") in the same build cycle — see commit
+     `8051c80`.
+  2. **Fixed a real file-copy-paste bug**, found from a screenshot of
+     Windows' own "Error Copying File or Folder: The object invoked has
+     disconnected from its clients." Root cause:
+     `_putReceivedOnClipboard` in `session_screen.dart` called
+     `FileClipboard.writeFiles` (a fresh `EmptyClipboard`+
+     `SetClipboardData(CF_HDROP, ...)`) once per `FileReceived` event, and
+     a folder/multi-file batch fires one event per top-level item — so a
+     paste that started right as a second file landed could have the
+     clipboard rewritten out from under Explorer mid-copy. Now debounces:
+     waits 600ms after the last file in a batch before writing the
+     clipboard once with the whole batch.
+  **Still open:** Bensal has not yet confirmed either fix actually resolves
+  what he saw (he was blocked testing when this was built — "Ask to
+  connect" was the workaround while v0.3.3 built). Also surfaced but not
+  yet investigated: his saved password for "Server PC" seems to have gone
+  stale, most likely because he changed the Share screen host's password
+  at some point and the viewer's saved copy wasn't updated to match — told
+  him to re-enter/re-save it; not yet confirmed fixed.
+  Draft: https://github.com/Bensalk/cipher-desk/releases/tag/untagged-8805f71aebfc9b15e7b2
+  — sent to Bensal 8 Nov, not yet tested.
 - **v0.3.2** (commit `17c3264`, built and released as a draft, link below):
   two things.
   1. Fixes the trap where enabling Settings → "Copy and paste for new
@@ -81,16 +116,45 @@ _Last updated: 8 Nov 2026._
 
 ## Waiting for Bensal's test results
 
-1. **Window visibility (v0.2.6 fix):** host's Cipher Desk window was still
-   invisible-but-clicking (photo confirmed, via the always-on service). Cause:
-   `flutter_window.cpp` set `WDA_EXCLUDEFROMCAPTURE` at startup, and Dart's
-   first `setSecure(false)` can run before the channel handler exists and is
-   lost, so the host window stayed hidden. v0.2.6 no longer protects by default.
-   Needs his confirmation on the **host** PC.
-2. **Best quality smoothness (v0.2.5):** he says AnyDesk/TeamViewer look better.
-   If still not good enough, next levers: faster screen grab (DXGI Desktop
-   Duplication instead of the current capture), adaptive quality from measured
-   bandwidth, frame markers so the viewer knows exactly when a frame is complete.
+1. **v0.3.3's two fixes** (longer auto-reconnect, file-copy clipboard
+   batching) — not yet confirmed. He was blocked testing v0.3.2 when this
+   was built (couldn't reconnect with the password method; "Ask to
+   connect" worked as a stand-in).
+2. **His saved password for "Server PC"** — likely stale after he changed
+   the Share screen host's password; told him to re-enter and re-save it
+   on the viewer side. Not yet confirmed whether that was actually the
+   issue or whether it's fixed now.
+3. **Picture/video quality** — he liked v0.3.0's improvement a lot but
+   asked for more ("my laptop display is 15 inch... try to improve image
+   quality"). Not started; next lever is likely a faster screen grab
+   (DXGI Desktop Duplication) on the host side. Explicitly lower priority
+   than the connection/copy-paste fixes, and he knows it's separate,
+   later work.
+4. **Floating full-screen/keys button opacity** (from v0.3.1): he finds it
+   too dark/solid, wants a Settings slider from solid to fully
+   transparent. Explicitly deferred to a later update by him, not now.
+
+## Official release (v0.4.0), once v0.3.3 is confirmed
+
+Bensal wants to publish an **official** GitHub release (not just a draft
+test build) before his weekly usage resets, and has agreed in principle to
+release even with the network-reconnect robustness still being tuned —
+reasoning that anything is a big step up from the ancient **v0.1.0** still
+shown on the repo's main branch and README. Plan, once he confirms v0.3.3
+works (or accepts it as-is):
+1. Merge `connection-methods` (PR #12) into `main`.
+2. Update **README.md** — it's still entirely on v0.2.1: the version badge,
+   the "v0.2.1 is a test release" note, and the whole download table
+   (links point at `.../releases/download/v0.2.1/...`, which don't exist).
+   Also refresh the feature list (no mention yet of file copy-paste, 2FA,
+   Ask to connect, VNC, the floating buttons, or the online/offline dots).
+3. Spot-check `docs/*.md` (HOW-TO-USE, methods/*, THREAT_MODEL,
+   SECURITY_REVIEW) match current behavior — several were updated
+   piecemeal during test builds, but no full pass has been done.
+4. Tag and publish as **v0.4.0** (his choice of number, to signal the size
+   of the jump from v0.1.0), not v0.3.3 — update `CHANGELOG.md` to match.
+5. Only publish the actual GitHub release (make the draft non-draft)
+   himself, or ask him to — same rule as every other release so far.
 
 ## Next features Bensal asked for (AnyDesk-like), in his priority order
 
