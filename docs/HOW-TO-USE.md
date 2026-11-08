@@ -48,9 +48,11 @@ empty for the method's usual port) and the username (`user`, `DOMAIN\user` or
   in the app's files. Windows asks for Windows Hello and Android for your
   fingerprint/face/screen lock before it is used. Without it, you type the password
   each time you connect.
-- **Share clipboard** (Private Remote Desktop only) — off by default. When turned on,
+- **Copy and paste (text and files)** (Private Remote Desktop and Share screen) — off by
+  default, except that a new Share screen connection starts with it on. When it is on,
   text you copy on this device is sent to the remote computer and text the remote
-  computer copies appears on this device. You can allow one direction only.
+  computer copies appears on this device, and files and folders copied in File Explorer
+  can be pasted on the other computer (Windows). You can allow one direction only.
 - **Send files** (Private Remote Desktop, Windows host only) — drag a file onto the
   session window or tap the *Send file* button in the toolbar to copy it to the remote
   computer's desktop. Files up to 256 MB; one at a time.

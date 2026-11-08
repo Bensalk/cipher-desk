@@ -307,6 +307,15 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
         ? ''
         : '${File(pinsPath).parent.path}${Platform.pathSeparator}Received';
     _receiveDir = downloadDir;
+    // Copy and paste is off for this connection: say how to turn it on, since
+    // copying text or files would otherwise silently do nothing.
+    if (clipboard == ClipboardMode.off && widget.profile.method.supportsClipboard) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        duration: Duration(seconds: 10),
+        content: Text('Copy and paste is off for this connection. To turn it on, disconnect, '
+            'edit the connection and set "Copy and paste (text and files)" to Both directions.'),
+      ));
+    }
     final vnc = widget.profile.method == ConnectionMethod.vnc;
     final stream = vnc
         ? (widget.useSavedPassword

@@ -28,6 +28,8 @@ enum Door {
 }
 
 pub fn run() -> anyhow::Result<()> {
+    // Real screen pixels at any Windows display scale (picture and clicks).
+    rdpv_host::win::make_dpi_aware();
     let data_dir = crate::config::data_dir()?;
     let password =
         crate::config::load_password()?.context("no sharing password is set for the service")?;

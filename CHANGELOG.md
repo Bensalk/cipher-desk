@@ -2,6 +2,19 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.0 (8 Nov 2026, test release)
+
+Builds on v0.2.9. The About screen shows **0.3.0**.
+
+- **Any Windows display scale on the shared computer.** The always-on sharing
+  service now knows about display scaling (125 %, 150 %, ...). Before, the
+  shared picture could be cut off (the taskbar missing) and clicks could land
+  in the wrong place on such a screen.
+- **Copy and paste is easier to find and turn on.** The connection setting is
+  now called *Copy and paste (text and files)* (it was "Share clipboard (text
+  only)", although it also controls files). A new *Share screen* connection
+  starts with it on, and a connection that has it off says how to turn it on.
+
 ## v0.2.9 (7 Nov 2026, test release)
 
 Builds on v0.2.8. The About screen shows **0.2.9**.

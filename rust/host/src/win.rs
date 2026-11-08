@@ -15,6 +15,9 @@ use windows::Win32::Graphics::Gdi::{
     ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, CAPTUREBLT, DIB_RGB_COLORS, HDC,
     SRCCOPY,
 };
+use windows::Win32::UI::HiDpi::{
+    SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
+};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYBD_EVENT_FLAGS,
     KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE, KEYEVENTF_UNICODE,
@@ -29,6 +32,23 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
 use crate::frames::{Frame, FrameSource};
 use crate::input::{Button, Input, InputSink};
+
+/// Makes this program aware of Windows display scaling (125 %, 150 %, ...).
+///
+/// Without it, Windows tells the program a smaller "scaled" screen size while
+/// the screen grab and the mouse still work in real pixels: the shared picture
+/// is cut off (the taskbar goes missing) and clicks land in the wrong place.
+/// Call once at start-up, before the first screen grab. The Cipher Desk app
+/// itself already declares this in its manifest; the background service has
+/// no manifest, so it calls this. A second call, or an older Windows without
+/// this setting, is harmless.
+pub fn make_dpi_aware() {
+    // SAFETY: a plain Win32 call that only changes this process's own DPI
+    // mode; it takes no pointers and fails harmlessly if the mode is set.
+    unsafe {
+        let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    }
+}
 
 fn screen_size() -> (i32, i32) {
     // SAFETY: GetSystemMetrics only reads system values.

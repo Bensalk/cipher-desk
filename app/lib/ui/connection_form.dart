@@ -44,6 +44,9 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
   bool _obscure = true;
   late bool _savePassword;
   late ClipboardMode _clipboard;
+  // Set once the person picks a clipboard choice themselves; until then a new
+  // Share screen connection starts with copy and paste on.
+  bool _clipboardTouched = false;
   late ConnectionMethod _method;
   late PictureQuality _quality;
   Map<String, String> _problems = const {};
@@ -175,7 +178,14 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                 _MethodPicker(
                   method: _method,
                   onChanged: (m) {
-                    setState(() => _method = m);
+                    setState(() {
+                      _method = m;
+                      if (widget.existing == null &&
+                          !_clipboardTouched &&
+                          m == ConnectionMethod.shareScreen) {
+                        _clipboard = ClipboardMode.both;
+                      }
+                    });
                     _revalidate();
                   },
                 ),
@@ -334,9 +344,9 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                   // Long choices must not overflow on narrow phones.
                   isExpanded: true,
                   decoration: const InputDecoration(
-                    labelText: 'Share clipboard (text only)',
-                    helperText: 'Anything you copy while connected can be read by the remote '
-                        'computer, and the remote computer can put text on this device.',
+                    labelText: 'Copy and paste (text and files)',
+                    helperText: 'Needed for copying text and files between the two computers. '
+                        'Anything you copy while connected can be read by the remote computer.',
                     helperMaxLines: 3,
                   ),
                   items: const [
@@ -351,7 +361,10 @@ class _ConnectionFormScreenState extends State<ConnectionFormScreen> {
                       child: Text('Remote → this device only', overflow: TextOverflow.ellipsis),
                     ),
                   ],
-                  onChanged: (v) => setState(() => _clipboard = v ?? ClipboardMode.off),
+                  onChanged: (v) => setState(() {
+                    _clipboardTouched = true;
+                    _clipboard = v ?? ClipboardMode.off;
+                  }),
                 ),
                 ],
                 const SizedBox(height: 16),
