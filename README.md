@@ -8,7 +8,7 @@
 <h4 align="center">A secure, open-source remote desktop app for Windows, Linux and Android: Remote Desktop (RDP), screen sharing and VNC.</h4>
 
 <p align="center">
-  <a href="https://github.com/Bensalk/cipher-desk/releases"><img src="https://img.shields.io/badge/release-v0.2.1%20test-FFC107?style=flat-square" alt="Release v0.2.1 (test)"></a>
+  <a href="https://github.com/Bensalk/cipher-desk/releases"><img src="https://img.shields.io/badge/release-v0.3.4%20test-FFC107?style=flat-square" alt="Release v0.3.4 (test)"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20Android%2010%2B-00796B?style=flat-square" alt="Windows, Linux, Android 10+">
   <img src="https://img.shields.io/badge/Rust-1.97-B7410E?style=flat-square&logo=rust&logoColor=white" alt="Rust">
   <img src="https://img.shields.io/badge/Flutter-stable-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter">
@@ -33,7 +33,7 @@
 Cipher Desk connects to your own computers from a PC, a Linux machine or an Android phone or tablet, in three ways: privately with Windows Remote Desktop, by sharing a Windows computer's screen with Cipher Desk itself, or with VNC. Made by **Bensal** with security first: it encrypts every connection (VNC is used only on your own network or Tailscale), checks the computer's identity, and never stores a password anywhere except your device's own secure storage. New to Cipher Desk? Follow the [step-by-step guide](docs/HOW-TO-USE.md).
 
 > [!NOTE]
-> **v0.2.1 is a test release.** It passes all automated tests, including live connections to test computers, but it has not yet had an independent security review. What was checked is listed in [docs/SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md).
+> **v0.3.4 is a test release.** It passes all automated tests, including live connections to test computers, but it has not yet had an independent security review. What was checked is listed in [docs/SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md).
 
 ## Key Features
 
@@ -41,10 +41,17 @@ Cipher Desk connects to your own computers from a PC, a Linux machine or an Andr
 - **Secure connections only** – Network Level Authentication (NLA) and TLS 1.2 / 1.3. Older, unprotected connections are refused, not downgraded.
 - **Certificate check and pinning** – the first time, you compare the computer's fingerprint before anything is sent. If it ever changes, the connection is blocked before your password leaves the device.
 - **Saved passwords, safely** – optional, and only in Windows Credential Manager, the Linux keyring or the Android Keystore, confirmed with Windows Hello or your screen lock. Never in the app's files, exports or logs.
+- **Copy and paste files, like AnyDesk** (Share screen) – copy files in File Explorer with Ctrl+C on either computer, Ctrl+V in a folder on the other. Works both ways with the window minimised; folders and large files included. Received files are also saved to a *Received* folder.
+- **Ask to connect** (Share screen) – connect without a password: a popup appears on the other computer and the screen appears only after they click *Yes*. Connecting with the password still goes straight in.
+- **Two-step verification** (Share screen) – add Google Authenticator to the shared computer's password door. Scan the QR code, enter a 6-digit code once, and the device is remembered for 30 days.
+- **Picture quality** per connection – *Best quality* (lossless, sharpest text), *Balanced* (default) or *Speed* (least data). Change it live from the session toolbar; switches without disconnecting.
+- **View modes** – *Original size* (one remote pixel per screen pixel), *Shrink to fit* and *Stretch to fill*, switchable from the session toolbar.
+- **Online / offline dot** on each saved connection – a green dot means the computer answers right now, red means it doesn't. Checked every 15 seconds.
+- **Always-on sharing** – Share screen keeps working in the background as a Windows service, even when no one is signed in. Set it to start when Windows starts; approve trusted devices to connect without being asked each time.
 - **Clipboard sharing** – two-way text clipboard, off by default; allow it per connection, in one direction or both.
-- **Works on touch screens** – tap to click, long-press to right-click, two-finger scroll, trackpad mode, pinch to zoom up to 4×, and a key bar with Ctrl, Alt and Shift that stay held (for Ctrl+C or Alt+Tab), Ctrl+Alt+Del, Windows key, Esc, Tab, arrows, F1–F12 and *Type text*.
+- **Works on touch screens** – tap to click, long-press to right-click, two-finger scroll, trackpad mode, pinch to zoom up to 4×, and a floating key bar (drag it anywhere) with Ctrl, Alt and Shift that stay held (for Ctrl+C or Alt+Tab), Ctrl+Alt+Del, Windows key, Esc, Tab, arrows, F1–F12 and *Type text*.
 - **Saved connections** – search, Wake-on-LAN, a *Check readiness* test, connection history, and export / import without passwords.
-- **Reliable** – reconnects by itself after a network drop (same computer, same certificate) and never retries a wrong password, so accounts don't get locked.
+- **Reliable** – reconnects by itself after a network drop (retries for about 1.5 minutes before giving up), and never retries a wrong password, so accounts don't get locked.
 - **Clear errors** – every message says what happened and what to do next; *Settings → What error messages mean* lists them all.
 - **Idle protection** – sessions end after 30 minutes without input (adjustable); on Android, 5 minutes after you leave the app.
 - **Portable** – a Windows ZIP and a Linux AppImage that keep everything on a USB drive, except passwords.
@@ -86,22 +93,22 @@ Cipher Desk connects to your own computers from a PC, a Linux machine or an Andr
 2. Install Cipher Desk and tap **New connection**. Choose the method, then enter the computer's name or IP address and your username.
 3. Tap the connection and type your password (or tick **Save password** to keep it in this device's secure storage).
 4. The first time, **compare the certificate fingerprint** with the one on the computer. Only trust it if they match.
-5. Use the key bar for Ctrl+Alt+Del, the Windows key and F-keys. Tap the link icon to disconnect.
+5. Use the floating key bar for Ctrl+Alt+Del, the Windows key and F-keys. Tap the link icon to disconnect.
 
 > [!TIP]
-> Only connect over your own network or a VPN such as Tailscale. Never open Remote Desktop (3389), Share screen (3395) or VNC (5900) to the internet.
+> Only connect over your own network or a VPN such as Tailscale. Never open Remote Desktop (3389), Share screen (3395 / 3396) or VNC (5900) to the internet.
 
 ## Download
 
-Latest: **v0.2.1 (test release)** – all files and checksums are on the [Releases page](https://github.com/Bensalk/cipher-desk/releases). Release notes are in [CHANGELOG.md](CHANGELOG.md).
+Latest: **v0.3.4 (test release)** – all files and checksums are on the [Releases page](https://github.com/Bensalk/cipher-desk/releases). Release notes are in [CHANGELOG.md](CHANGELOG.md).
 
 | System | Download | |
 |---|---|---|
-| **Android 10+** | [CipherDesk-0.2.1-android.apk](https://github.com/Bensalk/cipher-desk/releases/download/v0.2.1/CipherDesk-0.2.1-android.apk) | Allow installing from your browser or file manager when asked |
-| **Windows 10/11** (installer) | [CipherDesk-0.2.1-x64.msi](https://github.com/Bensalk/cipher-desk/releases/download/v0.2.1/CipherDesk-0.2.1-x64.msi) | Installs for your user only; no administrator rights needed |
-| **Windows** (portable) | [CipherDesk-0.2.1-windows-x64-portable.zip](https://github.com/Bensalk/cipher-desk/releases/download/v0.2.1/CipherDesk-0.2.1-windows-x64-portable.zip) | Unzip anywhere and run `cipher_desk.exe` |
-| **Debian / Ubuntu** | [cipher-desk_0.2.1_amd64.deb](https://github.com/Bensalk/cipher-desk/releases/download/v0.2.1/cipher-desk_0.2.1_amd64.deb) | `sudo apt install ./cipher-desk_0.2.1_amd64.deb` |
-| **Other Linux** | [Cipher_Desk-0.2.1-x86_64.AppImage](https://github.com/Bensalk/cipher-desk/releases/download/v0.2.1/Cipher_Desk-0.2.1-x86_64.AppImage) | Make it executable and run it |
+| **Android 10+** | [CipherDesk-0.3.4-android.apk](https://github.com/Bensalk/cipher-desk/releases/download/v0.3.4/CipherDesk-0.3.4-android.apk) | Allow installing from your browser or file manager when asked |
+| **Windows 10/11** (installer) | [CipherDesk-0.3.4-x64.msi](https://github.com/Bensalk/cipher-desk/releases/download/v0.3.4/CipherDesk-0.3.4-x64.msi) | Installs for your user only; no administrator rights needed |
+| **Windows** (portable) | [CipherDesk-0.3.4-windows-x64-portable.zip](https://github.com/Bensalk/cipher-desk/releases/download/v0.3.4/CipherDesk-0.3.4-windows-x64-portable.zip) | Unzip anywhere and run `cipher_desk.exe` |
+| **Debian / Ubuntu** | [cipher-desk_0.3.4_amd64.deb](https://github.com/Bensalk/cipher-desk/releases/download/v0.3.4/cipher-desk_0.3.4_amd64.deb) | `sudo apt install ./cipher-desk_0.3.4_amd64.deb` |
+| **Other Linux** | [Cipher_Desk-0.3.4-x86_64.AppImage](https://github.com/Bensalk/cipher-desk/releases/download/v0.3.4/Cipher_Desk-0.3.4-x86_64.AppImage) | Make it executable and run it |
 
 - Check a download with `SHA256SUMS` from the same release (`sha256sum -c SHA256SUMS`, or `Get-FileHash` on Windows).
 - The Windows files are not code-signed yet, so Windows SmartScreen may warn you: choose *More info → Run anyway* after checking the checksum.
