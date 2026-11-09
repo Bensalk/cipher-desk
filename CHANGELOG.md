@@ -2,6 +2,17 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.4 (9 Nov 2026, test release)
+
+Builds on v0.3.3. The About screen shows **0.3.4**.
+
+- **Fixed: Password door locks out from Tailscale reconnect floods.** When
+  Tailscale uses a relay (both devices behind hard NAT), rapid reconnect
+  attempts caused TLS-layer errors that counted as failed sign-in attempts.
+  Five of them in a row triggered the 15-minute lockout even when no wrong
+  password was ever entered. Now only a real wrong-password error (NLA
+  credential failure) counts toward lockout.
+
 ## v0.3.3 (8 Nov 2026, test release)
 
 Builds on v0.3.2. The About screen shows **0.3.3**.
