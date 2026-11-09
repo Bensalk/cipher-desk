@@ -9,6 +9,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../platform/app_window.dart';
 import '../platform/file_clipboard.dart';
@@ -17,6 +19,7 @@ import '../platform/secure_window.dart';
 import '../platform/session_service.dart';
 import '../session/scancodes.dart';
 import '../src/rust/api/errors.dart';
+import '../src/rust/api/log.dart' as rust_log;
 import '../src/rust/api/pins.dart';
 import '../src/rust/api/session.dart';
 import '../src/rust/api/store.dart' show ConnectionMethod;
@@ -329,6 +332,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   }
 
   Future<void> _start() async {
+    rust_log.sessionLogClear(); // fresh log for each connection attempt
     final pinsPath = widget.pinsPath;
     if (!mounted) return;
     final (w, h) = desktopSizeFor(View.of(context).physicalSize, phoneOrTablet: _isAndroid);
@@ -552,6 +556,41 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     // Two-step verification: ask for the authenticator code at once.
     if (error?.id == 'CodeNeeded' && widget.onAuthCode != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _askCode());
+    }
+  }
+
+  /// Exports the in-memory session log so the user can share it.
+  /// Android: share sheet.  Windows/Linux: file-save dialog → Desktop.
+  Future<void> _reportProblem() async {
+    if (!mounted) return;
+    final version = '0.3.5'; // keep in sync with pubspec.yaml
+    final content = rust_log.sessionLogExport(appVersion: version);
+    final fileName = 'cipher-desk-log-${DateTime.now().millisecondsSinceEpoch}.txt';
+
+    if (_isAndroid) {
+      // Write to a temp file, then hand off to the OS share sheet.
+      final tmp = await getTemporaryDirectory();
+      final file = File('${tmp.path}/$fileName');
+      await file.writeAsString(content);
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'text/plain')],
+        subject: 'Cipher Desk connection log',
+      );
+    } else {
+      // Desktop: file-save dialog.
+      final location = await getSaveLocation(
+        suggestedName: fileName,
+        acceptedTypeGroups: [
+          const XTypeGroup(label: 'Text files', extensions: ['txt']),
+        ],
+      );
+      if (location == null || !mounted) return;
+      final file = File(location.path);
+      await file.writeAsString(content);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Log saved to ${location.path}')),
+      );
     }
   }
 
@@ -1329,6 +1368,13 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
                     onPressed: () => Navigator.of(context).pop(),
                     child: const Text('Back to connections'),
                   ),
+                  if (_error != null)
+                    OutlinedButton.icon(
+                      key: const Key('button-report-problem'),
+                      onPressed: _reportProblem,
+                      icon: const Icon(Icons.bug_report_outlined),
+                      label: const Text('Report Problem'),
+                    ),
                 ],
               ),
             ),
@@ -1437,9 +1483,16 @@ class _FloatingToggle extends StatefulWidget {
 
 class _FloatingToggleState extends State<_FloatingToggle> {
   static const double _size = 44;
+  // Idle opacity: visible enough to find, unobtrusive over the remote picture.
+  static const double _opacityIdle = 0.25;
+  static const double _opacityActive = 1.0;
 
   late Offset _pos = _clamp(widget.initial, widget.bounds);
   bool _open = false;
+  bool _hovering = false;
+  bool _dragging = false;
+
+  bool get _active => _open || _hovering || _dragging;
 
   static Offset _clamp(Offset p, Size bounds) {
     final maxX = (bounds.width - _size).clamp(0.0, double.infinity);
@@ -1456,19 +1509,30 @@ class _FloatingToggleState extends State<_FloatingToggle> {
 
   @override
   Widget build(BuildContext context) {
-    final button = GestureDetector(
-      onPanUpdate: (d) => setState(() => _pos = _clamp(_pos + d.delta, widget.bounds)),
-      onTap: () => setState(() => _open = !_open),
-      child: Tooltip(
-        message: widget.tooltip,
-        child: Material(
-          color: Colors.black54,
-          shape: const CircleBorder(),
-          elevation: 4,
-          child: SizedBox(
-            width: _size,
-            height: _size,
-            child: Icon(_open ? Icons.close : widget.icon, color: Colors.white, size: 22),
+    final button = MouseRegion(
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: GestureDetector(
+        onPanStart: (_) => setState(() => _dragging = true),
+        onPanUpdate: (d) => setState(() => _pos = _clamp(_pos + d.delta, widget.bounds)),
+        onPanEnd: (_) => setState(() => _dragging = false),
+        onPanCancel: () => setState(() => _dragging = false),
+        onTap: () => setState(() => _open = !_open),
+        child: AnimatedOpacity(
+          opacity: _active ? _opacityActive : _opacityIdle,
+          duration: const Duration(milliseconds: 200),
+          child: Tooltip(
+            message: widget.tooltip,
+            child: Material(
+              color: Colors.black54,
+              shape: const CircleBorder(),
+              elevation: 4,
+              child: SizedBox(
+                width: _size,
+                height: _size,
+                child: Icon(_open ? Icons.close : widget.icon, color: Colors.white, size: 22),
+              ),
+            ),
           ),
         ),
       ),

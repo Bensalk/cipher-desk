@@ -2,6 +2,22 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.5 (9 Nov 2026, test release)
+
+Builds on v0.3.4. The About screen shows **0.3.5**.
+
+- **Report Problem button.** After a connection error or disconnect, a new
+  "Report Problem" button appears on the error screen. Tapping it exports a
+  plain-text log of the session — connection events, errors, reconnect attempts,
+  quality switches and clipboard events. On Android the OS share sheet opens so
+  you can send it anywhere; on Windows and Linux a save dialog lets you pick
+  where it goes. No passwords or screen content are ever included.
+
+- **Floating control button fades when idle.** The overlay button shown in
+  full-screen mode is now 25 % opaque when you are not interacting with it, so
+  it does not cover what you are looking at. It snaps back to full brightness
+  when you hover over it, drag it, or tap it to open the panel.
+
 ## v0.3.4 (9 Nov 2026, test release)
 
 Builds on v0.3.3. The About screen shows **0.3.4**.

@@ -33,6 +33,7 @@ pub mod profiles;
 pub mod second_factor;
 pub mod secret;
 pub mod session;
+pub mod session_log;
 pub mod settings;
 pub mod status;
 pub mod tls;
