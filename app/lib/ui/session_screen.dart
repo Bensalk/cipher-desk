@@ -563,7 +563,9 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   /// Android: share sheet.  Windows/Linux: file-save dialog → Desktop.
   Future<void> _reportProblem() async {
     if (!mounted) return;
-    final version = '0.3.5'; // keep in sync with pubspec.yaml
+    // TODO(next-bump): update this when pubspec version changes.
+    // Adding package_info_plus would let us read it at runtime.
+    const version = '0.3.5';
     final content = rust_log.sessionLogExport(appVersion: version);
     final fileName = 'cipher-desk-log-${DateTime.now().millisecondsSinceEpoch}.txt';
 

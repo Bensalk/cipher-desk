@@ -10,80 +10,62 @@ _Last updated: 9 Nov 2026._
 - Work happens on branch **`connection-methods`** (PR #12, open, not merged to
   `main`). It adds three connection methods: Private Remote Desktop, Share
   screen, VNC, plus the always-on Host service (sign-in screen / unattended).
+- **v0.3.5** (commit `5362330`, **tag not yet created**):
+  Two new features ready, waiting for Bensal to tag + trigger build.
+  How to release:
+  1. Go to https://github.com/Bensalk/cipher-desk/releases/new
+  2. Tag: `v0.3.5`, Target: `connection-methods` branch
+  3. Title: `v0.3.5`, leave as draft, click **Publish release**
+  4. CI builds and attaches APK + MSI (~20–30 min)
+  What's in it:
+  1. **Report Problem button** — after any connection error, a "Report Problem"
+     button appears on the error screen. Exports a plain-text log (last ~1000
+     events: connects, disconnects, reconnect attempts, quality switches,
+     clipboard events). Android: share sheet. Windows/Linux: file-save dialog.
+     No passwords or screen content ever included.
+  2. **Floating control button opacity** — the overlay button in full-screen
+     mode is 25% opaque when idle; snaps to 100% on hover, drag, or tap.
 - **v0.3.4** (commit `688d1b5`, tag `v0.3.4`):
   https://github.com/Bensalk/cipher-desk/releases/tag/v0.3.4
-  — released 9 Nov 2026. **Build still running** (run `42624733572`) —
-  check the release page for APK, MSI, ZIP, AppImage, .deb (~20–30 min
-  from tag push). Bensal has not yet tested this build.
-  What's in it:
-  1. **Fixed:** Quality switch (Low/Medium/High) no longer triggers the
-     15-minute password lockout. Quality switches cause disconnect +
-     Tailscale relay reconnect; those were counted as failed login attempts.
-     Now only a wrong password counts.
-  2. **Added:** Diagnostic logging for host→viewer file clipboard (copy on
-     host, paste on viewer). Share logs from
-     `C:\ProgramData\Cipher Desk\host-service\logs\` if file paste doesn't
-     work.
-  Commits this session: `fix: rustfmt long tracing lines in clipboard.rs`
-  (`688d1b5`) and `.claude/settings.json` allow rules (`55da73c`).
-- **v0.3.3** (commit `8051c80`, built and released as a draft, link below):
-  two fixes, both from Bensal's live testing of v0.3.2 on 8 Nov.
-  1. **More patient auto-reconnect.** `max_auto_reconnects` 3 → 6 and the
-     backoff curve 2/5/10s → 2/5/10/15/20/30s (`rust/core/src/policy.rs`,
-     `rust/core/src/status.rs`) — about 1.5 minutes of retrying instead of
-     ~17 seconds.
-  2. **Fixed a real file-copy-paste bug** (Windows' "Error Copying File or
-     Folder: The object invoked has disconnected from its clients."). Root
-     cause: `_putReceivedOnClipboard` rewrote the clipboard once per
-     `FileReceived` event; a folder/multi-file batch fires one event per
-     top-level item — so a paste mid-batch could have the clipboard rewritten
-     out from under Explorer. Now debounces: waits 600ms after the last file
-     before writing once.
-  Draft: https://github.com/Bensalk/cipher-desk/releases/tag/untagged-8805f71aebfc9b15e7b2
-  — sent to Bensal 8 Nov, not yet confirmed tested.
+  — released 9 Nov 2026. Bensal has not confirmed tested yet.
+  What's in it: Quality switch (Low/Medium/High) no longer triggers 15-min
+  lockout; diagnostic logging for host→viewer file clipboard.
 
 ## Waiting for Bensal's test results
 
-1. **v0.3.4** — just published (9 Nov 2026). Check build artifacts attached
-   to https://github.com/Bensalk/cipher-desk/releases/tag/v0.3.4 once the
-   release workflow finishes (~20–30 min from tag push). Send Bensal the link
-   and ask him to install the APK (phone) + MSI (Windows).
+1. **v0.3.4** — install APK (phone) + MSI (Windows), test quality switch
+   (Low → Medium → High should NOT lock out for 15 min). Release:
+   https://github.com/Bensalk/cipher-desk/releases/tag/v0.3.4
 2. **v0.3.3's two fixes** (longer auto-reconnect, file-copy clipboard
-   batching) — not yet confirmed from Bensal. He was blocked testing v0.3.2
-   when this was built.
-3. **Host→viewer file clipboard bug** (Bug 2): after Bensal tests v0.3.4,
-   ask him to share logs from `C:\ProgramData\Cipher Desk\host-service\logs\`
-   — look for `"clipboard changed"` and `"offering host clipboard files to
-   viewer"` lines to diagnose whether files are being offered at all.
-4. **His saved password for "Server PC"** — likely stale after he changed
-   the Share screen host's password; told him to re-enter/re-save on viewer
-   side. Not yet confirmed.
-5. **Picture/video quality** — lower priority; next lever is DXGI Desktop
-   Duplication on the host side.
-6. **Floating full-screen/keys button opacity** — deferred by Bensal.
+   batching) — not yet confirmed from Bensal.
+3. **Host→viewer file clipboard bug** (Bug 2): ask Bensal to share logs from
+   `C:\ProgramData\Cipher Desk\host-service\logs\` — look for
+   `"clipboard changed"` and `"offering host clipboard files to viewer"` lines.
+4. **His saved password for "Server PC"** — likely stale after changing the
+   Share screen host's password; told him to re-enter/re-save on viewer side.
 
-## Official release (v0.4.0), once v0.3.3/v0.3.4 is confirmed
+## Official release (v0.4.0), once v0.3.4 is confirmed
 
-Bensal wants to publish an **official** GitHub release before his weekly
-usage resets. Plan once he confirms the latest test build works:
+Plan once Bensal confirms the test build works:
 1. Merge `connection-methods` (PR #12) into `main`.
-2. Update **README.md** — still entirely on v0.2.1 (version badge, download
-   table, feature list).
-3. Spot-check `docs/*.md` match current behavior.
-4. Tag and publish as **v0.4.0** (his choice; signals big jump from v0.1.0).
-5. Bensal publishes the actual GitHub release himself.
+2. Spot-check `docs/*.md` match current behavior.
+3. Tag and publish as **v0.4.0**.
+4. Bensal publishes the GitHub release himself.
 
 ## Done on this branch
 
 | Version | What |
 | --- | --- |
-| v0.2.3 | Share screen keyboard/mouse fixed (SendInput needed `DESKTOP_JOURNALPLAYBACK`; input on its own thread). No "port in use" when the always-on service already shares. |
-| v0.2.4 | Picture quality per connection (Best = lossless QOIZ, Balanced, Speed); host always sends the newest picture (less lag); view modes Original / Shrink / Stretch; real full screen (taskbar hidden); Cipher Desk window on the shared PC visible to the viewer (capture-hiding only while *viewing*). |
-| v0.2.5 | Viewer holds a big change until the host has finished sending it (max 150 ms), so Best quality appears whole instead of in bands. `Session::poll` now returns `(events, caught_up)`. |
-| v0.2.6 | Host window no longer hidden from capture at startup (startup race lost the "show" call). |
-| v0.2.9 | **Folders and any file size**: shared `rdpv_core::xfer` now has `offer` (walks folders, max 20 000 items), `Receiver` (`.part` file, 4 MiB `CHUNK` requests), and `answer` (≤ 8 MiB per request). |
-| v0.2.8 | **File copy/paste like AnyDesk** (Windows); **2FA with Google Authenticator** (always-on sharing). |
-| v0.2.7 | **Ask to connect (no password)**: always-on worker listens on port+1; popup via `WTSSendMessageW`. |
+| v0.3.5 | Report Problem log export button; floating button 25% idle opacity |
+| v0.3.4 | Quality switch no longer triggers 15-min lockout; host→viewer file clipboard logging |
+| v0.3.3 | More patient auto-reconnect (6 attempts, 2/5/10/15/20/30s); file clipboard debounce (600ms batch) |
+| v0.2.3 | Share screen keyboard/mouse fixed; no "port in use" when always-on service already shares |
+| v0.2.4 | Picture quality per connection; view modes; real full screen |
+| v0.2.5 | Viewer holds big change until host finishes (max 150 ms) |
+| v0.2.6 | Host window no longer hidden from capture at startup |
+| v0.2.9 | Folders and any file size for file clipboard |
+| v0.2.8 | File copy/paste like AnyDesk (Windows); 2FA with Google Authenticator |
+| v0.2.7 | Ask to connect (no password); popup via WTSSendMessageW |
 
 ## Next features Bensal asked for (AnyDesk-like), in his priority order
 
@@ -92,6 +74,12 @@ usage resets. Plan once he confirms the latest test build works:
 3. 2FA for manual sharing too.
 4. File transfer progress bar; resume broken copy.
 5. Backlog: auto-adapt host resolution to viewer window.
+
+## Known issue: version string in Report Problem
+
+`app/lib/ui/session_screen.dart` has `const version = '0.3.5'` hardcoded in
+`_reportProblem`. Update this when bumping pubspec.yaml, or add
+`package_info_plus` to read it at runtime.
 
 ## Sandbox gotchas (Claude's cloud workspace)
 
@@ -109,5 +97,8 @@ usage resets. Plan once he confirms the latest test build works:
   create releases in future sessions.
 - Tag push blocked in cloud sessions (HTTP 403 via GitHub proxy). Workaround:
   use Chrome automation on GitHub web UI to create the tag + release.
+- **Built-in browser is NOT signed in to GitHub** — Chrome (the user's real
+  browser) is signed in; the built-in browser has its own profile. Use Chrome
+  automation (`mcp__claude-in-chrome__*`) for GitHub web UI actions.
 - The Android emulator CI job sometimes times out (exit 124); re-run only the
   failed job before suspecting the code.
