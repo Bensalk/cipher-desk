@@ -2,6 +2,25 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.6 (9 Nov 2026, test release)
+
+Builds on v0.3.5. The About screen shows **0.3.6**.
+
+- **Copy and paste on by default.** New connections now have clipboard sharing
+  enabled (both directions) out of the box. Existing connections that were
+  saved with it off still need a one-time "Turn on now" tap — a banner appears
+  at the top of the session screen for 60 seconds with that button.
+
+- **Clearer file-send message.** After tapping "Send a file to the remote
+  computer", the app now says "ready — press Ctrl+V in a folder on the remote
+  computer to paste it there", so you know exactly what to do next on the
+  remote side.
+
+- **Received-file location shown.** When a file arrives from the remote
+  computer, the notification now shows the full path where it was saved (on
+  Android and Linux). On Windows it still says "press Ctrl+V in any folder"
+  because the file is put on the clipboard.
+
 ## v0.3.5 (9 Nov 2026, test release)
 
 Builds on v0.3.4. The About screen shows **0.3.5**.

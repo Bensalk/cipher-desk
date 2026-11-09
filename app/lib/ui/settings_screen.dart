@@ -191,7 +191,7 @@ class SettingsScreen extends StatelessWidget {
             onChanged: (v) => settings.clipboardDefault = v,
             title: const Text('Copy and paste for new connections'),
             subtitle: const Text(
-                'Text and files. Off by default (new Share screen connections turn it on). You can change it for each connection.'),
+                'Text and files. On by default for new connections. You can change it for each connection.'),
           ),
           if (_isWindows)
             SwitchListTile(

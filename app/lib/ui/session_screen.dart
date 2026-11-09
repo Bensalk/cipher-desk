@@ -352,12 +352,15 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     // turned on — this button fixes THIS connection, with no settings menu.)
     if (clipboard == ClipboardMode.off && widget.profile.method.supportsClipboard) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        duration: const Duration(seconds: 20),
-        content: const Text('Copy and paste is off for this connection.'),
+        duration: const Duration(seconds: 60),
+        content: const Text(
+          'Copy and paste is off for this connection. '
+          'Right-click copy / Ctrl+C will not sync between devices.',
+        ),
         action: widget.onClipboardModeChanged == null
             ? null
             : SnackBarAction(
-                label: 'Turn on',
+                label: 'Turn on now',
                 onPressed: () {
                   widget.onClipboardModeChanged?.call(ClipboardMode.both);
                   Navigator.of(context).pop(true);
@@ -482,9 +485,10 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
         final path = u.label;
         if (path != null && path.isNotEmpty) _putReceivedOnClipboard(path);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(seconds: 10),
           content: Text(FileClipboard.supported
-              ? 'Received "$name". Paste it in any folder with Ctrl+V.'
-              : 'Received "$name" into the Received folder.'),
+              ? 'Received "$name" — press Ctrl+V in any folder to place it there.'
+              : 'Received "$name" into: $_receiveDir'),
         ));
     }
   }
@@ -497,9 +501,10 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     if (!mounted) return;
     final many = files.length > 1;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      duration: const Duration(seconds: 10),
       content: Text(many
-          ? 'Sending ${files.length} files to the remote computer…'
-          : 'Sending "${files.first.name}" to the remote computer…'),
+          ? '${files.length} files ready — press Ctrl+V in a folder on the remote computer to paste them there.'
+          : '"${files.first.name}" ready — press Ctrl+V in a folder on the remote computer to paste it there.'),
     ));
   }
 
@@ -565,7 +570,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     if (!mounted) return;
     // TODO(next-bump): update this when pubspec version changes.
     // Adding package_info_plus would let us read it at runtime.
-    const version = '0.3.5';
+    const version = '0.3.6';
     final content = rust_log.sessionLogExport(appVersion: version);
     final fileName = 'cipher-desk-log-${DateTime.now().millisecondsSinceEpoch}.txt';
 
