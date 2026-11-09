@@ -190,11 +190,17 @@ fn offer_copied_files(inner: &Inner) -> bool {
     }
     let files = xfer::offer(&paths);
     if files.is_empty() {
-        tracing::debug!(count = paths.len(), "clipboard has files but none could be offered (too large or missing?)");
+        tracing::debug!(
+            count = paths.len(),
+            "clipboard has files but none could be offered (too large or missing?)"
+        );
         return false;
     }
     let descriptors: Vec<FileDescriptor> = files.iter().map(|o| o.descriptor.clone()).collect();
-    tracing::info!(count = descriptors.len(), "offering host clipboard files to viewer");
+    tracing::info!(
+        count = descriptors.len(),
+        "offering host clipboard files to viewer"
+    );
     if let Ok(mut out) = inner.outgoing.lock() {
         *out = files;
     }
