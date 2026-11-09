@@ -10,10 +10,11 @@ _Last updated: 9 Nov 2026._
 - Work happens on branch **`connection-methods`** (PR #12, open, not merged to
   `main`). It adds three connection methods: Private Remote Desktop, Share
   screen, VNC, plus the always-on Host service (sign-in screen / unattended).
-- **v0.3.4** (commit `688d1b5`, tag `v0.3.4`, **published as a pre-release**):
+- **v0.3.4** (commit `688d1b5`, tag `v0.3.4`):
   https://github.com/Bensalk/cipher-desk/releases/tag/v0.3.4
-  — released 9 Nov 2026. **Build is running** — the release workflow will
-  attach APK, MSI, ZIP, AppImage, .deb within ~20–30 min of tagging.
+  — released 9 Nov 2026. **Build still running** (run `42624733572`) —
+  check the release page for APK, MSI, ZIP, AppImage, .deb (~20–30 min
+  from tag push). Bensal has not yet tested this build.
   What's in it:
   1. **Fixed:** Quality switch (Low/Medium/High) no longer triggers the
      15-minute password lockout. Quality switches cause disconnect +
