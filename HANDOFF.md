@@ -10,13 +10,19 @@ _Last updated: 9 Nov 2026._
 - Work happens on branch **`connection-methods`** (PR #12, open, not merged to
   `main`). It adds three connection methods: Private Remote Desktop, Share
   screen, VNC, plus the always-on Host service (sign-in screen / unattended).
-- **v0.3.5** (commit `5362330`, **tag not yet created**):
-  Two new features ready, waiting for Bensal to tag + trigger build.
-  How to release:
-  1. Go to https://github.com/Bensalk/cipher-desk/releases/new
-  2. Tag: `v0.3.5`, Target: `connection-methods` branch
-  3. Title: `v0.3.5`, leave as draft, click **Publish release**
-  4. CI builds and attaches APK + MSI (~20–30 min)
+- **v0.3.6** (commit `5dce261`, tag not yet created):
+  **Needs build** — push tag `v0.3.6` via Chrome (tag push blocked in cloud).
+  What's in it:
+  1. **Clipboard on by default** — new connections now default to both
+     directions. Existing connections saved with clipboard off show a 60-second
+     "Turn on now" banner at session start.
+  2. **File transfer messages** — after sending a file: "press Ctrl+V in a
+     folder on the remote". After receiving: shows the full saved path on
+     Android/Linux; "press Ctrl+V in any folder" on Windows.
+- **v0.3.5** (commit `ac88014`, tag `v0.3.5`):
+  Build dispatched at ~15:06 UTC 9 Nov 2026 (run 42641271410).
+  Draft release will appear at https://github.com/Bensalk/cipher-desk/releases
+  — Bensal publishes it.
   What's in it:
   1. **Report Problem button** — after any connection error, a "Report Problem"
      button appears on the error screen. Exports a plain-text log (last ~1000
@@ -56,6 +62,7 @@ Plan once Bensal confirms the test build works:
 
 | Version | What |
 | --- | --- |
+| v0.3.6 | Clipboard on by default; file-transfer messages show next step and destination path |
 | v0.3.5 | Report Problem log export button; floating button 25% idle opacity |
 | v0.3.4 | Quality switch no longer triggers 15-min lockout; host→viewer file clipboard logging |
 | v0.3.3 | More patient auto-reconnect (6 attempts, 2/5/10/15/20/30s); file clipboard debounce (600ms batch) |
@@ -77,7 +84,7 @@ Plan once Bensal confirms the test build works:
 
 ## Known issue: version string in Report Problem
 
-`app/lib/ui/session_screen.dart` has `const version = '0.3.5'` hardcoded in
+`app/lib/ui/session_screen.dart` has `const version = '0.3.6'` hardcoded in
 `_reportProblem`. Update this when bumping pubspec.yaml, or add
 `package_info_plus` to read it at runtime.
 
