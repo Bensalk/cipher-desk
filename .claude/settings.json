@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push origin v*)",
+      "Bash(git tag v*)",
+      "Bash(gh release create *)",
+      "Bash(gh workflow run *)"
+    ]
+  }
+}
