@@ -190,9 +190,11 @@ fn offer_copied_files(inner: &Inner) -> bool {
     }
     let files = xfer::offer(&paths);
     if files.is_empty() {
+        tracing::debug!(count = paths.len(), "clipboard has files but none could be offered (too large or missing?)");
         return false;
     }
     let descriptors: Vec<FileDescriptor> = files.iter().map(|o| o.descriptor.clone()).collect();
+    tracing::info!(count = descriptors.len(), "offering host clipboard files to viewer");
     if let Ok(mut out) = inner.outgoing.lock() {
         *out = files;
     }
@@ -238,8 +240,10 @@ fn spawn_poller(inner: Arc<Inner>) -> Poller {
                     prev = seq;
                     // Files we just received and placed there: not a new copy.
                     if seq == inner.own_seq.load(Ordering::Relaxed) {
+                        tracing::debug!("clipboard change is our own echo, skipping");
                         continue;
                     }
+                    tracing::debug!(seq, "clipboard changed, checking for files to offer");
                     // Files copied here go to the viewer; otherwise text (or
                     // nothing). Files already on the clipboard when the viewer
                     // connected are not sent: only a new copy is.

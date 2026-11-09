@@ -78,13 +78,26 @@ impl ConnectionHandler for Limiter {
         error: Option<&anyhow::Error>,
     ) -> PostConnectionAction {
         let _ = self.events.send(HostEvent::ViewerDisconnected);
-        if self.record(Instant::now(), duration, error.is_some()) {
+        // Only credential failures count toward lockout. TLS noise from relay
+        // networks (accept_begin failed, UnknownCA) and post-auth network drops
+        // must not trigger the 15-minute lockout: they are not password guesses.
+        if self.record(Instant::now(), duration, is_credential_failure(error)) {
             let _ = self.events.send(HostEvent::LockedOut {
                 minutes: LOCKOUT.as_secs() / 60,
             });
         }
         PostConnectionAction::Continue
     }
+}
+
+/// True only when the error chain contains evidence of a failed sign-in
+/// (wrong password / wrong user). Pure TLS errors, early connection drops, and
+/// network noise return false and are not counted against the lockout budget.
+fn is_credential_failure(error: Option<&anyhow::Error>) -> bool {
+    let Some(err) = error else { return false };
+    // The CredSSP server reports "LogonDenied" when NLA credentials are wrong.
+    let chain = format!("{err:#}");
+    chain.contains("LogonDenied")
 }
 
 #[cfg(test)]
