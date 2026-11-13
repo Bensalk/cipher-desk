@@ -135,16 +135,24 @@ impl Inner {
         match step {
             xfer::Step::Request(req) => self.send(ClipboardMessage::SendFileContentsRequest(req)),
             xfer::Step::Done(top_level) => {
+                tracing::info!(count = top_level.len(), "host clip: file receive done");
                 if let Ok(mut r) = self.receiving.lock() {
                     *r = None;
                 }
                 let done: Vec<PathBuf> = top_level.into_iter().filter(|p| p.exists()).collect();
                 if done.is_empty() {
+                    tracing::warn!("host clip: no received files exist on disk");
                     return;
                 }
-                if winclip::write_files(&done).is_ok() {
-                    self.own_seq
-                        .store(winclip::sequence_number(), Ordering::Relaxed);
+                match winclip::write_files(&done) {
+                    Ok(()) => {
+                        tracing::info!(count = done.len(), "host clip: wrote CF_HDROP to clipboard");
+                        self.own_seq
+                            .store(winclip::sequence_number(), Ordering::Relaxed);
+                    }
+                    Err(ref e) => {
+                        tracing::error!(?e, "host clip: write_files (CF_HDROP) FAILED");
+                    }
                 }
                 for p in done {
                     let name = p
@@ -341,17 +349,20 @@ impl CliprdrBackend for Backend {
 
     fn on_remote_file_list(&mut self, files: &[FileDescriptor], clip_data_id: Option<u32>) {
         // The viewer is sending files and folders: receive them in pieces.
+        tracing::info!(count = files.len(), ?clip_data_id, "host clip: got file list from viewer, starting receive");
         let items = files
             .iter()
             .map(xfer::RemoteItem::from_descriptor)
             .collect();
         let step = {
             let Ok(mut r) = self.inner.receiving.lock() else {
+                tracing::error!("host clip: receiving mutex poisoned");
                 return;
             };
             // A new copy replaces one still arriving.
             *r = None;
             let (rx, step) = xfer::Receiver::start(items, clip_data_id, &self.inner.receive_dir);
+            tracing::info!(file_count = rx.file_count(), total_bytes = rx.total_bytes, "host clip: receiver started");
             *r = Some(rx);
             step
         };
@@ -389,6 +400,7 @@ impl CliprdrBackend for Backend {
 
     fn on_file_contents_request(&mut self, request: FileContentsRequest) {
         // The viewer is downloading (a piece of) a file we offered.
+        tracing::info!(stream_id = request.stream_id, index = request.index, "host clip: viewer requesting file contents");
         let answer = self
             .inner
             .outgoing
@@ -397,12 +409,17 @@ impl CliprdrBackend for Backend {
             .and_then(|out| xfer::answer(&out, &request));
         let response = match answer {
             Some(xfer::FileContentsAnswer::Size(size)) => {
+                tracing::info!(stream_id = request.stream_id, size, "host clip: answering SIZE request");
                 FileContentsResponse::new_size_response(request.stream_id, size)
             }
             Some(xfer::FileContentsAnswer::Data(bytes)) => {
+                tracing::info!(stream_id = request.stream_id, len = bytes.len(), "host clip: answering DATA request");
                 FileContentsResponse::new_data_response(request.stream_id, bytes)
             }
-            None => FileContentsResponse::new_error(request.stream_id),
+            None => {
+                tracing::error!(stream_id = request.stream_id, index = request.index, "host clip: no answer for file request (outgoing empty?)");
+                FileContentsResponse::new_error(request.stream_id)
+            }
         };
         self.inner
             .send(ClipboardMessage::SendFileContentsResponse(response));

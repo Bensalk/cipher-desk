@@ -1,7 +1,7 @@
 name: cipher_desk
 description: "Secure open-source RDP remote desktop viewer for Windows, Linux and Android."
 publish_to: 'none'
-version: 0.3.6+18
+version: 0.3.7+19
 
 environment:
   sdk: ^3.11.0

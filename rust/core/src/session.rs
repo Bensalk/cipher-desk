@@ -454,29 +454,42 @@ impl Session {
     /// if clipboard sharing to the remote is off for this connection, or if no
     /// path is a readable file within the size limit.
     pub fn send_files(&mut self, paths: Vec<PathBuf>) -> Result<(), ConnectionError> {
+        tracing::info!(count = paths.len(), ?paths, "send_files: viewer→host file copy");
         let descriptors = {
             let Some(clip) = self.clip.as_mut() else {
+                tracing::info!("send_files: no clip state, skipping");
                 return Ok(());
             };
             if !clip.policy.local_to_host {
+                tracing::info!("send_files: local_to_host disabled, skipping");
                 return Ok(());
             }
             let files = crate::xfer::offer(&paths);
             if files.is_empty() {
+                tracing::info!(count = paths.len(), "send_files: offer() produced no files");
                 return Ok(());
             }
+            tracing::info!(offered = files.len(), "send_files: files offered");
             let descriptors: Vec<FileDescriptor> =
                 files.iter().map(|o| o.descriptor.clone()).collect();
             clip.outgoing = files;
             descriptors
         };
-        let msgs = self
+        let result = self
             .stage
             .get_svc_processor_mut::<CliprdrClient>()
-            .ok_or(ConnectionError::Unexpected)?
-            .initiate_file_copy(descriptors)
-            .map_err(|_| ConnectionError::Unexpected)?;
-        self.send_svc(msgs)
+            .ok_or(ConnectionError::Unexpected)
+            .and_then(|c| c.initiate_file_copy(descriptors).map_err(|e| {
+                tracing::error!(?e, "send_files: initiate_file_copy failed");
+                ConnectionError::Unexpected
+            }));
+        match result {
+            Ok(msgs) => {
+                tracing::info!("send_files: initiate_file_copy ok, sending FormatList");
+                self.send_svc(msgs)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     /// Carries out a step of receiving files: ask for the next piece, or
@@ -497,6 +510,7 @@ impl Session {
                 self.send_svc(msgs)
             }
             crate::xfer::Step::Done(top_level) => {
+                tracing::info!(count = top_level.len(), "clip: file receive done, writing to events");
                 if let Some(clip) = self.clip.as_mut() {
                     clip.receiving = None;
                 }
@@ -506,7 +520,10 @@ impl Session {
                             .file_name()
                             .map(|n| n.to_string_lossy().into_owned())
                             .unwrap_or_default();
+                        tracing::info!(%name, "clip: FileReceived event");
                         events.push(SessionEvent::FileReceived { name, path });
+                    } else {
+                        tracing::warn!(?path, "clip: received file path does not exist");
                     }
                 }
                 Ok(())
@@ -625,6 +642,7 @@ impl Session {
                 }
                 ClipAction::DataReceived(_) => {}
                 ClipAction::RemoteFiles(format) => {
+                    tracing::info!(?format, host_to_local = policy.host_to_local, "clip: host offered files (RemoteFiles)");
                     if policy.host_to_local {
                         let msgs = self
                             .stage
@@ -632,6 +650,7 @@ impl Session {
                             .ok_or(ConnectionError::Unexpected)?
                             .initiate_paste(format)
                             .map_err(|_| ConnectionError::Unexpected)?;
+                        tracing::info!("clip: sent FormatDataRequest for file list");
                         self.send_svc(msgs)?;
                     }
                 }
@@ -639,6 +658,13 @@ impl Session {
                     files,
                     clip_data_id,
                 } => {
+                    tracing::info!(
+                        file_count = files.len(),
+                        ?clip_data_id,
+                        receive_dir = ?clip.receive_dir,
+                        host_to_local = policy.host_to_local,
+                        "clip: got FileList from host"
+                    );
                     if policy.host_to_local {
                         if let Some(dir) = clip.receive_dir.clone() {
                             // A new copy replaces one still arriving.
@@ -646,6 +672,7 @@ impl Session {
                             let (rx, step) =
                                 crate::xfer::Receiver::start(files, clip_data_id, &dir);
                             let count = rx.file_count();
+                            tracing::info!(count, total_bytes = rx.total_bytes, "clip: starting file receive");
                             if count > 0 {
                                 events.push(SessionEvent::FilesIncoming {
                                     files: count,
@@ -654,10 +681,19 @@ impl Session {
                             }
                             clip.receiving = Some(rx);
                             self.receive_step(step, events)?;
+                        } else {
+                            tracing::warn!("clip: FileList received but receive_dir is None, cannot receive");
                         }
                     }
                 }
                 ClipAction::FileRequest(request) => {
+                    tracing::info!(
+                        stream_id = request.stream_id,
+                        index = request.index,
+                        outgoing_count = clip.outgoing.len(),
+                        local_to_host = policy.local_to_host,
+                        "clip: host requesting file data (FileRequest)"
+                    );
                     let answer = if policy.local_to_host {
                         crate::xfer::answer(&clip.outgoing, &request)
                     } else {

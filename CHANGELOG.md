@@ -2,6 +2,16 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.7 (13 Nov 2026)
+
+Builds on v0.3.6. The About screen shows **0.3.7**.
+
+- **File clipboard diagnostics.** Adds detailed logging throughout the
+  clipboard file-transfer path (both directions) to identify why
+  Explorer Ctrl+C → Ctrl+V between two Windows PCs is not working.
+  Check the WORKER.LOG on both the viewer and host after attempting a
+  file copy to see which step is failing.
+
 ## v0.3.6 (9 Nov 2026, pre-release)
 
 Builds on v0.3.5. The About screen shows **0.3.6**.
