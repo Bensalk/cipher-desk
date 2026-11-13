@@ -3,22 +3,26 @@
 Read this with `CLAUDE.md` at the start of a new chat. Update it at the end of
 every working session (newest state first; drop what is no longer true).
 
-_Last updated: 9 Nov 2026._
+_Last updated: 13 Nov 2026._
 
 ## Current branch and build
 
 - Work happens on branch **`connection-methods`** (PR #12, open, not merged to
   `main`). It adds three connection methods: Private Remote Desktop, Share
   screen, VNC, plus the always-on Host service (sign-in screen / unattended).
-- **v0.3.6** (commit `5dce261`, tag not yet created):
-  **Needs build** — push tag `v0.3.6` via Chrome (tag push blocked in cloud).
+- **v0.3.6** (commit `e74af06`, run `43408964991`):
+  **Draft release ready** — all three build jobs succeeded (Linux ✅ Windows ✅ Android ✅).
+  Draft release: https://github.com/Bensalk/cipher-desk/releases/tag/untagged-6271b0ad8090ed596fc6
+  **Bensal: open the link above and click "Publish release".**
   What's in it:
   1. **Clipboard on by default** — new connections now default to both
      directions. Existing connections saved with clipboard off show a 60-second
      "Turn on now" banner at session start.
   2. **File transfer messages** — after sending a file: "press Ctrl+V in a
-     folder on the remote". After receiving: shows the full saved path on
-     Android/Linux; "press Ctrl+V in any folder" on Windows.
+     folder on the remote". After receiving: shows the full saved path.
+  Fixes in this session (not user-visible):
+  - Added missing FRB generated bindings for the log module (caused build failure).
+  - Bumped Gradle wrapper to 9.3.1 and AGP to 9.1.1 (Flutter minimum).
 - **v0.3.5** (commit `ac88014`, tag `v0.3.5`):
   Build dispatched at ~15:06 UTC 9 Nov 2026 (run 42641271410).
   Draft release will appear at https://github.com/Bensalk/cipher-desk/releases
