@@ -16,6 +16,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 ///    the tracing crate level (`release_max_level_info` feature).
 /// 2. [`rdpv_core::session_log::SessionLog`] — the in-memory ring buffer that
 ///    powers the "Report Problem" export.
+#[flutter_rust_bridge::frb(sync)]
 pub fn init_logging() {
     // EnvFilter as a global layer + fmt layer + SessionLog ring-buffer.
     let _ = tracing_subscriber::registry()
@@ -32,6 +33,7 @@ pub fn init_logging() {
 /// while it is still running) to get a log file the user can share.
 ///
 /// The result never contains passwords or screen content.
+#[flutter_rust_bridge::frb(sync)]
 pub fn session_log_export(app_version: String) -> String {
     rdpv_core::session_log::export(&app_version)
 }
@@ -40,6 +42,7 @@ pub fn session_log_export(app_version: String) -> String {
 ///
 /// Called by the Flutter session service at the start of each new connection
 /// attempt so the exported file covers only the current session.
+#[flutter_rust_bridge::frb(sync)]
 pub fn session_log_clear() {
     rdpv_core::session_log::clear();
 }

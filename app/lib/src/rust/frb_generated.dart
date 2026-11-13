@@ -167,6 +167,12 @@ bool crateApiHostHostServiceStashPassword({required String pendingPath , require
 
 VaultResult crateApiHostHostSetPassword({required String password });
 
+void crateApiLogInitLogging();
+
+String crateApiLogSessionLogExport({required String appVersion });
+
+void crateApiLogSessionLogClear();
+
 bool crateApiHostHostSupported();
 
 Uint32List crateApiStoreIdleMinuteChoices();
@@ -1636,7 +1642,82 @@ sse_encode_String(password, serializer);
             debugName: "wake_on_lan",
             argNames: ["mac"],
         );
-        
+
+
+@override void crateApiLogInitLogging()  { return handler.executeSync(SyncTask(
+            callFfi: () {
+
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 54)!;
+
+            },
+            codec:
+        SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiLogInitLoggingConstMeta,
+            argValues: [],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiLogInitLoggingConstMeta => const TaskConstMeta(
+            debugName: "init_logging",
+            argNames: [],
+        );
+
+
+@override String crateApiLogSessionLogExport({required String appVersion })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_String(appVersion, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 55)!;
+
+            },
+            codec:
+        SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiLogSessionLogExportConstMeta,
+            argValues: [appVersion],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiLogSessionLogExportConstMeta => const TaskConstMeta(
+            debugName: "session_log_export",
+            argNames: ["app_version"],
+        );
+
+
+@override void crateApiLogSessionLogClear()  { return handler.executeSync(SyncTask(
+            callFfi: () {
+
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 56)!;
+
+            },
+            codec:
+        SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiLogSessionLogClearConstMeta,
+            argValues: [],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiLogSessionLogClearConstMeta => const TaskConstMeta(
+            debugName: "session_log_clear",
+            argNames: [],
+        );
+
 
 RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_RdpSession => wire.rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession;
 
