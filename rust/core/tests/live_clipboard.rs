@@ -35,6 +35,9 @@ fn open(direction: ClipboardDirection, max_bytes: usize) -> Result<Session, Stri
             pinned_fingerprint: pin,
             connect_timeout: Duration::from_secs(5),
             clipboard: ClipboardPolicy::from_direction(direction, max_bytes),
+            receive_dir: None,
+            quality: rdpv_core::profiles::Quality::Balanced,
+            second_factor: None,
         })
     };
     let fp = match connect(params(None)?) {
@@ -57,7 +60,7 @@ fn collect(
     let deadline = Instant::now() + Duration::from_secs(secs);
     let mut all = Vec::new();
     while Instant::now() < deadline && !s.is_ended() {
-        let ev = s.poll();
+        let ev = s.poll().0;
         let hit = ev.iter().any(&mut stop);
         all.extend(ev);
         if hit {

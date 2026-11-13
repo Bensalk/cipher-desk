@@ -1,21 +1,32 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../platform/app_window.dart';
+import '../platform/file_clipboard.dart';
 import '../platform/remote_clipboard.dart';
+import '../platform/secure_window.dart';
 import '../platform/session_service.dart';
 import '../session/scancodes.dart';
 import '../src/rust/api/errors.dart';
+import '../src/rust/api/log.dart' as rust_log;
 import '../src/rust/api/pins.dart';
 import '../src/rust/api/session.dart';
+import '../src/rust/api/store.dart' show ConnectionMethod;
 import '../state/profiles.dart';
+import 'connection_methods.dart';
 import 'error_banner.dart';
+import 'picture_quality.dart';
 import 'status_chip.dart';
 
 /// The remote desktop size to ask for, in pixels (even numbers).
@@ -51,6 +62,10 @@ class SessionScreen extends StatefulWidget {
     this.useSavedPassword = false,
     this.idleMinutes = 30,
     this.onOutcome,
+    this.onQualityChanged,
+    this.onClipboardModeChanged,
+    this.authCode = '',
+    this.onAuthCode,
   });
 
   final ConnectionProfile profile;
@@ -64,6 +79,23 @@ class SessionScreen extends StatefulWidget {
   /// Called once when the session ends, with "connected" (it was used and
   /// then closed), "cancelled" (closed before connecting) or an error id.
   final void Function(String outcome)? onOutcome;
+
+  /// Saves a new picture quality for this connection. The screen then closes
+  /// with `true`, so the caller connects again with the new setting.
+  final void Function(PictureQuality quality)? onQualityChanged;
+
+  /// Saves a new clipboard mode for this connection (from the "Turn on"
+  /// button on the copy-and-paste-is-off notice). The screen then closes
+  /// with `true`, so the caller connects again with the new setting.
+  final void Function(ClipboardMode mode)? onClipboardModeChanged;
+
+  /// Share screen with two-step verification: the 6-digit code the user
+  /// typed for this attempt (empty if none).
+  final String authCode;
+
+  /// Called with a code the user typed after the host asked for one; the
+  /// screen then closes with `true`, so the caller connects again with it.
+  final void Function(String code)? onAuthCode;
 
   /// Typed (or, on Android, vault-read) password. Used once, never stored here.
   final String? password;
@@ -90,6 +122,15 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   double _zoom = 1;
   Offset _pan = Offset.zero;
   bool _trackpad = false;
+  // Stretch the remote picture to fill the window (ignores aspect ratio);
+  // off = fit the whole screen with correct proportions.
+  _ViewMode _view = _ViewMode.shrink;
+
+  /// Screen pixels per logical pixel, for "Original size" (one remote pixel
+  /// on one screen pixel).
+  double _dpr = 1;
+  // Immersive: hide the app bar and key bar so the remote screen fills the window.
+  bool _immersive = false;
   Offset _cursor = Offset.zero; // remote coordinates, trackpad mode
   double _startZoom = 1;
   Offset _startFocal = Offset.zero;
@@ -126,15 +167,29 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   // Clipboard (S6).
   Timer? _clipTimer;
   String? _lastLocalClip;
+
+  // Copy and paste of files with Explorer, like AnyDesk (Windows).
+  // Files copied here go to the remote; files from the remote are put on
+  // this computer's clipboard. `_fileSeq` is the last clipboard change seen,
+  // `_ownFileSeq` the one made by putting received files there.
+  int? _fileSeq;
+  int? _ownFileSeq;
+  String _receiveDir = '';
+  final List<String> _receivedBatch = [];
+  DateTime? _lastReceived;
+  Timer? _receivedBatchTimer;
   bool get _sendsClipboard =>
-      widget.profile.clipboardMode == ClipboardMode.both ||
-      widget.profile.clipboardMode == ClipboardMode.toRemoteOnly;
+      widget.profile.method.supportsClipboard &&
+      (widget.profile.clipboardMode == ClipboardMode.both ||
+      widget.profile.clipboardMode == ClipboardMode.toRemoteOnly);
   static bool get _isAndroid => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // "Block screenshots" protects the remote screen while it is shown here.
+    SecureWindow.setViewing(true);
     // Start after the first frame: _start reads the window size with View.of,
     // which must not be called from initState.
     WidgetsBinding.instance.addPostFrameCallback((_) => _start());
@@ -150,8 +205,88 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     _lastLocalClip = null;
     _offerLocalClipboard();
     if (!_isAndroid) {
-      _clipTimer = Timer.periodic(const Duration(seconds: 1), (_) => _offerLocalClipboard());
+      // Files already copied before connecting are not sent: only a new copy.
+      _fileSeq = null;
+      FileClipboard.sequence().then((seq) => _fileSeq ??= seq);
+      _clipTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        _offerLocalClipboard();
+        _offerCopiedFiles();
+      });
     }
+  }
+
+  /// Files copied in Explorer on this computer are sent to the remote, which
+  /// puts them on its clipboard (Ctrl+V there pastes them).
+  bool _checkingFiles = false;
+
+  Future<void> _offerCopiedFiles() async {
+    if (_ended || !_sendsClipboard || !FileClipboard.supported || _checkingFiles) return;
+    _checkingFiles = true;
+    try {
+      await _checkCopiedFiles();
+    } finally {
+      _checkingFiles = false;
+    }
+  }
+
+  Future<void> _checkCopiedFiles() async {
+    final seq = await FileClipboard.sequence();
+    if (seq == null) return;
+    if (_fileSeq == null) {
+      _fileSeq = seq;
+      return;
+    }
+    if (seq == _fileSeq) return;
+    // Explorer puts several formats on the clipboard one after another: let it
+    // finish before reading the file list, or the copy could be missed.
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    final settled = await FileClipboard.sequence() ?? seq;
+    _fileSeq = settled;
+    if (settled == _ownFileSeq) return;
+    final files = await FileClipboard.readFiles();
+    if (files.isEmpty || _ended) return;
+    // Files that just came from the remote: don't send them back.
+    if (_receiveDir.isNotEmpty && files.every((f) => f.startsWith(_receiveDir))) return;
+    _session.sendFiles(paths: files);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(files.length == 1
+          ? 'Copying "${files.first.split(Platform.pathSeparator).last}" to the remote computer. '
+              'Paste it there with Ctrl+V when it has arrived.'
+          : 'Copying ${files.length} items to the remote computer. '
+              'Paste them there with Ctrl+V when they have arrived.'),
+    ));
+  }
+
+  /// How long to wait, after the last file of a batch lands, before putting
+  /// the batch on the clipboard. Several files (or a folder) arrive as
+  /// separate events close together; writing the clipboard again for each one
+  /// can land mid-paste if the user is quick, which Explorer shows as
+  /// "The object invoked has disconnected from its clients." Waiting for the
+  /// batch to go quiet first means Explorer only ever sees one, complete write.
+  static const _receivedBatchSettle = Duration(milliseconds: 600);
+
+  /// Puts files received from the remote on this computer's clipboard, so
+  /// Ctrl+V in a folder pastes them. Files arriving close together form one
+  /// batch, pasted together once no more have arrived for a short while.
+  void _putReceivedOnClipboard(String path) {
+    if (!FileClipboard.supported) return;
+    final now = DateTime.now();
+    final last = _lastReceived;
+    if (last == null || now.difference(last) > const Duration(seconds: 5)) {
+      _receivedBatch.clear();
+    }
+    _lastReceived = now;
+    _receivedBatch.add(path);
+    _receivedBatchTimer?.cancel();
+    _receivedBatchTimer = Timer(_receivedBatchSettle, () async {
+      if (!mounted) return;
+      final seq = await FileClipboard.writeFiles(List.of(_receivedBatch));
+      if (seq != null) {
+        _ownFileSeq = seq;
+        _fileSeq = seq;
+      }
+    });
   }
 
   Future<void> _offerLocalClipboard() async {
@@ -197,10 +332,58 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   }
 
   Future<void> _start() async {
+    rust_log.sessionLogClear(); // fresh log for each connection attempt
     final pinsPath = widget.pinsPath;
     if (!mounted) return;
     final (w, h) = desktopSizeFor(View.of(context).physicalSize, phoneOrTablet: _isAndroid);
-    final stream = widget.useSavedPassword
+    // Clipboard is text-only and off for VNC; the method decides.
+    final clipboard =
+        widget.profile.method.supportsClipboard ? widget.profile.clipboardMode : ClipboardMode.off;
+    // Files the remote sends land in a "Received" folder beside the app data.
+    // Empty turns file receiving off (when the clipboard is off).
+    final downloadDir = clipboard == ClipboardMode.off
+        ? ''
+        : '${File(pinsPath).parent.path}${Platform.pathSeparator}Received';
+    _receiveDir = downloadDir;
+    // Copy and paste is off for this connection: offer to turn it on right
+    // here, since copying text or files would otherwise silently do nothing.
+    // (The global Settings default only applies to new connections, so an
+    // already-saved one like this can still be off even after that is
+    // turned on — this button fixes THIS connection, with no settings menu.)
+    if (clipboard == ClipboardMode.off && widget.profile.method.supportsClipboard) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(seconds: 60),
+        content: const Text(
+          'Copy and paste is off for this connection. '
+          'Right-click copy / Ctrl+C will not sync between devices.',
+        ),
+        action: widget.onClipboardModeChanged == null
+            ? null
+            : SnackBarAction(
+                label: 'Turn on now',
+                onPressed: () {
+                  widget.onClipboardModeChanged?.call(ClipboardMode.both);
+                  Navigator.of(context).pop(true);
+                },
+              ),
+      ));
+    }
+    final vnc = widget.profile.method == ConnectionMethod.vnc;
+    final stream = vnc
+        ? (widget.useSavedPassword
+            ? _session.startVncWithSavedPassword(
+                connectionId: widget.profile.id,
+                host: widget.profile.host,
+                port: widget.profile.port,
+                idleMinutes: widget.idleMinutes,
+              )
+            : _session.startVnc(
+                host: widget.profile.host,
+                port: widget.profile.port,
+                password: widget.password ?? '',
+                idleMinutes: widget.idleMinutes,
+              ))
+        : widget.useSavedPassword
         ? _session.startWithSavedPassword(
             connectionId: widget.profile.id,
             host: widget.profile.host,
@@ -209,8 +392,12 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
             width: w,
             height: h,
             pinsPath: pinsPath,
-            clipboardDirection: widget.profile.clipboardMode,
+            clipboardDirection: clipboard,
+            downloadDir: downloadDir,
             idleMinutes: widget.idleMinutes,
+            quality: widget.profile.quality,
+            shareScreen: widget.profile.method == ConnectionMethod.shareScreen,
+            authCode: widget.authCode,
           )
         : _session.start(
             host: widget.profile.host,
@@ -220,8 +407,12 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
             width: w,
             height: h,
             pinsPath: pinsPath,
-            clipboardDirection: widget.profile.clipboardMode,
+            clipboardDirection: clipboard,
+            downloadDir: downloadDir,
             idleMinutes: widget.idleMinutes,
+            quality: widget.profile.quality,
+            shareScreen: widget.profile.method == ConnectionMethod.shareScreen,
+            authCode: widget.authCode,
           );
     _sub = stream.listen(_onUpdate, onError: (_) => _onEnded(null));
   }
@@ -282,7 +473,39 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Text copied on the remote computer was larger than 1 MB and was not copied.'),
         ));
+      case UpdateKind.filesIncoming:
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Receiving ${u.text ?? 'files'} from the remote computer…'),
+          duration: const Duration(seconds: 6),
+        ));
+      case UpdateKind.fileReceived:
+        if (!mounted) return;
+        final name = u.text ?? 'a file';
+        final path = u.label;
+        if (path != null && path.isNotEmpty) _putReceivedOnClipboard(path);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(seconds: 10),
+          content: Text(FileClipboard.supported
+              ? 'Received "$name" — press Ctrl+V in any folder to place it there.'
+              : 'Received "$name" into: $_receiveDir'),
+        ));
     }
+  }
+
+  /// Picks local files and sends them to the remote computer.
+  Future<void> _sendFiles() async {
+    final files = await openFiles();
+    if (files.isEmpty) return;
+    _session.sendFiles(paths: files.map((f) => f.path).toList());
+    if (!mounted) return;
+    final many = files.length > 1;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      duration: const Duration(seconds: 10),
+      content: Text(many
+          ? '${files.length} files ready — press Ctrl+V in a folder on the remote computer to paste them there.'
+          : '"${files.first.name}" ready — press Ctrl+V in a folder on the remote computer to paste it there.'),
+    ));
   }
 
   (String, String)? _changedFingerprints;
@@ -322,6 +545,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   }
 
   void _onEnded(ErrorInfo? error) {
+    if (_immersive) _setImmersive(false);
     _heldModifiers.clear();
     _clipTimer?.cancel();
     _backgroundTimer?.cancel();
@@ -334,6 +558,59 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
       _state = error == null ? RdpConnectionState.disconnected : RdpConnectionState.failed;
       _statusLabel = _state.label;
     });
+    // Two-step verification: ask for the authenticator code at once.
+    if (error?.id == 'CodeNeeded' && widget.onAuthCode != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _askCode());
+    }
+  }
+
+  /// Exports the in-memory session log so the user can share it.
+  /// Android: share sheet.  Windows/Linux: file-save dialog → Desktop.
+  Future<void> _reportProblem() async {
+    if (!mounted) return;
+    // TODO(next-bump): update this when pubspec version changes.
+    // Adding package_info_plus would let us read it at runtime.
+    const version = '0.3.6';
+    final content = rust_log.sessionLogExport(appVersion: version);
+    final fileName = 'cipher-desk-log-${DateTime.now().millisecondsSinceEpoch}.txt';
+
+    if (_isAndroid) {
+      // Write to a temp file, then hand off to the OS share sheet.
+      final tmp = await getTemporaryDirectory();
+      final file = File('${tmp.path}/$fileName');
+      await file.writeAsString(content);
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'text/plain')],
+        subject: 'Cipher Desk connection log',
+      );
+    } else {
+      // Desktop: file-save dialog.
+      final location = await getSaveLocation(
+        suggestedName: fileName,
+        acceptedTypeGroups: [
+          const XTypeGroup(label: 'Text files', extensions: ['txt']),
+        ],
+      );
+      if (location == null || !mounted) return;
+      final file = File(location.path);
+      await file.writeAsString(content);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Log saved to ${location.path}')),
+      );
+    }
+  }
+
+  /// Asks for the 6-digit authenticator code, then connects again with it.
+  Future<void> _askCode() async {
+    if (!mounted) return;
+    final code = await showDialog<String>(
+      context: context,
+      builder: (_) => const _CodeDialog(),
+    );
+    if (code == null || !mounted) return;
+    widget.onAuthCode?.call(code);
+    Navigator.of(context).pop(true);
   }
 
   Future<void> _askApproval(String fingerprint) async {
@@ -403,9 +680,12 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
 
   @override
   void dispose() {
+    if (_immersive) AppWindow.setFullScreen(false);
+    SecureWindow.setViewing(false);
     WidgetsBinding.instance.removeObserver(this);
     _clipTimer?.cancel();
     _backgroundTimer?.cancel();
+    _receivedBatchTimer?.cancel();
     if (_serviceStarted) SessionService.stop();
     if (!_ended) {
       // Leaving the screen ends the session; record it before the stream is cancelled.
@@ -430,8 +710,17 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   static const maxZoom = 4.0;
 
   /// Scale with zoom 1 = whole desktop visible (like BoxFit.contain).
-  double _baseScale(Size box) =>
-      (_width == 0 || _height == 0) ? 0.0 : math.min(box.width / _width, box.height / _height);
+  double _baseScale(Size box) {
+    if (_width == 0 || _height == 0) return 0.0;
+    final fit = math.min(box.width / _width, box.height / _height);
+    return switch (_view) {
+      // One remote pixel per screen pixel.
+      _ViewMode.original => 1 / _dpr,
+      // The whole screen, but never enlarged (enlarging only blurs it).
+      _ViewMode.shrink => math.min(fit, 1 / _dpr),
+      _ViewMode.stretch => fit,
+    };
+  }
 
   double _scale(Size box) => _baseScale(box) * _zoom;
 
@@ -440,6 +729,37 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
 
   /// Top-left of the remote desktop in view coordinates.
   Offset _origin(Size box) => _centred(box, _scale(box)) + _pan;
+
+  // Per-axis scale and origin, so "stretch" can fill the window on each axis
+  // independently. In fit mode both axes share the aspect-correct scale.
+  bool get _stretch => _view == _ViewMode.stretch;
+  double _sx(Size box) => _stretch && _width != 0 ? box.width / _width : _scale(box);
+  double _sy(Size box) => _stretch && _height != 0 ? box.height / _height : _scale(box);
+  Offset _origin2(Size box) {
+    if (_stretch) return Offset.zero;
+    final o = _origin(box);
+    // On whole screen pixels, so 1:1 pixels stay sharp.
+    return Offset((o.dx * _dpr).roundToDouble() / _dpr, (o.dy * _dpr).roundToDouble() / _dpr);
+  }
+
+  /// "Original size" with a remote screen larger than the window: the view
+  /// follows the mouse, so moving it towards an edge shows that part.
+  void _followMouse(Offset local, Size box) {
+    if (_view != _ViewMode.original || _zoom != 1) return;
+    final s = _scale(box);
+    double axis(double pointer, double view, double content, double centred) {
+      if (content <= view) return 0;
+      final f = (pointer / view).clamp(0.0, 1.0);
+      return -f * (content - view) - centred;
+    }
+
+    final c = _centred(box, s);
+    final pan = Offset(
+      axis(local.dx, box.width, _width * s, c.dx),
+      axis(local.dy, box.height, _height * s, c.dy),
+    );
+    if ((pan - _pan).distance >= 0.5) setState(() => _pan = pan);
+  }
 
   /// Keeps the zoomed desktop covering the view (no empty margins when zoomed in).
   Offset _clampPan(Size box, double s, Offset pan) {
@@ -458,11 +778,12 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
 
   /// Converts a position in the view to remote-desktop coordinates.
   (int, int)? _toRemote(Offset local, Size box) {
-    final s = _scale(box);
-    if (s <= 0) return null;
-    final o = _origin(box);
-    final x = ((local.dx - o.dx) / s).round().clamp(0, _width - 1);
-    final y = ((local.dy - o.dy) / s).round().clamp(0, _height - 1);
+    final sx = _sx(box);
+    final sy = _sy(box);
+    if (sx <= 0 || sy <= 0) return null;
+    final o = _origin2(box);
+    final x = ((local.dx - o.dx) / sx).round().clamp(0, _width - 1);
+    final y = ((local.dy - o.dy) / sy).round().clamp(0, _height - 1);
     return (x, y);
   }
 
@@ -586,6 +907,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   /// accepts those, so a mouse click is never sent twice).
   void _pointer(PointerEvent e, Size box, {bool? down}) {
     if (_touchKinds.contains(e.kind)) return;
+    if (down == null) _followMouse(e.localPosition, box);
     final p = _toRemote(e.localPosition, box);
     if (p == null) return;
     if (down == null) {
@@ -761,9 +1083,74 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   }
 
   /// The remote desktop at the current zoom and pan, plus the trackpad cursor.
+  /// Full screen: hides the toolbar and, on Windows and Android, the taskbar
+  /// or system bars too.
+  void _setImmersive(bool on) {
+    if (_immersive == on) return;
+    if (mounted) setState(() => _immersive = on);
+    AppWindow.setFullScreen(on);
+    _focus.requestFocus();
+  }
+
+  Widget _viewMenu() => PopupMenuButton<_ViewMode>(
+        key: const Key('button-view-mode'),
+        tooltip: 'View: ${_view.label}',
+        icon: Icon(_view.icon),
+        initialValue: _view,
+        onSelected: (v) => setState(() {
+          _view = v;
+          _zoom = 1;
+          _pan = Offset.zero;
+          _focus.requestFocus();
+        }),
+        itemBuilder: (_) => [
+          for (final v in _ViewMode.values)
+            CheckedPopupMenuItem(
+              value: v,
+              checked: v == _view,
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(v.label),
+                subtitle: Text(v.description),
+              ),
+            ),
+        ],
+      );
+
+  Widget _qualityMenu() => PopupMenuButton<PictureQuality>(
+        key: const Key('button-quality'),
+        tooltip: 'Picture quality: ${widget.profile.quality.label}',
+        icon: Icon(widget.profile.quality.icon),
+        initialValue: widget.profile.quality,
+        onSelected: (q) {
+          if (q == widget.profile.quality) return;
+          // The quality is agreed when connecting: save it and connect again.
+          widget.onQualityChanged?.call(q);
+          Navigator.of(context).pop(true);
+        },
+        itemBuilder: (_) => [
+          for (final q in PictureQuality.values)
+            CheckedPopupMenuItem(
+              value: q,
+              checked: q == widget.profile.quality,
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(q.label),
+                subtitle: Text(q.description),
+              ),
+            ),
+          const PopupMenuDivider(),
+          const PopupMenuItem<PictureQuality>(
+            enabled: false,
+            child: Text('Changing it reconnects.'),
+          ),
+        ],
+      );
+
   Widget _desktop(ui.Image image, Size box) {
-    final s = _scale(box);
-    final o = _origin(box);
+    final sx = _sx(box);
+    final sy = _sy(box);
+    final o = _origin2(box);
     return ClipRect(
       child: SizedBox.expand(
         child: Stack(
@@ -771,14 +1158,21 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
             Positioned(
               left: o.dx,
               top: o.dy,
-              width: _width * s,
-              height: _height * s,
-              child: RawImage(image: image, fit: BoxFit.fill, filterQuality: FilterQuality.medium),
+              width: _width * sx,
+              height: _height * sy,
+              child: RawImage(
+                image: image,
+                fit: BoxFit.fill,
+                // 1:1 pixels need no smoothing; scaled views do.
+                filterQuality: _view == _ViewMode.original && _zoom == 1
+                    ? FilterQuality.none
+                    : FilterQuality.medium,
+              ),
             ),
             if (_trackpad)
               Positioned(
-                left: o.dx + _cursor.dx * s - 2,
-                top: o.dy + _cursor.dy * s - 2,
+                left: o.dx + _cursor.dx * sx - 2,
+                top: o.dy + _cursor.dy * sy - 2,
                 child: const IgnorePointer(
                   child: Icon(
                     Icons.navigation,
@@ -843,6 +1237,13 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
                 icon: const Icon(Icons.content_paste_go_outlined),
                 onPressed: _offerLocalClipboard,
               ),
+            if (_sendsClipboard)
+              IconButton(
+                key: const Key('button-send-file'),
+                tooltip: 'Send a file to the remote computer',
+                icon: const Icon(Icons.upload_file_outlined),
+                onPressed: _sendFiles,
+              ),
           ],
         ),
       ),
@@ -871,6 +1272,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
 
   @override
   Widget build(BuildContext context) {
+    _dpr = MediaQuery.devicePixelRatioOf(context);
     final changed = _changedFingerprints;
     return PopScope(
       canPop: !_sessionOpen,
@@ -878,9 +1280,22 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
         if (!didPop) _confirmLeave();
       },
       child: Scaffold(
-      appBar: AppBar(
+      appBar: _immersive
+          ? null
+          : AppBar(
         title: Text(widget.profile.displayName),
         actions: [
+          if (!_ended && _state == RdpConnectionState.connected) ...[
+            _viewMenu(),
+            if (widget.profile.method != ConnectionMethod.vnc && widget.onQualityChanged != null)
+              _qualityMenu(),
+            IconButton(
+              key: const Key('button-fullscreen'),
+              tooltip: 'Full screen',
+              icon: const Icon(Icons.fullscreen),
+              onPressed: () => _setImmersive(true),
+            ),
+          ],
           if (widget.profile.clipboardEnabled && _state == RdpConnectionState.connected)
             Tooltip(
               message: switch (widget.profile.clipboardMode) {
@@ -921,6 +1336,16 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: _FingerprintCompare(pinned: changed.$1, presented: changed.$2),
             ),
+          if (_ended && _error?.id == 'CodeNeeded' && widget.onAuthCode != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: FilledButton.icon(
+                key: const Key('button-enter-code'),
+                onPressed: _askCode,
+                icon: const Icon(Icons.pin_outlined),
+                label: const Text('Enter authenticator code'),
+              ),
+            ),
           if (changed != null && _ended && _error?.id == 'CertificateChanged')
             Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -950,11 +1375,80 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
                     onPressed: () => Navigator.of(context).pop(),
                     child: const Text('Back to connections'),
                   ),
+                  if (_error != null)
+                    OutlinedButton.icon(
+                      key: const Key('button-report-problem'),
+                      onPressed: _reportProblem,
+                      icon: const Icon(Icons.bug_report_outlined),
+                      label: const Text('Report Problem'),
+                    ),
                 ],
               ),
             ),
-          if (!_ended) Expanded(child: _remoteView()),
-          if (!_ended && _state == RdpConnectionState.connected) _keysBar(),
+          if (!_ended)
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final bounds = constraints.biggest;
+                  return Stack(
+                    children: [
+                      Positioned.fill(child: _remoteView()),
+                      // Full-screen controls: a small draggable button so you can
+                      // move it off whatever it's covering; tap to show the view
+                      // and exit-full-screen buttons, tap again to hide them.
+                      if (_immersive)
+                        _FloatingToggle(
+                          icon: Icons.more_horiz,
+                          tooltip: 'Full-screen controls',
+                          bounds: bounds,
+                          initial: Offset(bounds.width - 56, 16),
+                          panelAbove: false,
+                          panelBuilder: (context) => SafeArea(
+                            child: Material(
+                              color: Colors.black54,
+                              shape: const StadiumBorder(),
+                              child: IconTheme(
+                                data: const IconThemeData(color: Colors.white),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _viewMenu(),
+                                    IconButton(
+                                      key: const Key('button-exit-fullscreen'),
+                                      tooltip: 'Exit full screen',
+                                      icon: const Icon(Icons.fullscreen_exit),
+                                      onPressed: () => _setImmersive(false),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      // Keyboard shortcuts: same idea — a draggable button instead
+                      // of a bar that always takes up space across the bottom.
+                      if (!_immersive && _state == RdpConnectionState.connected)
+                        _FloatingToggle(
+                          icon: Icons.keyboard_outlined,
+                          tooltip: 'Keyboard shortcuts',
+                          bounds: bounds,
+                          // Lines the button up so the panel (up to 560 wide) opens
+                          // roughly centred above it instead of running off-screen.
+                          initial: Offset((bounds.width - 560).clamp(0.0, double.infinity) / 2, bounds.height - 64),
+                          panelAbove: true,
+                          // A horizontal scroller needs a bounded width; give it
+                          // most of the screen width, capped so it isn't huge on a
+                          // big monitor.
+                          panelBuilder: (context) => SizedBox(
+                            width: (bounds.width - 32).clamp(200, 560),
+                            child: _keysBar(),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ),
         ],
       ),
     ),
@@ -963,6 +1457,112 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
 }
 
 enum _TwoFinger { undecided, zoom, scroll }
+
+/// A small round button that floats over the remote picture. Drag it
+/// anywhere so it isn't covering something on the remote screen. Tap it to
+/// open a panel next to it (the keyboard shortcuts, or the full-screen
+/// controls); tap again to close the panel. The button itself always stays
+/// on screen — only the panel can be closed — so full screen and disconnect
+/// are never out of reach.
+class _FloatingToggle extends StatefulWidget {
+  const _FloatingToggle({
+    required this.icon,
+    required this.tooltip,
+    required this.bounds,
+    required this.initial,
+    required this.panelBuilder,
+    required this.panelAbove,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final Size bounds;
+  final Offset initial;
+  final Widget Function(BuildContext context) panelBuilder;
+
+  /// Whether the panel opens above the button (for a button near the bottom
+  /// of the screen) or below it (for a button near the top).
+  final bool panelAbove;
+
+  @override
+  State<_FloatingToggle> createState() => _FloatingToggleState();
+}
+
+class _FloatingToggleState extends State<_FloatingToggle> {
+  static const double _size = 44;
+  // Idle opacity: visible enough to find, unobtrusive over the remote picture.
+  static const double _opacityIdle = 0.25;
+  static const double _opacityActive = 1.0;
+
+  late Offset _pos = _clamp(widget.initial, widget.bounds);
+  bool _open = false;
+  bool _hovering = false;
+  bool _dragging = false;
+
+  bool get _active => _open || _hovering || _dragging;
+
+  static Offset _clamp(Offset p, Size bounds) {
+    final maxX = (bounds.width - _size).clamp(0.0, double.infinity);
+    final maxY = (bounds.height - _size).clamp(0.0, double.infinity);
+    return Offset(p.dx.clamp(0.0, maxX), p.dy.clamp(0.0, maxY));
+  }
+
+  @override
+  void didUpdateWidget(covariant _FloatingToggle old) {
+    super.didUpdateWidget(old);
+    // The window was resized or rotated: keep the button on screen.
+    if (old.bounds != widget.bounds) _pos = _clamp(_pos, widget.bounds);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final button = MouseRegion(
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: GestureDetector(
+        onPanStart: (_) => setState(() => _dragging = true),
+        onPanUpdate: (d) => setState(() => _pos = _clamp(_pos + d.delta, widget.bounds)),
+        onPanEnd: (_) => setState(() => _dragging = false),
+        onPanCancel: () => setState(() => _dragging = false),
+        onTap: () => setState(() => _open = !_open),
+        child: AnimatedOpacity(
+          opacity: _active ? _opacityActive : _opacityIdle,
+          duration: const Duration(milliseconds: 200),
+          child: Tooltip(
+            message: widget.tooltip,
+            child: Material(
+              color: Colors.black54,
+              shape: const CircleBorder(),
+              elevation: 4,
+              child: SizedBox(
+                width: _size,
+                height: _size,
+                child: Icon(_open ? Icons.close : widget.icon, color: Colors.white, size: 22),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    return Positioned(
+      left: _pos.dx,
+      top: _pos.dy,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: widget.panelAbove
+            ? [
+                if (_open) Padding(padding: const EdgeInsets.only(bottom: 6), child: widget.panelBuilder(context)),
+                button,
+              ]
+            : [
+                button,
+                if (_open) Padding(padding: const EdgeInsets.only(top: 6), child: widget.panelBuilder(context)),
+              ],
+      ),
+    );
+  }
+}
 
 class _ModifierButton extends StatelessWidget {
   const _ModifierButton(this.label, {required this.held, required this.onPressed});
@@ -1023,6 +1623,87 @@ class _FingerprintCompare extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// How the remote screen fits the window (like AnyDesk's view modes).
+enum _ViewMode {
+  original,
+  shrink,
+  stretch;
+
+  String get label => switch (this) {
+        _ViewMode.original => 'Original size',
+        _ViewMode.shrink => 'Shrink to fit',
+        _ViewMode.stretch => 'Stretch to fill',
+      };
+
+  String get description => switch (this) {
+        _ViewMode.original => 'Sharpest: one remote pixel per screen pixel. Move the mouse to an edge to see more.',
+        _ViewMode.shrink => 'The whole screen, never enlarged.',
+        _ViewMode.stretch => 'Fills the window.',
+      };
+
+  IconData get icon => switch (this) {
+        _ViewMode.original => Icons.crop_original,
+        _ViewMode.shrink => Icons.fit_screen_outlined,
+        _ViewMode.stretch => Icons.aspect_ratio_outlined,
+      };
+}
+
+/// Asks for the 6-digit code from the authenticator app.
+class _CodeDialog extends StatefulWidget {
+  const _CodeDialog();
+
+  @override
+  State<_CodeDialog> createState() => _CodeDialogState();
+}
+
+class _CodeDialogState extends State<_CodeDialog> {
+  final _controller = TextEditingController();
+
+  bool get _valid => RegExp(r'^\d{6}$').hasMatch(_controller.text.trim());
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_valid) Navigator.pop(context, _controller.text.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Authenticator code'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Open Google Authenticator on your phone and type the '
+              '6-digit code for Cipher Desk. This computer is then remembered '
+              'for 30 days.'),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('field-auth-code'),
+            controller: _controller,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: const InputDecoration(labelText: '6-digit code'),
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) => _submit(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        FilledButton(onPressed: _valid ? _submit : null, child: const Text('Connect')),
+      ],
     );
   }
 }

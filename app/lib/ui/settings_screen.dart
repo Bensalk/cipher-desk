@@ -172,7 +172,7 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           const _Header('Privacy & security'),
-          if (isAndroid)
+          if (isAndroid || _isWindows)
             SwitchListTile(
               key: const Key('setting-block-screenshots'),
               value: settings.blockScreenshots,
@@ -181,16 +181,17 @@ class SettingsScreen extends StatelessWidget {
                 SecureWindow.setEnabled(v);
               },
               title: const Text('Block screenshots'),
-              subtitle: const Text(
-                'Hides the remote screen from screenshots, screen recording and the recent-apps view.',
-              ),
+              subtitle: Text(isAndroid
+                  ? 'Hides the remote screen from screenshots, screen recording and the recent-apps view.'
+                  : 'Hides the remote screen you are viewing from screenshots, screen recording and screen sharing.'),
             ),
           SwitchListTile(
             key: const Key('setting-clipboard-default'),
             value: settings.clipboardDefault,
             onChanged: (v) => settings.clipboardDefault = v,
-            title: const Text('Share clipboard for new connections'),
-            subtitle: const Text('Off by default. You can change it for each connection.'),
+            title: const Text('Copy and paste for new connections'),
+            subtitle: const Text(
+                'Text and files. On by default for new connections. You can change it for each connection.'),
           ),
           if (_isWindows)
             SwitchListTile(

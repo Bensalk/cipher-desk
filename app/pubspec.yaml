@@ -1,7 +1,7 @@
 name: cipher_desk
 description: "Secure open-source RDP remote desktop viewer for Windows, Linux and Android."
 publish_to: 'none'
-version: 0.1.1+2
+version: 0.3.6+18
 
 environment:
   sdk: ^3.11.0
@@ -17,6 +17,8 @@ dependencies:
   local_auth: ^2.3.0
   # Choosing where to export and which file to import (Windows and Linux; F7).
   file_selector: ^1.0.3
+  # Android share sheet for the "Report Problem" log export (F8).
+  share_plus: ^10.1.4
 
 dev_dependencies:
   flutter_test:

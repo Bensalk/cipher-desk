@@ -38,13 +38,17 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       - name: Format
-        run: cargo fmt --all -- --check
+        shell: bash
+        run: bash scripts/ci-run.sh "Format" cargo fmt --all -- --check
       - name: Clippy (zero warnings)
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        shell: bash
+        run: bash scripts/ci-run.sh "Clippy" cargo clippy --workspace --all-targets -- -D warnings
       - name: Tests (debug)
-        run: cargo test --workspace
+        shell: bash
+        run: bash scripts/ci-run.sh "Tests (debug)" cargo test --workspace
       - name: Tests (release — checks release logging cap)
-        run: cargo test --workspace --release
+        shell: bash
+        run: bash scripts/ci-run.sh "Tests (release)" cargo test --workspace --release
       - name: Security policy checks
         shell: bash
         run: sh scripts/check-policy.sh
@@ -71,7 +75,7 @@ jobs:
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
             xvfb xterm freerdp3-shadow-x11 winpr3-utils xrdp xorgxrdp openssl \
-            gnome-keyring dbus-x11
+            gnome-keyring dbus-x11 x11vnc
       - name: Start test hosts (random password per run)
         run: bash scripts/start-test-hosts.sh
       - name: Live tests with an OS keyring (debug and release)
@@ -85,6 +89,7 @@ jobs:
             bash scripts/ci-run.sh "live_vault" cargo test -p rdpv-core --test live_vault real_vault -- --ignored
             bash scripts/ci-run.sh "live_clipboard" cargo test -p rdpv-core --test live_clipboard -- --ignored --test-threads=1
             bash scripts/ci-run.sh "live_host (release)" cargo test --release -p rdpv-core --test live_host -- --ignored --test-threads=1
+            bash scripts/ci-run.sh "live_vnc" cargo test -p rdpv-core --test live_vnc -- --ignored --test-threads=1
           '
       - name: Reliability tests (reconnect, certificate on reconnect, memory; Stage 8)
         # L3 (silent network drop) needs root to change firewall rules; it is run

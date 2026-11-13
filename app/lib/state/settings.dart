@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 class AppSettings extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
   bool _blockScreenshots = true; // S10: on by default
-  bool _clipboardDefault = false; // S3/S6: off by default
+  bool _clipboardDefault = true; // S3/S6: on by default for new connections
   bool _confirmSavedPassword = true; // S5/S13: on by default
   int _idleMinutes = 30; // S7; 0 = never
 

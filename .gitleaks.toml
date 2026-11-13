@@ -11,6 +11,12 @@ description = "Hard-coded password value"
 # Values starting with "$" are variable references (e.g. "$PASSWORD"), not secrets.
 regex = '''(?i)(password|passwd|pwd|secret)\s*[:=]\s*["'][^"'\s$][^"'\s]{3,}["']'''
 keywords = ["password", "passwd", "pwd", "secret"]
+# The public "ask to connect" sign-in (rdpv_host::REQUEST_PASSWORD) is not a
+# secret by design: the screen is only shown after someone accepts. The rule's
+# "secret" is the keyword group, so match the whole line here.
+[rules.allowlist]
+regexTarget = "line"
+regexes = ['''ask-to-connect''']
 
 # Catch passwords passed as command-line flags in scripts/docs, e.g. --password xxx or /p:xxx
 # (a plain "-p" is not matched: it is also cargo's package flag).

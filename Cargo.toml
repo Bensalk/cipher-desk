@@ -1,9 +1,9 @@
 [workspace]
 resolver = "2"
-members = ["rust/core", "rust/bridge"]
+members = ["rust/core", "rust/bridge", "rust/host", "rust/host-service"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.3.6"
 edition = "2021"
 license = "Apache-2.0"
 rust-version = "1.85"
@@ -29,7 +29,7 @@ bytes = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tracing = { version = "0.1", features = ["release_max_level_info"] }
-tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt", "std"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt", "registry", "std"] }
 zeroize = { version = "1", features = ["zeroize_derive"] }
 thiserror = "2"
 

@@ -60,6 +60,9 @@ fn params(
         pinned_fingerprint: pin,
         connect_timeout: Duration::from_secs(5),
         clipboard: rdpv_core::clipboard::ClipboardPolicy::off(),
+        receive_dir: None,
+        quality: rdpv_core::profiles::Quality::Balanced,
+        second_factor: None,
     })
 }
 
@@ -87,7 +90,7 @@ fn poll_until(
     let deadline = Instant::now() + Duration::from_secs(secs);
     let mut all = Vec::new();
     while Instant::now() < deadline {
-        let ev = s.poll();
+        let ev = s.poll().0;
         let hit = ev.iter().any(&mut pred);
         all.extend(ev);
         if hit || s.is_ended() {

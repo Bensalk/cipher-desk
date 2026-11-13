@@ -1,0 +1,59 @@
+[package]
+name = "rdpv-host"
+description = "Cipher Desk Host: shares this computer's own screen over RDP (Share screen method)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+rdpv-core = { path = "../core" }
+# Copy of the IronRDP server for the 0.12 crates (see its README). QOIZ is the
+# lossless codec behind the viewer's "Best quality" setting.
+ironrdp-server = { path = "../third_party/ironrdp-server", features = ["qoiz"] }
+ironrdp-cliprdr.workspace = true
+ironrdp-core.workspace = true
+anyhow = "1"
+async-trait = "0.1"
+bytes = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "sync", "macros"] }
+tracing = "0.1"
+rcgen = { version = "0.14", default-features = false, features = ["crypto", "ring", "pem"] }
+zeroize.workspace = true
+ring = "0.17"
+# The QR code Google Authenticator scans when two-step verification is set up
+# (encoder only; no image libraries).
+qrcode = { version = "0.14", default-features = false }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_UI_HiDpi",
+  "Win32_System_LibraryLoader",
+  "Win32_System_StationsAndDesktops",
+  "Win32_Security_Cryptography",
+  "Win32_System_Memory",
+  "Win32_System_DataExchange",
+] }
+
+[dev-dependencies]
+tempfile = "3"
+
+# Same lints as the workspace, except that unsafe code is "deny" instead of
+# "forbid": the Windows screen capture and input module must call Win32 APIs.
+# That one module allows it, with a SAFETY comment on every call (reviewed
+# exception, CONTRIBUTING.md). Everything else in this crate stays safe.
+[lints.rust]
+unsafe_code = "deny"
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(frb_expand)"] }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "deny"

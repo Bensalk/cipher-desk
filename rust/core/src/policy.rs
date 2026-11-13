@@ -55,7 +55,11 @@ pub struct SecurityDefaults {
     pub require_unlock_for_saved_password: bool,
     /// SA-8: never auto-retry after an authentication failure.
     pub retry_after_auth_failure: bool,
-    /// F13: maximum automatic reconnect attempts after a network drop.
+    /// F13: maximum automatic reconnect attempts after a network drop. At
+    /// the delays in [`ConnectionError::reconnect_delay`] this gives about
+    /// 1.5 minutes of retrying (plus up to ~30-45 s to first notice the drop,
+    /// see `KEEPALIVE_*` in `session.rs`) before giving up and asking the
+    /// user to reconnect by hand.
     pub max_auto_reconnects: u8,
 }
 
@@ -77,7 +81,7 @@ impl SecurityDefaults {
             idle_disconnect: Duration::from_secs(30 * 60),
             require_unlock_for_saved_password: true,
             retry_after_auth_failure: false,
-            max_auto_reconnects: 3,
+            max_auto_reconnects: 6,
         }
     }
 }
@@ -111,7 +115,7 @@ mod tests {
         assert!(d.connect_timeout > Duration::ZERO);
         assert!(d.connect_timeout <= Duration::from_secs(60));
         assert!(d.idle_disconnect > Duration::ZERO);
-        assert!(d.max_auto_reconnects <= 5);
+        assert!(d.max_auto_reconnects <= 8);
     }
 
     #[test]

@@ -8,9 +8,9 @@ import 'errors.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 
-            // These functions are ignored because they are not marked as `pub`: `approval`, `changed`, `drive`, `ended`, `frame`, `new`, `pause`, `pending_disconnect`, `policy`, `reconnect`, `reconnecting`, `remote_clipboard`, `resized`, `run`, `send`, `spawn`, `status`, `union`, `wait_for_approval`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Command`, `Drive`, `Reconnect`, `Target`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`
+            // These functions are ignored because they are not marked as `pub`: `approval`, `changed`, `clamped`, `describe_files`, `disconnect`, `drive`, `ended`, `file_received`, `frame_ready`, `frame`, `from_core`, `keep_running`, `new`, `offer_local_clipboard`, `pause`, `pending_disconnect`, `policy`, `poll`, `reconnect`, `reconnecting`, `region_pixels`, `remote_clipboard`, `resized`, `run`, `send_files`, `send_input`, `send`, `size`, `spawn`, `status`, `to_core`, `union`, `vnc`, `wait_for_approval`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Command`, `Drive`, `Reconnect`, `Remote`, `Target`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`
 
 
             
@@ -58,17 +58,31 @@ static RdpSession  create()=>RustLib.instance.api.crateApiSessionRdpSessionCreat
  void  offerClipboardText({required String text });
 
 
+/// Sends local files to the remote computer, which downloads them. Sent
+/// only if clipboard sharing to the remote is allowed for this connection.
+ void  sendFiles({required List<String> paths });
+
+
 /// Connects on a worker thread; updates arrive on `sink` (a Dart stream).
 /// The password is used for this connection only and never stored here.
 /// `pins_path` is the certificate pin file in the app's private data folder.
 /// Can be called once per handle.
- Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required int idleMinutes });
+ Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality , required bool shareScreen , required String authCode });
+
+
+/// Connects with the VNC method (no username; no clipboard or certificate).
+/// Only addresses on the own network or Tailscale are allowed.
+ Stream<SessionUpdate>  startVnc({required String host , required int port , required String password , required int idleMinutes });
+
+
+/// Like [`RdpSession::start_vnc`], with the password saved in the OS vault.
+ Stream<SessionUpdate>  startVncWithSavedPassword({required String connectionId , required String host , required int port , required int idleMinutes });
 
 
 /// Like [`RdpSession::start`], but reads the saved password from the OS
 /// vault inside Rust, so it never passes through the UI (Windows, Linux).
 /// The caller must have confirmed the user's identity first (S5).
- Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required int idleMinutes });
+ Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality , required bool shareScreen , required String authCode });
 
 
 /// Types text (on-screen keyboards, IMEs, pasted text is NOT sent this way).
@@ -93,6 +107,18 @@ both,
 toRemoteOnly,
 /// Only from the remote computer to this device.
 fromRemoteOnly,
+                    ;
+                    
+                }
+
+/// Picture quality of a connection (like AnyDesk's display quality).
+enum PictureQuality {
+                    /// Exact pixels with Cipher Desk Host; uses the most data.
+best,
+/// Sharp picture with compression; good for most links.
+balanced,
+/// Least data and quickest response on slow links.
+speed,
                     ;
                     
                 }
@@ -152,6 +178,11 @@ ended,
 remoteClipboard,
 /// Text copied on the remote computer was larger than allowed and was dropped.
 remoteClipboardTooLarge,
+/// A file sent by the remote finished arriving (`text` = its name).
+fileReceived,
+/// Files copied on the remote started arriving; `text` says how many and
+/// how big (e.g. "3 files, 1.2 GB").
+filesIncoming,
 /// The network dropped; reconnect attempt `x` of `y` is under way (`label`).
 /// Input is ignored until `Status` with `connected` arrives again.
 reconnecting,

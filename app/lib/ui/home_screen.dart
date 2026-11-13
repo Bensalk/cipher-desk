@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../platform/password_vault.dart';
@@ -7,10 +9,13 @@ import '../src/rust/api/store.dart';
 import '../state/persistence.dart';
 import '../state/profiles.dart';
 import '../state/settings.dart';
+import '../state/share.dart';
 import 'connection_form.dart';
+import 'connection_methods.dart';
 import 'error_banner.dart';
 import 'session_screen.dart';
 import 'settings_screen.dart';
+import 'share_screen.dart';
 import 'status_chip.dart';
 
 /// Main window: saved connections with search, and quick actions.
@@ -46,9 +51,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<AppPaths> _appPaths() async => _paths ??= widget.paths ?? await AppPaths.resolve();
 
+  /// "Share this screen" (Windows only); keeps running on every page.
+  late final ShareController? _share =
+      ShareController.supported ? ShareController(_appPaths) : null;
+
+  @override
+  void dispose() {
+    _share?.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
+    _share?.load();
     final notice = widget.startupNotice;
     if (notice != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -81,6 +97,10 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  /// Authenticator codes typed after a host asked for one, used once by the
+  /// next connection to that profile.
+  final Map<String, String> _authCodes = {};
 
   Future<void> _connect(ConnectionProfile p) async {
     String? password;
@@ -130,15 +150,53 @@ class _HomeScreenState extends State<HomeScreen> {
           pinsPath: paths.pins,
           idleMinutes: widget.settings.idleMinutes,
           onOutcome: (outcome) => widget.store.addHistory(p.id, outcome, DateTime.now()),
+          authCode: _authCodes.remove(p.id) ?? '',
+          onAuthCode: (code) => _authCodes[p.id] = code,
+          onQualityChanged: (quality) {
+            final current = widget.store.byId(p.id);
+            if (current != null) widget.store.upsert(current.copyWith(quality: quality));
+          },
+          onClipboardModeChanged: (mode) {
+            final current = widget.store.byId(p.id);
+            if (current != null) widget.store.upsert(current.copyWith(clipboardMode: mode));
+          },
         ),
       ),
     );
     password = null;
-    // After re-trusting a changed certificate, connect again (asks to check it).
+    // After re-trusting a changed certificate, or choosing another picture
+    // quality, connect again.
     if (reconnect == true && mounted) {
       final current = widget.store.byId(p.id);
       if (current != null) await _connect(current);
     }
+  }
+
+  /// "Ask to connect": no password. The other computer's always-on sharing
+  /// shows a popup there, and the screen appears once someone accepts it.
+  /// Uses the next port and the public "ask" sign-in (must match
+  /// `rdpv_host::request_port`, `REQUEST_USERNAME` and `REQUEST_PASSWORD`).
+  Future<void> _ask(ConnectionProfile p) async {
+    final paths = await _appPaths();
+    if (!mounted) return;
+    widget.store.markUsed(p.id, DateTime.now());
+    _snack('Asking ${p.displayName}. Someone there has 30 seconds to accept.');
+    final asking = p.copyWith(
+      port: p.port < 65535 ? p.port + 1 : p.port - 1,
+      username: 'ask',
+      savePassword: false,
+    );
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => SessionScreen(
+          profile: asking,
+          password: 'ask-to-connect',
+          pinsPath: paths.pins,
+          idleMinutes: widget.settings.idleMinutes,
+          onOutcome: (outcome) => widget.store.addHistory(p.id, outcome, DateTime.now()),
+        ),
+      ),
+    );
   }
 
   Future<void> _wake(ConnectionProfile p) async {
@@ -229,12 +287,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       : ListView.builder(
                           itemCount: items.length,
                           itemBuilder: (context, i) => _ProfileTile(
+                            key: ValueKey(items[i].id),
                             profile: items[i],
                             onConnect: () => _connect(items[i]),
                             onEdit: () => _openForm(items[i]),
                             onDelete: () => _confirmDelete(items[i]),
                             onWake: () => _wake(items[i]),
                             onCheck: () => _checkReadiness(items[i]),
+                            onAsk: () => _ask(items[i]),
                           ),
                         ),
             ),
@@ -247,18 +307,27 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 720;
-    final body = _tab == 0
-        ? _connections()
-        : SettingsScreen(
-            settings: widget.settings,
-            store: widget.store,
-            paths: _appPaths,
-            portableDir: (widget.paths?.portable ?? false) ? widget.paths!.dir : null,
-          );
-    final destinations = const [
+    final share = _share;
+    final settingsPage = SettingsScreen(
+      settings: widget.settings,
+      store: widget.store,
+      paths: _appPaths,
+      portableDir: (widget.paths?.portable ?? false) ? widget.paths!.dir : null,
+    );
+    final pages = <Widget>[
+      _connections(),
+      if (share != null) ShareScreenPage(share: share),
+      settingsPage,
+    ];
+    final destinations = [
       (Icons.computer_outlined, Icons.computer, 'Connections'),
+      if (share != null) (Icons.screen_share_outlined, Icons.screen_share, 'Share screen'),
       (Icons.settings_outlined, Icons.settings, 'Settings'),
     ];
+    final page = pages[_tab.clamp(0, pages.length - 1)];
+    final body = share == null
+        ? page
+        : Column(children: [SharingBanner(share: share), Expanded(child: page)]);
     return Scaffold(
       appBar: AppBar(title: const Text('Cipher Desk')),
       floatingActionButton: _tab == 0
@@ -304,14 +373,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _ProfileTile extends StatelessWidget {
+class _ProfileTile extends StatefulWidget {
   const _ProfileTile({
+    super.key,
     required this.profile,
     required this.onConnect,
     required this.onEdit,
     required this.onDelete,
     required this.onWake,
     required this.onCheck,
+    required this.onAsk,
   });
 
   final ConnectionProfile profile;
@@ -320,18 +391,93 @@ class _ProfileTile extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onWake;
   final VoidCallback onCheck;
+  final VoidCallback onAsk;
+
+  @override
+  State<_ProfileTile> createState() => _ProfileTileState();
+}
+
+/// How often each tile re-checks whether its computer is online. A short TCP
+/// connect attempt (see `checkReachable`), nothing is sent to the computer.
+const _statusRecheck = Duration(seconds: 15);
+
+class _ProfileTileState extends State<_ProfileTile> {
+  // null = still checking (first time, or a re-check in progress).
+  bool? _online;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+    _timer = Timer.periodic(_statusRecheck, (_) => _check());
+  }
+
+  @override
+  void didUpdateWidget(_ProfileTile old) {
+    super.didUpdateWidget(old);
+    // The host or port changed (edited elsewhere): check again right away.
+    if (old.profile.endpoint != widget.profile.endpoint) _check();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _check() {
+    checkReachable(host: widget.profile.host, port: widget.profile.port, timeoutMs: 2500).then((ok) {
+      if (mounted) setState(() => _online = ok);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final profile = widget.profile;
     final details = [
       profile.endpoint,
       if (profile.username.isNotEmpty) profile.username,
+      profile.method.label,
     ].join(' · ');
+    final statusColor = switch (_online) {
+      true => Colors.green,
+      false => Colors.red,
+      null => Theme.of(context).colorScheme.outline,
+    };
+    final statusLabel = switch (_online) {
+      true => 'Online',
+      false => 'Offline',
+      null => 'Checking…',
+    };
     return ListTile(
-      leading: const CircleAvatar(child: Icon(Icons.desktop_windows_outlined)),
+      leading: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          CircleAvatar(
+            child: Tooltip(message: profile.method.label, child: Icon(profile.method.icon)),
+          ),
+          Positioned(
+            right: -2,
+            bottom: -2,
+            child: Tooltip(
+              message: statusLabel,
+              child: Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: statusColor,
+                  border: Border.all(color: Theme.of(context).colorScheme.surface, width: 2),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
       title: Text(profile.displayName),
       subtitle: Text(details),
-      onTap: onConnect,
+      onTap: widget.onConnect,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -345,12 +491,19 @@ class _ProfileTile extends StatelessWidget {
           PopupMenuButton<String>(
             tooltip: 'More',
             onSelected: (v) => switch (v) {
-              'edit' => onEdit(),
-              'wake' => onWake(),
-              'check' => onCheck(),
-              _ => onDelete(),
+              'edit' => widget.onEdit(),
+              'wake' => widget.onWake(),
+              'check' => widget.onCheck(),
+              'ask' => widget.onAsk(),
+              _ => widget.onDelete(),
             },
             itemBuilder: (_) => [
+              if (profile.method == ConnectionMethod.shareScreen)
+                const PopupMenuItem(
+                  key: Key('profile-ask'),
+                  value: 'ask',
+                  child: Text('Ask to connect (no password)'),
+                ),
               const PopupMenuItem(value: 'edit', child: Text('Edit')),
               if (profile.wakeMac != null) const PopupMenuItem(value: 'wake', child: Text('Wake up')),
               const PopupMenuItem(value: 'check', child: Text('Check readiness')),
@@ -411,6 +564,7 @@ class _ReadinessDialog extends StatefulWidget {
 
 class _ReadinessDialogState extends State<_ReadinessDialog> {
   bool? _reachable;
+  bool? _vncAllowed;
   late final bool _trusted;
 
   @override
@@ -421,6 +575,11 @@ class _ReadinessDialogState extends State<_ReadinessDialog> {
     checkReachable(host: p.host, port: p.port, timeoutMs: 5000).then((ok) {
       if (mounted) setState(() => _reachable = ok);
     });
+    if (p.method == ConnectionMethod.vnc) {
+      vncAddressAllowed(host: p.host).then((ok) {
+        if (mounted) setState(() => _vncAllowed = ok);
+      });
+    }
   }
 
   Widget _row(bool? ok, String good, String bad, {String? pending}) {
@@ -445,11 +604,21 @@ class _ReadinessDialogState extends State<_ReadinessDialog> {
         children: [
           _row(_reachable, 'The computer answers on port ${p.port}',
               'The computer does not answer on port ${p.port}. Check that it is on, awake, '
-                  'and that you are on the same network or VPN.',
+                  '${switch (p.method) {
+                    ConnectionMethod.shareScreen => 'that "Start sharing" is on in Cipher Desk there, ',
+                    ConnectionMethod.vnc => 'that its VNC program is running, ',
+                    ConnectionMethod.privateRemoteDesktop => '',
+                  }}and that you are on the same network or VPN.',
               pending: 'Checking the computer…'),
-          _row(_trusted, 'Its certificate is trusted',
-              'Not connected before: you will be asked to check its certificate'),
-          _row(p.username.isNotEmpty, 'Username: ${p.username}', 'No username set'),
+          if (p.method == ConnectionMethod.vnc)
+            _row(_vncAllowed, 'The address is on your own network or Tailscale',
+                'VNC works only on your own network or Tailscale (100.x.x.x). Use one of those addresses.',
+                pending: 'Checking the address…')
+          else
+            _row(_trusted, 'Its certificate is trusted',
+                'Not connected before: you will be asked to check its certificate'),
+          if (p.method.needsUsername)
+            _row(p.username.isNotEmpty, 'Username: ${p.username}', 'No username set'),
           _row(p.savePassword, 'Password saved in this device\'s secure storage',
               'The password will be asked for when connecting'),
           if (p.wakeMac != null) _row(true, 'Wake-on-LAN set up', ''),
@@ -500,7 +669,7 @@ class _PasswordDialogState extends State<_PasswordDialog> {
             Text(widget.notice!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
             const SizedBox(height: 8),
           ],
-          Text('Username: ${widget.profile.username}'),
+          if (widget.profile.username.isNotEmpty) Text('Username: ${widget.profile.username}'),
           const SizedBox(height: 12),
           TextField(
             key: const Key('connect-password'),

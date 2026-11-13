@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'platform/secure_window.dart';
+import 'src/rust/api/log.dart' as rust_log;
 import 'src/rust/frb_generated.dart';
 import 'state/persistence.dart';
 import 'state/profiles.dart';
@@ -19,6 +20,7 @@ const removePasswordsFlag = '--remove-saved-passwords';
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   await RustLib.init();
+  rust_log.initLogging(); // set up Rust tracing subscriber + in-memory log
   final paths = await AppPaths.resolve();
   if (args.contains(removePasswordsFlag)) {
     final store = ProfileStore();
