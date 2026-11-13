@@ -2,7 +2,7 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
-## v0.3.6 (9 Nov 2026, test release)
+## v0.3.6 (9 Nov 2026, pre-release)
 
 Builds on v0.3.5. The About screen shows **0.3.6**.
 
