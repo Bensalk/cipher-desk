@@ -226,6 +226,11 @@ pub fn connect(params: ConnectParams) -> Result<Session, ConnectFailure> {
         connector = connector.with_static_channel(CliprdrClient::new(Box::new(QueueBackend::new(
             std::sync::Arc::clone(&queue),
         ))));
+        tracing::info!(
+            local_to_host = clipboard.local_to_host,
+            host_to_local = clipboard.host_to_local,
+            "clip: session starting with clipboard policy"
+        );
         Some(ClipState {
             policy: clipboard,
             queue,
@@ -602,6 +607,11 @@ impl Session {
                     self.advertise_local()?;
                 }
                 ClipAction::RemoteChanged { has_text } => {
+                    tracing::info!(
+                        has_text,
+                        host_to_local = policy.host_to_local,
+                        "clip: host clipboard changed (RemoteChanged)"
+                    );
                     if has_text && policy.host_to_local {
                         let msgs = self
                             .stage

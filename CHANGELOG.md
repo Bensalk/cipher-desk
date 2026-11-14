@@ -2,6 +2,11 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.19 (15 Nov 2026)
+
+### Diagnostic
+- **Clipboard direction diagnostic** — the session log now records which clipboard policy is active at connect time (`local_to_host`, `host_to_local`) and logs every host clipboard change event with whether it was processed or skipped by the policy. Use **Export session log** to capture this after a failed host→viewer paste so the cause can be pinpointed.
+
 ## v0.3.18 (15 Nov 2026)
 
 ### Fixed
