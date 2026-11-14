@@ -9,20 +9,21 @@ _Last updated: 14 Nov 2026._
 
 - **Work is now on `main`** — the `connection-methods` branch was merged.
   All releases now dispatch from `main`.
-- **v0.3.13** — build dispatched (run 43608605235). This should be the
-  **first working build with host→viewer file clipboard** on Windows 11.
-  **What was fixed:** Explorer on Windows 11 never puts `CF_HDROP` on the
-  clipboard — it uses `CFSTR_SHELLIDLIST` ("Shell IDList Array") instead.
-  v0.3.9 added the CIDA/PIDL parsing code but it had three compile errors
-  hidden by Cargokit/MSBuild: `ILCombine` and `ILFree` need
-  `Option<*const ITEMIDLIST>` (not bare pointer), and `SHGetPathFromIDListW`
-  takes `&mut [u16; 260]` (not `PWSTR`). Fixed in v0.3.13.
+- **v0.3.14** — build dispatched (run 43622084977, 14 Nov 2026).
+  **What was fixed:** CapsLock / NumLock / ScrollLock sync on connect.
+  When you connect to a remote PC, Cipher Desk now sends your keyboard's
+  current lock-key state to the host. The host reads each lock with
+  `GetKeyState` and toggles it with `SendInput` if it doesn't match, so
+  both keyboards are in sync from the first keystroke.
   **After the build finishes** (draft release at
   https://github.com/Bensalk/cipher-desk/releases):
-  1. Install the APK on your phone.
-  2. On the host (Windows) PC, copy some files in Explorer (Ctrl+C).
-  3. On the viewer (phone), long-press in a file manager → paste.
-  4. Tell me if it works.
+  1. Install the APK on your phone (or MSI on Windows).
+  2. Turn CapsLock ON on your phone/PC before connecting.
+  3. Connect to the host — type a few letters. They should be uppercase.
+  4. Try the same with NumLock off on your side.
+  5. Tell me if it works.
+- **v0.3.13** — build dispatched (run 43608605235). First working build with
+  host→viewer file clipboard on Windows 11 (CFSTR_SHELLIDLIST fix).
 - **v0.3.6** (commit `e74af06`): published at
   https://github.com/Bensalk/cipher-desk/releases/tag/untagged-6271b0ad8090ed596fc6
   What's in it:
@@ -48,9 +49,11 @@ _Last updated: 14 Nov 2026._
 
 ## Waiting for Bensal's test results
 
-1. **v0.3.13** — host→viewer file clipboard fix. Confirm the draft release
-   builds, install APK, test: copy files in Windows Explorer → paste on phone.
-2. **Reconnect storm** (known issue, next fix): ~20 disconnect events fire
+1. **v0.3.14** — CapsLock/NumLock/ScrollLock sync fix. Install APK/MSI,
+   turn CapsLock ON before connecting, connect to host, type — should be uppercase.
+2. **v0.3.13** — host→viewer file clipboard fix. Copy files in Windows
+   Explorer → paste on phone.
+3. **Reconnect storm** (known issue, next fix): ~20 disconnect events fire
    within 1 second when the connection drops. Not addressed yet.
 
 ## Sandbox gotcha: spurious draft v0.3.9 release
@@ -64,6 +67,8 @@ API returns 403 from the cloud session. Use Chrome automation
 
 | Version | What |
 | --- | --- |
+| v0.3.14 | CapsLock/NumLock/ScrollLock sync on connect |
+| v0.3.13 | Windows 11 host→viewer file clipboard (CFSTR_SHELLIDLIST fix) |
 | v0.3.6 | Clipboard on by default; file-transfer messages show next step and destination path |
 | v0.3.5 | Report Problem log export button; floating button 25% idle opacity |
 | v0.3.4 | Quality switch no longer triggers 15-min lockout; host→viewer file clipboard logging |
