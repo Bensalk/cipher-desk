@@ -73,10 +73,10 @@ API returns 403 from the cloud session. Use Chrome automation
 | v0.2.5 | Viewer holds big change until host finishes (max 150 ms) |
 | v0.2.6 | Host window no longer hidden from capture at startup |
 | v0.2.9 | Folders and any file size for file clipboard |
-| v0.2.8 | File copy/paste like AnyDesk (Windows); 2FA with Google Authenticator |
+| v0.2.8 | File copy/paste (Windows); 2FA with Google Authenticator |
 | v0.2.7 | Ask to connect (no password); popup via WTSSendMessageW |
 
-## Next features Bensal asked for (AnyDesk-like), in his priority order
+## Next features Bensal asked for, in his priority order
 
 1. "Always allow this device" checkbox; popup for manual sharing too; show who is asking.
 2. Unattended access password in OS vault for always-on service.

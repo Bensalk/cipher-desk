@@ -1,7 +1,7 @@
 //! The worker: runs the Share screen Host on the active session, following the
 //! input desktop so the viewer also sees the sign-in and lock screens.
 //!
-//! It listens twice, like AnyDesk:
+//! It listens twice:
 //!
 //! - on the sharing port with the sharing password: the viewer gets straight
 //!   in (unattended access to your own computers);

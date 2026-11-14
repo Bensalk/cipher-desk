@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 /// Files on this computer's clipboard (what Explorer copies and pastes), for
-/// copy and paste of files in a remote session, like AnyDesk. Windows only;
+/// copy and paste of files in a remote session. Windows only;
 /// elsewhere it reports no files and does nothing.
 class FileClipboard {
   static const _channel = MethodChannel('rdpv/file_clipboard');

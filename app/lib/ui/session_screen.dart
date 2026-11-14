@@ -168,7 +168,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   Timer? _clipTimer;
   String? _lastLocalClip;
 
-  // Copy and paste of files with Explorer, like AnyDesk (Windows).
+  // Copy and paste of files with Explorer (Windows).
   // Files copied here go to the remote; files from the remote are put on
   // this computer's clipboard. `_fileSeq` is the last clipboard change seen,
   // `_ownFileSeq` the one made by putting received files there.
@@ -1627,7 +1627,7 @@ class _FingerprintCompare extends StatelessWidget {
   }
 }
 
-/// How the remote screen fits the window (like AnyDesk's view modes).
+/// How the remote screen fits the window.
 enum _ViewMode {
   original,
   shrink,

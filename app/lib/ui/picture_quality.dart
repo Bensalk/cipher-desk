@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../src/rust/api/session.dart' show PictureQuality;
 
-/// Names and help for the picture quality setting (like AnyDesk's display quality).
+/// Names and help for the picture quality setting.
 extension PictureQualityText on PictureQuality {
   String get label => switch (this) {
         PictureQuality.best => 'Best quality',

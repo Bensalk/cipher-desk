@@ -183,7 +183,7 @@ Builds on v0.2.8. The About screen shows **0.2.9**.
 
 - File copy and paste now handles **folders** (with everything inside them)
   and **files of any size**. Files travel in small pieces written straight to
-  disk, like AnyDesk, so large downloads and .zip files work too. The viewer
+  disk, so large downloads and .zip files work too. The viewer
   shows "Receiving … from the remote computer" with the number and size of the
   files; paste with Ctrl+V once they have arrived. An unfinished file is never
   left behind if the copy stops half-way.
@@ -194,7 +194,7 @@ Builds on v0.2.8. The About screen shows **0.2.9**.
 
 Builds on v0.2.7. The About screen shows **0.2.8**.
 
-- **Copy and paste files, like AnyDesk** (Share screen, Windows): copy files in
+- **Copy and paste files** (Share screen, Windows): copy files in
   File Explorer with **Ctrl+C** on either computer, then press **Ctrl+V** in a
   folder on the other one. Works both ways while a session is open, also with
   the Cipher Desk window minimised. The connection's *Clipboard* setting must
@@ -212,7 +212,7 @@ Builds on v0.2.7. The About screen shows **0.2.8**.
 
 Builds on v0.2.6. The About screen shows **0.2.7**.
 
-- **Ask to connect (no password)**, like AnyDesk: for a *Share screen*
+- **Ask to connect (no password)**: for a *Share screen*
   connection, choose **Ask to connect** in its ⋮ menu. On the other computer,
   where always-on sharing is turned on, a popup asks whether to allow it. The
   screen appears only after someone there clicks **Yes**; **No**, or no answer
@@ -241,7 +241,7 @@ Builds on v0.2.4. The About screen shows **0.2.5**.
 
 Builds on v0.2.3. The About screen shows **0.2.4**.
 
-- **Picture quality** setting per connection, like AnyDesk: *Best quality*,
+- **Picture quality** setting per connection: *Best quality*,
   *Balanced* (the default) or *Speed*. Change it in the connection's settings or
   from the quality button in the session toolbar (changing it reconnects).
   - *Best quality* with Share screen is lossless: every pixel arrives exactly

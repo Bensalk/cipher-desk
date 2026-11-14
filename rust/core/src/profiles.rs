@@ -34,8 +34,7 @@ pub enum ClipboardSetting {
     FromRemote,
 }
 
-/// Picture quality of a connection, like the display quality setting of
-/// AnyDesk or TeamViewer. Older files have none: they use [`Quality::Balanced`].
+/// Picture quality of a connection. Older files have none: they use [`Quality::Balanced`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Quality {

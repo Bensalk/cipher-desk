@@ -1,4 +1,4 @@
-//! Two-step verification for Share screen (Google Authenticator), like AnyDesk.
+//! Two-step verification for Share screen (Google Authenticator).
 //!
 //! The viewer's sign-in carries, besides the sharing password, a small
 //! "cookie" in the RDP Client Info PDU (sent inside the TLS connection, after

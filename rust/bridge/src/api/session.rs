@@ -490,7 +490,7 @@ impl ClipboardMode {
     }
 }
 
-/// Picture quality of a connection (like AnyDesk's display quality).
+/// Picture quality of a connection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PictureQuality {
     /// Exact pixels with Cipher Desk Host; uses the most data.

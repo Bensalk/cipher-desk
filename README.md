@@ -37,11 +37,11 @@ Cipher Desk connects to your own computers from a PC, a Linux machine or an Andr
 
 ## Key Features
 
-- **Three connection methods** – [Private Remote Desktop](docs/methods/PRIVATE-REMOTE-DESKTOP.md) (the computer's screen locks), [Share screen](docs/methods/SHARE-SCREEN.md) (the screen stays visible, like AnyDesk; any Windows edition) and [VNC](docs/methods/VNC.md) (own network or Tailscale only). A two-question helper picks the right one. See [which one to use](docs/CONNECTION-METHODS.md).
+- **Three connection methods** – [Private Remote Desktop](docs/methods/PRIVATE-REMOTE-DESKTOP.md) (the computer's screen locks), [Share screen](docs/methods/SHARE-SCREEN.md) (the screen stays on and usable at the computer; any Windows edition) and [VNC](docs/methods/VNC.md) (own network or Tailscale only). A two-question helper picks the right one. See [which one to use](docs/CONNECTION-METHODS.md).
 - **Secure connections only** – Network Level Authentication (NLA) and TLS 1.2 / 1.3. Older, unprotected connections are refused, not downgraded.
 - **Certificate check and pinning** – the first time, you compare the computer's fingerprint before anything is sent. If it ever changes, the connection is blocked before your password leaves the device.
 - **Saved passwords, safely** – optional, and only in Windows Credential Manager, the Linux keyring or the Android Keystore, confirmed with Windows Hello or your screen lock. Never in the app's files, exports or logs.
-- **Copy and paste files, like AnyDesk** (Share screen) – copy files in File Explorer with Ctrl+C on either computer, Ctrl+V in a folder on the other. Works both ways with the window minimised; folders and large files included. Received files are also saved to a *Received* folder.
+- **Copy and paste files** (Share screen) – copy files in File Explorer with Ctrl+C on either computer, Ctrl+V in a folder on the other. Works both ways with the window minimised; folders and large files included. Received files are also saved to a *Received* folder.
 - **Ask to connect** (Share screen) – connect without a password: a popup appears on the other computer and the screen appears only after they click *Yes*. Connecting with the password still goes straight in.
 - **Two-step verification** (Share screen) – add Google Authenticator to the shared computer's password door. Scan the QR code, enter a 6-digit code once, and the device is remembered for 30 days.
 - **Picture quality** per connection – *Best quality* (lossless, sharpest text), *Balanced* (default) or *Speed* (least data). Change it live from the session toolbar; switches without disconnecting.

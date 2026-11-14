@@ -7,7 +7,7 @@
 //!   only, CF_UNICODETEXT, with a size cap).
 //! - Files the viewer sends arrive in a "Received" folder; files offered here
 //!   with [`ClipHandle::offer_files`] are downloaded by the viewer.
-//! - Copy and paste of files, like AnyDesk: files copied in Explorer here
+//! - Copy and paste of files: files copied in Explorer here
 //!   (while a viewer is connected) are sent to the viewer and put on its
 //!   clipboard; files the viewer copies arrive here and are put on this
 //!   computer's clipboard, so Ctrl+V in Explorer pastes them.

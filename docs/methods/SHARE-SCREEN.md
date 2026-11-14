@@ -1,7 +1,7 @@
 # Share screen: step by step
 
 Show and control a Windows computer's screen **while it stays on and usable** at
-the computer, like AnyDesk or TeamViewer. Cipher Desk on the computer shares its
+the computer. Cipher Desk on the computer shares its
 screen; Cipher Desk on your phone or another computer connects to it.
 
 Back to [Connection methods](../CONNECTION-METHODS.md).

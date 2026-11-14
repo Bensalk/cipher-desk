@@ -111,7 +111,7 @@ fromRemoteOnly,
                     
                 }
 
-/// Picture quality of a connection (like AnyDesk's display quality).
+/// Picture quality of a connection.
 enum PictureQuality {
                     /// Exact pixels with Cipher Desk Host; uses the most data.
 best,

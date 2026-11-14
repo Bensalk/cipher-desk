@@ -347,7 +347,7 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
     final installed = _service.installed;
     final children = <Widget>[
       // The primary control: one switch that makes this PC always available to
-      // connect (like AnyDesk) without anyone clicking Start Sharing — it runs
+      // connect without anyone clicking Start Sharing — it runs
       // a background service that also reaches the Windows sign-in/lock screen.
       SwitchListTile(
         key: const Key('service-always-allow'),
