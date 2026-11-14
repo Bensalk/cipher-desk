@@ -3,25 +3,26 @@
 Read this with `CLAUDE.md` at the start of a new chat. Update it at the end of
 every working session (newest state first; drop what is no longer true).
 
-_Last updated: 13 Nov 2026._
+_Last updated: 14 Nov 2026._
 
 ## Current branch and build
 
-- Work happens on branch **`connection-methods`** (PR #12, open, not merged to
-  `main`). It adds three connection methods: Private Remote Desktop, Share
-  screen, VNC, plus the always-on Host service (sign-in screen / unattended).
-- **v0.3.7** — build dispatched (run triggered below). Builds on v0.3.6.
-  **PURPOSE: diagnostic build — both directions of Explorer file clipboard
-  (Ctrl+C → Ctrl+V) are broken; this build adds detailed logging at every
-  step of the file transfer path.**
-  After installing and testing file copy (both directions):
-  1. Try to copy files from viewer → paste on host PC (Ctrl+C on viewer, Ctrl+V on host)
-  2. Try to copy files from host → paste on viewer PC (Ctrl+C on host, Ctrl+V on viewer)
-  3. After each attempt, collect logs:
-     - Viewer: use "Report Problem" button to export WORKER.LOG
-     - Host: check `C:\ProgramData\Cipher Desk\host-service\logs\`
-  4. Send both logs — look for lines containing "send_files", "RemoteFiles",
-     "FileList", "file list from viewer", "CF_HDROP", "FAILED".
+- **Work is now on `main`** — the `connection-methods` branch was merged.
+  All releases now dispatch from `main`.
+- **v0.3.13** — build dispatched (run 43608605235). This should be the
+  **first working build with host→viewer file clipboard** on Windows 11.
+  **What was fixed:** Explorer on Windows 11 never puts `CF_HDROP` on the
+  clipboard — it uses `CFSTR_SHELLIDLIST` ("Shell IDList Array") instead.
+  v0.3.9 added the CIDA/PIDL parsing code but it had three compile errors
+  hidden by Cargokit/MSBuild: `ILCombine` and `ILFree` need
+  `Option<*const ITEMIDLIST>` (not bare pointer), and `SHGetPathFromIDListW`
+  takes `&mut [u16; 260]` (not `PWSTR`). Fixed in v0.3.13.
+  **After the build finishes** (draft release at
+  https://github.com/Bensalk/cipher-desk/releases):
+  1. Install the APK on your phone.
+  2. On the host (Windows) PC, copy some files in Explorer (Ctrl+C).
+  3. On the viewer (phone), long-press in a file manager → paste.
+  4. Tell me if it works.
 - **v0.3.6** (commit `e74af06`): published at
   https://github.com/Bensalk/cipher-desk/releases/tag/untagged-6271b0ad8090ed596fc6
   What's in it:
@@ -47,24 +48,17 @@ _Last updated: 13 Nov 2026._
 
 ## Waiting for Bensal's test results
 
-1. **v0.3.4** — install APK (phone) + MSI (Windows), test quality switch
-   (Low → Medium → High should NOT lock out for 15 min). Release:
-   https://github.com/Bensalk/cipher-desk/releases/tag/v0.3.4
-2. **v0.3.3's two fixes** (longer auto-reconnect, file-copy clipboard
-   batching) — not yet confirmed from Bensal.
-3. **Host→viewer file clipboard bug** (Bug 2): ask Bensal to share logs from
-   `C:\ProgramData\Cipher Desk\host-service\logs\` — look for
-   `"clipboard changed"` and `"offering host clipboard files to viewer"` lines.
-4. **His saved password for "Server PC"** — likely stale after changing the
-   Share screen host's password; told him to re-enter/re-save on viewer side.
+1. **v0.3.13** — host→viewer file clipboard fix. Confirm the draft release
+   builds, install APK, test: copy files in Windows Explorer → paste on phone.
+2. **Reconnect storm** (known issue, next fix): ~20 disconnect events fire
+   within 1 second when the connection drops. Not addressed yet.
 
-## Official release (v0.4.0), once v0.3.4 is confirmed
+## Sandbox gotcha: spurious draft v0.3.9 release
 
-Plan once Bensal confirms the test build works:
-1. Merge `connection-methods` (PR #12) into `main`.
-2. Spot-check `docs/*.md` match current behavior.
-3. Tag and publish as **v0.4.0**.
-4. Bensal publishes the GitHub release himself.
+There is a stale draft release with ID 445340661 for v0.3.9 on GitHub — it was
+created by a workflow that ran on old code. It should be deleted but the REST
+API returns 403 from the cloud session. Use Chrome automation
+(`mcp__claude-in-chrome__*`) on the GitHub Releases page to delete it manually.
 
 ## Done on this branch
 
@@ -92,9 +86,8 @@ Plan once Bensal confirms the test build works:
 
 ## Known issue: version string in Report Problem
 
-`app/lib/ui/session_screen.dart` has `const version = '0.3.6'` hardcoded in
-`_reportProblem`. Update this when bumping pubspec.yaml, or add
-`package_info_plus` to read it at runtime.
+`app/lib/ui/session_screen.dart` has `const version = '...'` hardcoded.
+Update this when bumping pubspec.yaml (currently kept in sync manually).
 
 ## Sandbox gotchas (Claude's cloud workspace)
 
@@ -106,7 +99,7 @@ Plan once Bensal confirms the test build works:
 - The local clone may only fetch `main`, so `origin/connection-methods` can be
   stale. Check with `gh api repos/Bensalk/cipher-desk/branches/connection-methods --jq .commit.sha`.
 - GitHub GraphQL is blocked: use `gh api` REST.
-- Start a build: `gh api -X POST repos/Bensalk/cipher-desk/actions/workflows/release.yml/dispatches -f ref=connection-methods -F 'inputs[make_release]=true'`.
+- Start a build: `gh api -X POST repos/Bensalk/cipher-desk/actions/workflows/release.yml/dispatches -f ref=main -F 'inputs[make_release]=true'`.
 - After bumping versions, fix `rust/fuzz/Cargo.lock` too.
 - `.claude/settings.json` allow rules let Claude auto-push version tags and
   create releases in future sessions.
