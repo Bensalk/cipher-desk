@@ -2,6 +2,12 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.12 (14 Nov 2026)
+
+Diagnostic build: adds a direct `cargo build` step before the Flutter build so the actual
+Rust compile error is visible in CI annotations (Cargokit/MSBuild previously swallowed it).
+No functional change.
+
 ## v0.3.11 (14 Nov 2026)
 
 Builds on v0.3.10. The About screen shows **0.3.11**.

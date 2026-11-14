@@ -140,6 +140,11 @@ jobs:
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           channel: stable
+      - name: Check Rust host crate compiles (shows real errors before Cargokit hides them)
+        run: |
+          $env:RUSTFLAGS = "--remap-path-prefix=$env:USERPROFILE=C:\home --remap-path-prefix=$env:GITHUB_WORKSPACE=C:\src"
+          & "$env:ProgramFiles\Git\bin\bash.exe" scripts/ci-run.sh "Rust host crate check" cargo build --release -p rdpv-host
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build release bundle (local paths removed, SA-9)
         working-directory: app
         run: |
