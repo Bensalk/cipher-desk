@@ -9,20 +9,23 @@ _Last updated: 15 Nov 2026._
 
 - **Work is now on `main`** — the `connection-methods` branch was merged.
   All releases now dispatch from `main`.
-- **v0.3.17** — build dispatched (run 43643422166, 15 Nov 2026). Wait for the
+- **v0.3.18** — build dispatched (run 43644585250, 15 Nov 2026). Wait for the
   draft release at https://github.com/Bensalk/cipher-desk/releases; then publish it.
   **What was fixed:**
-  - **CapsLock desync on Windows** — if CapsLock was ON before connecting, the
-    viewer sent an extra Synchronize PDU to the host at connect time. This caused
-    the host's CapsLock to get out of step, so pressing CapsLock once more left
-    them in opposite states (viewer OFF, host ON). Removed the sync-at-connect
-    call. Both sides now track CapsLock independently through normal key presses.
+  - **Viewer→host file paste — CF_HDROP wiped before you could paste** — this is
+    the REAL fix for the bug you reported. The v0.3.16 quiet-window fix was wrong:
+    it suppressed the log but CF_HDROP was still being overwritten by the CLIPRDR
+    protocol round-trip (`on_remote_copy` → `SendInitiatePaste` → `EmptyClipboard`).
+    Now: when CF_HDROP is written, a flag blocks `on_remote_copy` from starting a
+    new paste until you copy something new on the host.
   **To test:**
-  1. Turn CapsLock **ON** on your Windows viewer keyboard.
-  2. Connect to the host.
-  3. Press CapsLock once — both sides should go OFF together.
-  4. Press CapsLock again — both sides should go ON together.
-  5. They should stay in sync from then on.
+  1. On the viewer PC, copy a file in Explorer (Ctrl+C).
+  2. Connect to the host (or already connected).
+  3. The file transfer should happen automatically.
+  4. On the host PC, open Explorer and press Ctrl+V — the file should paste.
+  5. It should paste successfully even if you wait 30 seconds before pressing Ctrl+V.
+- **v0.3.17** — **PUBLISHED** at https://github.com/Bensalk/cipher-desk/releases/tag/v0.3.17
+  **What was fixed:** CapsLock desync on Windows — removed sync-at-connect call.
 - **v0.3.16** — **PUBLISHED** at https://github.com/Bensalk/cipher-desk/releases/tag/v0.3.16
   **What was fixed:**
   1. **CapsLock key bar button** — Caps button added for touch users.
@@ -70,10 +73,12 @@ _Last updated: 15 Nov 2026._
 
 ## Waiting for Bensal's test results
 
-1. **v0.3.17** — CapsLock desync fix. Turn CapsLock ON before connecting,
+1. **v0.3.18** — CF_HDROP real fix. Copy files on viewer, they arrive on host,
+   then Ctrl+V in Explorer on host — files should paste. Test even after waiting
+   30 seconds before pasting. This is the fix for "NOT PASTING FROM HOST PC TO
+   VIEWER PC".
+2. **v0.3.17** — CapsLock desync fix. Turn CapsLock ON before connecting,
    connect, then press CapsLock once — both sides should toggle together.
-2. **v0.3.16** — file clipboard CF_HDROP overwrite fix. Copy files from viewer
-   Windows clipboard, paste on host — file should not be lost/overwritten.
 3. **Reconnect storm** (known issue, next fix): ~20 disconnect events fire
    within 1 second when the connection drops. Not addressed yet.
 
@@ -88,8 +93,9 @@ API returns 403 from the cloud session. Use Chrome automation
 
 | Version | What |
 | --- | --- |
+| v0.3.18 | CF_HDROP real fix — block on_remote_copy from wiping clipboard |
 | v0.3.17 | CapsLock desync fix — removed sync-at-connect |
-| v0.3.16 | Caps key bar button; CF_HDROP 5-second quiet window |
+| v0.3.16 | Caps key bar button; CF_HDROP 5-second quiet window (incomplete fix) |
 | v0.3.15 | Host→viewer file clipboard "Access is denied." fix (retry up to 4 s) |
 | v0.3.14 | CapsLock/NumLock/ScrollLock sync on connect |
 | v0.3.13 | Windows 11 host→viewer file clipboard (CFSTR_SHELLIDLIST fix) |
