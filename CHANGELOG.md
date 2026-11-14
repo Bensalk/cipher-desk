@@ -2,6 +2,15 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.8 (14 Nov 2026)
+
+Builds on v0.3.7. The About screen shows **0.3.8**.
+
+- **More host clipboard diagnostics.** Adds detailed logging to the host-side
+  clipboard poller to show exactly whether the poller starts, detects the
+  clipboard change, finds CF_HDROP files, and sends them to the viewer.
+  Needed to pinpoint the host→viewer file clipboard failure.
+
 ## v0.3.7 (13 Nov 2026)
 
 Builds on v0.3.6. The About screen shows **0.3.7**.

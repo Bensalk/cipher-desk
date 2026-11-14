@@ -189,18 +189,21 @@ impl CliprdrServerFactory for HostClipboard {}
 /// holds files. Returns whether it did.
 fn offer_copied_files(inner: &Inner) -> bool {
     let Some(paths) = winclip::read_files() else {
+        tracing::info!("host clip: clipboard changed but no CF_HDROP files found");
         return false;
     };
+    tracing::info!(count = paths.len(), ?paths, "host clip: CF_HDROP files found on clipboard");
     // Files we received from the viewer and put there ourselves: not a new
     // copy (sending them back would duplicate them on the viewer).
     if paths.iter().all(|p| p.starts_with(&inner.receive_dir)) {
+        tracing::info!("host clip: all clipboard files are own-received, skipping echo");
         return true;
     }
     let files = xfer::offer(&paths);
     if files.is_empty() {
-        tracing::debug!(
+        tracing::info!(
             count = paths.len(),
-            "clipboard has files but none could be offered (too large or missing?)"
+            "host clip: clipboard has files but none could be offered (too large or missing?)"
         );
         return false;
     }
@@ -254,10 +257,10 @@ fn spawn_poller(inner: Arc<Inner>) -> Poller {
                     prev = seq;
                     // Files we just received and placed there: not a new copy.
                     if seq == inner.own_seq.load(Ordering::Relaxed) {
-                        tracing::debug!("clipboard change is our own echo, skipping");
+                        tracing::info!("host clip: clipboard change is our own echo, skipping");
                         continue;
                     }
-                    tracing::debug!(seq, "clipboard changed, checking for files to offer");
+                    tracing::info!(seq, "host clip: clipboard sequence changed, checking for files");
                     // Files copied here go to the viewer; otherwise text (or
                     // nothing). Files already on the clipboard when the viewer
                     // connected are not sent: only a new copy is.
@@ -318,6 +321,7 @@ impl CliprdrBackend for Backend {
     }
 
     fn on_ready(&mut self) {
+        tracing::info!("host clip: clipboard channel ready, starting poller");
         if self.poller.is_none() {
             self.poller = Some(spawn_poller(Arc::clone(&self.inner)));
         }
