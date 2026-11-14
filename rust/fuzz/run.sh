@@ -16,7 +16,7 @@ TRIPLE=$(rustc -vV | sed -n 's/^host: //p')
 export RUSTFLAGS="-Cllvm-args=-sanitizer-coverage-level=4 \
 -Cllvm-args=-sanitizer-coverage-inline-8bit-counters -Cllvm-args=-sanitizer-coverage-pc-table \
 -Cllvm-args=-sanitizer-coverage-trace-compares -Cdebug-assertions -Coverflow-checks"
-cargo build --release --locked --target "$TRIPLE" --bins
+cargo build --release --target "$TRIPLE" --bins
 for t in "${TARGETS[@]}"; do
   mkdir -p "corpus/$t" "artifacts/$t"
   # Seeds (checked in) plus whatever earlier runs found (not checked in).
