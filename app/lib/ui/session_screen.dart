@@ -447,7 +447,6 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
           }
           if (_inBackground) _armBackgroundTimer();
           _focus.requestFocus();
-          _syncLockKeys();
           _startClipboardSync();
         }
       case UpdateKind.certificateApproval:

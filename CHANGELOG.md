@@ -2,6 +2,11 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.17 (15 Nov 2026)
+
+### Fixed
+- **CapsLock desync on Windows** — if your keyboard had CapsLock **on** before connecting, the viewer was sending an extra synchronise signal to the host at connect time. This caused the host's CapsLock state to get out of step with the viewer, so pressing CapsLock once more would leave them in opposite states (viewer off, host on). The sync-at-connect call has been removed; both sides now track CapsLock independently through the normal key presses, which is the standard RDP behaviour. Use the **Caps** button in the key bar if you need to toggle CapsLock on the host from a touchscreen.
+
 ## v0.3.16 (15 Nov 2026)
 
 ### Fixed
