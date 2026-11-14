@@ -498,7 +498,6 @@ mod winclip {
     };
     use windows::Win32::UI::Shell::{ILCombine, ILFree, SHGetPathFromIDListW};
     use windows::Win32::UI::Shell::Common::ITEMIDLIST;
-    use windows::core::PWSTR;
 
     const CF_UNICODETEXT: u32 = 13;
     /// A list of files (what Explorer puts there on Ctrl+C).
@@ -712,16 +711,20 @@ mod winclip {
                 // Combine parent + relative item PIDL into an absolute PIDL.
                 let parent_pidl = ptr.add(parent_offset) as *const ITEMIDLIST;
                 let item_pidl = ptr.add(item_off) as *const ITEMIDLIST;
-                let abs_pidl: *mut ITEMIDLIST = ILCombine(parent_pidl, item_pidl);
+                // ILCombine takes Option<*const ITEMIDLIST> in windows 0.62.
+                let abs_pidl: *mut ITEMIDLIST =
+                    ILCombine(Some(parent_pidl), Some(item_pidl));
                 if abs_pidl.is_null() {
                     continue;
                 }
 
                 // Convert the absolute PIDL to a filesystem path.
-                let mut path_buf = vec![0u16; 32_768];
+                // SHGetPathFromIDListW takes &mut [u16; 260] (MAX_PATH) in windows 0.62.
+                let mut path_buf = [0u16; 260];
                 let ok =
-                    SHGetPathFromIDListW(abs_pidl as *const _, PWSTR(path_buf.as_mut_ptr()));
-                ILFree(Some(abs_pidl));
+                    SHGetPathFromIDListW(abs_pidl as *const _, &mut path_buf);
+                // ILFree takes Option<*const ITEMIDLIST>; abs_pidl is *mut, cast needed.
+                ILFree(Some(abs_pidl as *const _));
 
                 if ok.as_bool() {
                     let len = path_buf

@@ -2,6 +2,13 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.13 (14 Nov 2026)
+
+Fix Windows build: correct `ILCombine` and `SHGetPathFromIDListW` call signatures for
+`windows` crate 0.62 — `ILCombine` takes `Option<*const ITEMIDLIST>` (not bare pointer),
+`SHGetPathFromIDListW` takes `&mut [u16; 260]` (not `PWSTR`). This should make
+host→viewer file clipboard work on Windows.
+
 ## v0.3.12 (14 Nov 2026)
 
 Diagnostic build: adds a direct `cargo build` step before the Flutter build so the actual
