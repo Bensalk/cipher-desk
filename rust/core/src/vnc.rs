@@ -549,6 +549,8 @@ impl VncSession {
                 .map(|k| vec![self.key_event(k, false)])
                 .unwrap_or_default(),
             InputEvent::Unicode { ch, down } => vec![self.key_event(keysym_for_char(ch), down)],
+            // VNC has no lock-key sync mechanism; silently ignore.
+            InputEvent::SyncLockKeys { .. } => vec![],
         }
     }
 
