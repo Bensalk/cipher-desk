@@ -9,16 +9,30 @@ _Last updated: 15 Nov 2026._
 
 - **Work is now on `main`** — the `connection-methods` branch was merged.
   All releases now dispatch from `main`.
+- **v0.3.19** — build dispatched (run 43646894239, 15 Nov 2026). Wait for the
+  draft release at https://github.com/Bensalk/cipher-desk/releases; then publish it.
+  **What is in it:** Diagnostic logging for the clipboard direction investigation.
+  **To test (clipboard root-cause check):**
+  1. Install v0.3.19 on viewer (Android or Windows).
+  2. Connect to host PC.
+  3. Copy some text on the HOST PC (Ctrl+C a word in Notepad).
+  4. Try to paste on VIEWER PC — does it paste?
+  5. **If it still fails:** go to Session menu → Export session log, send me the log.
+     The log will show:
+     - `clip: session starting with clipboard policy local_to_host=... host_to_local=...`
+     - `clip: host clipboard changed (RemoteChanged) has_text=true host_to_local=...`
+     If `host_to_local=false` appears in the log, your connection is set to
+     "To remote only" clipboard mode — that is the root cause. Change the
+     connection's clipboard setting to **"Both directions"** and reconnect.
+  6. Also test: **If host_to_local=true in the log but paste still fails**, report
+     what the log shows after the RemoteChanged line — that would mean a code bug.
 - **v0.3.18** — build dispatched (run 43644585250, 15 Nov 2026). Wait for the
   draft release at https://github.com/Bensalk/cipher-desk/releases; then publish it.
   **What was fixed:**
-  - **Viewer→host file paste — CF_HDROP wiped before you could paste** — this is
-    the REAL fix for the bug you reported. The v0.3.16 quiet-window fix was wrong:
-    it suppressed the log but CF_HDROP was still being overwritten by the CLIPRDR
-    protocol round-trip (`on_remote_copy` → `SendInitiatePaste` → `EmptyClipboard`).
-    Now: when CF_HDROP is written, a flag blocks `on_remote_copy` from starting a
-    new paste until you copy something new on the host.
-  **To test:**
+  - **Viewer→host file paste — CF_HDROP wiped before you could paste** — VIEWER→HOST
+    direction only (copy files on viewer, paste in Explorer on host). The HANDOFF
+    previously said this fixed "host→viewer" — that description was wrong.
+  **To test (VIEWER→HOST direction):**
   1. On the viewer PC, copy a file in Explorer (Ctrl+C).
   2. Connect to the host (or already connected).
   3. The file transfer should happen automatically.
@@ -71,15 +85,45 @@ _Last updated: 15 Nov 2026._
   What's in it: Quality switch (Low/Medium/High) no longer triggers 15-min
   lockout; diagnostic logging for host→viewer file clipboard.
 
+## Active investigation: host→viewer clipboard broken
+
+Bensal reported: "Pasting From viewer pc to host pc working. Problem is cant paste
+from host to viewer."
+
+**Root cause identified (not yet confirmed by live test):**
+
+All HOST→VIEWER paths in `rust/core/src/session.rs` are gated by `policy.host_to_local`.
+When `host_to_local = false`, the host clipboard events arrive at the viewer but are
+silently discarded. No error. `host_to_local = false` happens only with
+`ClipboardMode.toRemoteOnly` ("To remote only") on the connection settings.
+Since VIEWER→HOST works, `local_to_host = true` — which is consistent with either
+`both` or `toRemoteOnly`. If it's `toRemoteOnly`, HOST→VIEWER is blocked by policy.
+
+**v0.3.19 adds diagnostic logging** to confirm this. The session log will show:
+- `clip: session starting with clipboard policy local_to_host=X host_to_local=Y`
+- `clip: host clipboard changed (RemoteChanged) has_text=true host_to_local=Y`
+
+**Expected fix** (once confirmed): Tell Bensal to change his connection's
+clipboard setting from "To remote only" to "Both directions". No code fix needed.
+
+**If `host_to_local=true` in the log but paste still fails**: there is a code bug
+in the HOST→VIEWER path that needs further investigation. The poller → `advertise()`
+→ viewer `on_remote_copy()` → `RemoteChanged` → `initiate_paste()` → host
+`on_format_data_request()` → viewer `DataReceived` → Flutter `setText()` path
+was reviewed and appears correct — but a timing or CLIPRDR handshake issue
+cannot be ruled out without live logs.
+
 ## Waiting for Bensal's test results
 
-1. **v0.3.18** — CF_HDROP real fix. Copy files on viewer, they arrive on host,
+1. **v0.3.19** — Diagnostic build. Connect, copy text on host, try to paste on viewer.
+   If still broken: export session log and share. Looking for `host_to_local=false`
+   which would confirm the clipboard mode is set to "To remote only".
+2. **v0.3.18** — VIEWER→HOST CF_HDROP fix. Copy files on viewer, they arrive on host,
    then Ctrl+V in Explorer on host — files should paste. Test even after waiting
-   30 seconds before pasting. This is the fix for "NOT PASTING FROM HOST PC TO
-   VIEWER PC".
-2. **v0.3.17** — CapsLock desync fix. Turn CapsLock ON before connecting,
+   30 seconds before pasting.
+3. **v0.3.17** — CapsLock desync fix. Turn CapsLock ON before connecting,
    connect, then press CapsLock once — both sides should toggle together.
-3. **Reconnect storm** (known issue, next fix): ~20 disconnect events fire
+4. **Reconnect storm** (known issue, next fix): ~20 disconnect events fire
    within 1 second when the connection drops. Not addressed yet.
 
 ## Sandbox gotcha: spurious draft v0.3.9 release
@@ -93,7 +137,8 @@ API returns 403 from the cloud session. Use Chrome automation
 
 | Version | What |
 | --- | --- |
-| v0.3.18 | CF_HDROP real fix — block on_remote_copy from wiping clipboard |
+| v0.3.19 | Clipboard-direction diagnostic logging |
+| v0.3.18 | VIEWER→HOST CF_HDROP fix — block on_remote_copy from wiping clipboard |
 | v0.3.17 | CapsLock desync fix — removed sync-at-connect |
 | v0.3.16 | Caps key bar button; CF_HDROP 5-second quiet window (incomplete fix) |
 | v0.3.15 | Host→viewer file clipboard "Access is denied." fix (retry up to 4 s) |
