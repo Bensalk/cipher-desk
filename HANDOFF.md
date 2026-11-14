@@ -3,23 +3,31 @@
 Read this with `CLAUDE.md` at the start of a new chat. Update it at the end of
 every working session (newest state first; drop what is no longer true).
 
-_Last updated: 14 Nov 2026._
+_Last updated: 15 Nov 2026._
 
 ## Current branch and build
 
 - **Work is now on `main`** — the `connection-methods` branch was merged.
   All releases now dispatch from `main`.
-- **v0.3.15** — **PUBLISHED** at https://github.com/Bensalk/cipher-desk/releases/tag/v0.3.15
-  Release workflow running (run 43623879966, 14 Nov 2026). Wait for it to finish;
-  built packages (APK, MSI, ZIP) will appear as assets on the release page.
-  **What was fixed:** Host→viewer file clipboard "Access is denied." error.
-  The Windows host worker now retries `OpenClipboard` for up to 4 seconds (up
-  from 0.5 s). Windows Clipboard History, clipboard managers, and antivirus can
-  hold the clipboard lock for >500 ms; the old limit silently discarded pasted files.
+- **v0.3.16** — build dispatched (run 43640076017, 15 Nov 2026). Wait for the
+  draft release at https://github.com/Bensalk/cipher-desk/releases; then publish it.
+  **What was fixed:**
+  1. **CapsLock key bar button** — Added a **Caps** button to the key bar.
+     Android / touch-screen users can now toggle CapsLock on the remote PC
+     without needing a physical keyboard.
+  2. **File clipboard overwrite after paste** — After CF_HDROP was written to
+     the clipboard, Windows Clipboard History and the CLIPRDR round-trip were
+     overwriting it with format 49161 before the user could paste. Added a
+     5-second quiet window: the host worker now ignores clipboard changes for
+     5 s after writing CF_HDROP.
   **To test:**
-  1. Install the new APK on your phone (or MSI on Windows).
-  2. Copy a file from the viewer side.
-  3. Paste it on the host — it should land now without "Access is denied."
+  1. Install the new APK on your phone.
+  2. Test CapsLock: tap **Caps** in the key bar → type letters on the remote host.
+     They should be UPPERCASE. Tap **Caps** again → lowercase.
+  3. Test file paste: on Windows viewer, copy a file, switch to host RDP session,
+     Ctrl+V. File should appear without being lost.
+- **v0.3.15** — **PUBLISHED** at https://github.com/Bensalk/cipher-desk/releases/tag/v0.3.15
+  **What was fixed:** Host→viewer file clipboard "Access is denied." error.
 - **v0.3.14** — build dispatched (run 43622084977, 14 Nov 2026).
   **What was fixed:** CapsLock / NumLock / ScrollLock sync on connect.
   When you connect to a remote PC, Cipher Desk now sends your keyboard's
