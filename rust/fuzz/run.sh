@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
 # Builds and runs the fuzzers with libFuzzer on the STABLE toolchain (coverage
-# instrumentation through stable rustc flags; no sanitizer, but Rust's own
-# bounds and overflow checks are on).
+# instrumentation through SanitizerCoverage LLVM flags; no sanitizer, but
+# Rust's own bounds and overflow checks are on).
 #   bash rust/fuzz/run.sh [seconds per target, default 60] [target ...]
+#
+# Note: -Cpasses=sancov-module was removed from Rust stable (≥ 1.78); coverage
+# instrumentation is passed directly via -Cllvm-args instead.  libfuzzer-sys 0.4
+# links the LLVM libFuzzer runtime which picks up these sancov flags automatically.
 set -euo pipefail
 cd "$(dirname "$0")"
 SECS=${1:-60}; shift || true
 TARGETS=("$@")
 [ ${#TARGETS[@]} -eq 0 ] && TARGETS=(server_text clipboard_text certificate desktop_size files form_fields)
 TRIPLE=$(rustc -vV | sed -n 's/^host: //p')
-export RUSTFLAGS="--cfg fuzzing -Cpasses=sancov-module -Cllvm-args=-sanitizer-coverage-level=4 \
+export RUSTFLAGS="-Cllvm-args=-sanitizer-coverage-level=4 \
 -Cllvm-args=-sanitizer-coverage-inline-8bit-counters -Cllvm-args=-sanitizer-coverage-pc-table \
 -Cllvm-args=-sanitizer-coverage-trace-compares -Cdebug-assertions -Coverflow-checks"
 cargo build --release --locked --target "$TRIPLE" --bins

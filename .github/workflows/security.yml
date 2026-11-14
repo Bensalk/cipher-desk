@@ -24,7 +24,10 @@ jobs:
         env:
           GITLEAKS_VERSION: "8.28.0"
         run: |
-          curl -sSfL -o gl.tgz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          BASE="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          curl -sSfL -o gl.tgz      "${BASE}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o gl.checksums "${BASE}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          grep "linux_x64.tar.gz" gl.checksums | sha256sum --check
           tar xzf gl.tgz gitleaks && sudo install gitleaks /usr/local/bin/
       - name: Scan every commit
         run: gitleaks git --no-banner --redact --config .gitleaks.toml --verbose
