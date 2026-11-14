@@ -2,6 +2,11 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.18 (15 Nov 2026)
+
+### Fixed
+- **Viewer→host file paste — CF_HDROP wiped before you could paste** — after the received files were written to the Windows clipboard (CF_HDROP), the RDP CLIPRDR protocol was triggering a round-trip that called `EmptyClipboard` and replaced CF_HDROP with the viewer's format before you could press Ctrl+V in Explorer. The 5-second quiet window in v0.3.16 suppressed the log but did not stop the overwrite. The real fix: when CF_HDROP has just been written, the host worker now blocks the CLIPRDR callback (`on_remote_copy`) from starting a new paste from the viewer. The block is lifted as soon as you copy something new on the host, so normal clipboard use is not affected.
+
 ## v0.3.17 (15 Nov 2026)
 
 ### Fixed

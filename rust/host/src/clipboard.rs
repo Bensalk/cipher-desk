@@ -67,6 +67,13 @@ struct Inner {
     /// poller suppresses cascade echoes for a few seconds afterwards even
     /// when the sequence number has advanced past `own_seq`.
     own_write_ms: AtomicU64,
+    /// Set to true when we write received files to CF_HDROP; cleared when the
+    /// host user copies something new (poller detects a genuine change).
+    /// While set, `on_remote_copy` ignores file-list announcements from the
+    /// viewer, which prevents IronRDP's CLIPRDR backend from calling
+    /// EmptyClipboard + SetClipboardData(49161) and wiping our CF_HDROP entry
+    /// before the user can paste.
+    hdrop_pending: AtomicBool,
 }
 
 impl HostClipboard {
@@ -89,6 +96,7 @@ impl HostClipboard {
                 max_bytes,
                 own_seq: AtomicU32::new(0),
                 own_write_ms: AtomicU64::new(0),
+                hdrop_pending: AtomicBool::new(false),
             }),
         }
     }
@@ -159,6 +167,10 @@ impl Inner {
                             .unwrap_or_default()
                             .as_millis() as u64;
                         self.own_write_ms.store(now_ms, Ordering::Relaxed);
+                        // Block on_remote_copy from calling SendInitiatePaste(49161)
+                        // until the user copies something new. That CLIPRDR round-trip
+                        // calls EmptyClipboard and wipes our CF_HDROP entry.
+                        self.hdrop_pending.store(true, Ordering::Relaxed);
                     }
                     Err(ref e) => {
                         tracing::error!(?e, "host clip: write_files (CF_HDROP) FAILED");
@@ -305,6 +317,9 @@ fn spawn_poller(inner: Arc<Inner>) -> Poller {
                         );
                         continue;
                     }
+                    // A genuine new copy on the host: clear the flag so the
+                    // viewer's format list can be accepted again next time.
+                    inner.hdrop_pending.store(false, Ordering::Relaxed);
                     tracing::info!(seq, "host clip: clipboard sequence changed, checking for files");
                     // Files copied here go to the viewer; otherwise text (or
                     // nothing). Files already on the clipboard when the viewer
@@ -385,6 +400,17 @@ impl CliprdrBackend for Backend {
     fn on_remote_copy(&mut self, formats: &[ClipboardFormat]) {
         // The viewer copied something: pull files if offered, else text.
         if let Some(file_format) = formats.iter().find(|f| is_file_list(f)) {
+            // If we just wrote received files to CF_HDROP, skip the paste
+            // initiation. Calling SendInitiatePaste here would cause IronRDP's
+            // CLIPRDR backend to call EmptyClipboard + SetClipboardData(49161),
+            // wiping our CF_HDROP before the user can Ctrl+V in Explorer.
+            if self.inner.hdrop_pending.load(Ordering::Relaxed) {
+                tracing::info!(
+                    "host clip: viewer announced files but hdrop_pending — \
+                     skipping SendInitiatePaste to protect CF_HDROP"
+                );
+                return;
+            }
             self.inner
                 .send(ClipboardMessage::SendInitiatePaste(file_format.id()));
             return;
@@ -445,7 +471,10 @@ impl CliprdrBackend for Backend {
         }
         if let Some(text) = decode_unicode_text(data) {
             if !text.is_empty() {
-                let _ = winclip::write_text(&text);
+                if winclip::write_text(&text).is_ok() {
+                    // Text from viewer replaced the clipboard; CF_HDROP is gone.
+                    self.inner.hdrop_pending.store(false, Ordering::Relaxed);
+                }
             }
         }
     }
