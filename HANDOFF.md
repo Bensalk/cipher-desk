@@ -9,6 +9,17 @@ _Last updated: 14 Nov 2026._
 
 - **Work is now on `main`** — the `connection-methods` branch was merged.
   All releases now dispatch from `main`.
+- **v0.3.15** — **PUBLISHED** at https://github.com/Bensalk/cipher-desk/releases/tag/v0.3.15
+  Release workflow running (run 43623879966, 14 Nov 2026). Wait for it to finish;
+  built packages (APK, MSI, ZIP) will appear as assets on the release page.
+  **What was fixed:** Host→viewer file clipboard "Access is denied." error.
+  The Windows host worker now retries `OpenClipboard` for up to 4 seconds (up
+  from 0.5 s). Windows Clipboard History, clipboard managers, and antivirus can
+  hold the clipboard lock for >500 ms; the old limit silently discarded pasted files.
+  **To test:**
+  1. Install the new APK on your phone (or MSI on Windows).
+  2. Copy a file from the viewer side.
+  3. Paste it on the host — it should land now without "Access is denied."
 - **v0.3.14** — build dispatched (run 43622084977, 14 Nov 2026).
   **What was fixed:** CapsLock / NumLock / ScrollLock sync on connect.
   When you connect to a remote PC, Cipher Desk now sends your keyboard's
@@ -49,10 +60,10 @@ _Last updated: 14 Nov 2026._
 
 ## Waiting for Bensal's test results
 
-1. **v0.3.14** — CapsLock/NumLock/ScrollLock sync fix. Install APK/MSI,
+1. **v0.3.15** — file clipboard "Access is denied." fix. Copy files from viewer,
+   paste on host — should work now without error.
+2. **v0.3.14** — CapsLock/NumLock/ScrollLock sync fix. Install APK/MSI,
    turn CapsLock ON before connecting, connect to host, type — should be uppercase.
-2. **v0.3.13** — host→viewer file clipboard fix. Copy files in Windows
-   Explorer → paste on phone.
 3. **Reconnect storm** (known issue, next fix): ~20 disconnect events fire
    within 1 second when the connection drops. Not addressed yet.
 
@@ -67,6 +78,7 @@ API returns 403 from the cloud session. Use Chrome automation
 
 | Version | What |
 | --- | --- |
+| v0.3.15 | Host→viewer file clipboard "Access is denied." fix (retry up to 4 s) |
 | v0.3.14 | CapsLock/NumLock/ScrollLock sync on connect |
 | v0.3.13 | Windows 11 host→viewer file clipboard (CFSTR_SHELLIDLIST fix) |
 | v0.3.6 | Clipboard on by default; file-transfer messages show next step and destination path |
