@@ -2,6 +2,12 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.16 (15 Nov 2026)
+
+### Fixed
+- **CapsLock toggle from Android / touch keyboards** — a **Caps** button has been added to the key bar so you can toggle CapsLock on the remote PC even when your device has no physical CapsLock key (phone, tablet, Chromebook touchscreen).
+- **Host→viewer file clipboard — files overwritten after paste** — after Cipher Desk writes the received files to the Windows clipboard (CF_HDROP), a cascade of internal clipboard notifications was overwriting the entry before you could paste. The host worker now ignores all clipboard changes for 5 seconds after writing CF_HDROP, so the file remains available for pasting.
+
 ## v0.3.15 (14 Nov 2026)
 
 ### Fixed

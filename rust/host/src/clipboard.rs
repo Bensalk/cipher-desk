@@ -18,10 +18,10 @@
 #![allow(unsafe_code)]
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use ironrdp_cliprdr::backend::{ClipboardMessage, CliprdrBackend, CliprdrBackendFactory};
 use ironrdp_cliprdr::pdu::{
@@ -63,6 +63,10 @@ struct Inner {
     /// Clipboard sequence number right after we put received files on it, so
     /// the poller does not send them straight back.
     own_seq: AtomicU32,
+    /// Milliseconds since UNIX epoch when we last wrote CF_HDROP, so the
+    /// poller suppresses cascade echoes for a few seconds afterwards even
+    /// when the sequence number has advanced past `own_seq`.
+    own_write_ms: AtomicU64,
 }
 
 impl HostClipboard {
@@ -84,6 +88,7 @@ impl HostClipboard {
                 receiving: Mutex::new(None),
                 max_bytes,
                 own_seq: AtomicU32::new(0),
+                own_write_ms: AtomicU64::new(0),
             }),
         }
     }
@@ -149,6 +154,11 @@ impl Inner {
                         tracing::info!(count = done.len(), "host clip: wrote CF_HDROP to clipboard");
                         self.own_seq
                             .store(winclip::sequence_number(), Ordering::Relaxed);
+                        let now_ms = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64;
+                        self.own_write_ms.store(now_ms, Ordering::Relaxed);
                     }
                     Err(ref e) => {
                         tracing::error!(?e, "host clip: write_files (CF_HDROP) FAILED");
@@ -276,8 +286,23 @@ fn spawn_poller(inner: Arc<Inner>) -> Poller {
                     seq = winclip::sequence_number();
                     prev = seq;
                     // Files we just received and placed there: not a new copy.
-                    if seq == inner.own_seq.load(Ordering::Relaxed) {
-                        tracing::info!("host clip: clipboard change is our own echo, skipping");
+                    // Also suppress cascade echoes for 5 s after writing CF_HDROP
+                    // (Windows Clipboard History and the CLIPRDR round-trip can
+                    // trigger several additional sequence bumps that would
+                    // otherwise overwrite CF_HDROP with the viewer's format).
+                    let is_own_echo = seq == inner.own_seq.load(Ordering::Relaxed);
+                    let write_ms = inner.own_write_ms.load(Ordering::Relaxed);
+                    let now_ms = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis() as u64;
+                    let in_quiet_window = write_ms > 0 && now_ms.saturating_sub(write_ms) < 5_000;
+                    if is_own_echo || in_quiet_window {
+                        tracing::info!(
+                            is_own_echo,
+                            in_quiet_window,
+                            "host clip: clipboard change is our own echo, skipping"
+                        );
                         continue;
                     }
                     tracing::info!(seq, "host clip: clipboard sequence changed, checking for files");

@@ -1216,6 +1216,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
               ),
             _KeyButton('Esc', () => _pressKey(0x01)),
             _KeyButton('Tab', () => _pressKey(0x0F)),
+            _KeyButton('Caps', () => _pressKey(0x3A)),
             _KeyButton('Win', () => _pressKey(0x5B, extended: true)),
             _KeyButton('Ctrl+Alt+Del', _session.ctrlAltDel),
             _KeyButton('←', () => _pressKey(0x4B, extended: true)),
