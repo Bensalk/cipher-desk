@@ -9,23 +9,25 @@ _Last updated: 15 Nov 2026._
 
 - **Work is now on `main`** — the `connection-methods` branch was merged.
   All releases now dispatch from `main`.
-- **v0.3.16** — build dispatched (run 43640076017, 15 Nov 2026). Wait for the
+- **v0.3.17** — build dispatched (run 43643422166, 15 Nov 2026). Wait for the
   draft release at https://github.com/Bensalk/cipher-desk/releases; then publish it.
   **What was fixed:**
-  1. **CapsLock key bar button** — Added a **Caps** button to the key bar.
-     Android / touch-screen users can now toggle CapsLock on the remote PC
-     without needing a physical keyboard.
-  2. **File clipboard overwrite after paste** — After CF_HDROP was written to
-     the clipboard, Windows Clipboard History and the CLIPRDR round-trip were
-     overwriting it with format 49161 before the user could paste. Added a
-     5-second quiet window: the host worker now ignores clipboard changes for
-     5 s after writing CF_HDROP.
+  - **CapsLock desync on Windows** — if CapsLock was ON before connecting, the
+    viewer sent an extra Synchronize PDU to the host at connect time. This caused
+    the host's CapsLock to get out of step, so pressing CapsLock once more left
+    them in opposite states (viewer OFF, host ON). Removed the sync-at-connect
+    call. Both sides now track CapsLock independently through normal key presses.
   **To test:**
-  1. Install the new APK on your phone.
-  2. Test CapsLock: tap **Caps** in the key bar → type letters on the remote host.
-     They should be UPPERCASE. Tap **Caps** again → lowercase.
-  3. Test file paste: on Windows viewer, copy a file, switch to host RDP session,
-     Ctrl+V. File should appear without being lost.
+  1. Turn CapsLock **ON** on your Windows viewer keyboard.
+  2. Connect to the host.
+  3. Press CapsLock once — both sides should go OFF together.
+  4. Press CapsLock again — both sides should go ON together.
+  5. They should stay in sync from then on.
+- **v0.3.16** — **PUBLISHED** at https://github.com/Bensalk/cipher-desk/releases/tag/v0.3.16
+  **What was fixed:**
+  1. **CapsLock key bar button** — Caps button added for touch users.
+  2. **File clipboard overwrite after paste** — 5-second quiet window in host
+     worker prevents CLIPRDR cascade from overwriting CF_HDROP.
 - **v0.3.15** — **PUBLISHED** at https://github.com/Bensalk/cipher-desk/releases/tag/v0.3.15
   **What was fixed:** Host→viewer file clipboard "Access is denied." error.
 - **v0.3.14** — build dispatched (run 43622084977, 14 Nov 2026).
@@ -68,10 +70,10 @@ _Last updated: 15 Nov 2026._
 
 ## Waiting for Bensal's test results
 
-1. **v0.3.15** — file clipboard "Access is denied." fix. Copy files from viewer,
-   paste on host — should work now without error.
-2. **v0.3.14** — CapsLock/NumLock/ScrollLock sync fix. Install APK/MSI,
-   turn CapsLock ON before connecting, connect to host, type — should be uppercase.
+1. **v0.3.17** — CapsLock desync fix. Turn CapsLock ON before connecting,
+   connect, then press CapsLock once — both sides should toggle together.
+2. **v0.3.16** — file clipboard CF_HDROP overwrite fix. Copy files from viewer
+   Windows clipboard, paste on host — file should not be lost/overwritten.
 3. **Reconnect storm** (known issue, next fix): ~20 disconnect events fire
    within 1 second when the connection drops. Not addressed yet.
 
@@ -86,6 +88,8 @@ API returns 403 from the cloud session. Use Chrome automation
 
 | Version | What |
 | --- | --- |
+| v0.3.17 | CapsLock desync fix — removed sync-at-connect |
+| v0.3.16 | Caps key bar button; CF_HDROP 5-second quiet window |
 | v0.3.15 | Host→viewer file clipboard "Access is denied." fix (retry up to 4 s) |
 | v0.3.14 | CapsLock/NumLock/ScrollLock sync on connect |
 | v0.3.13 | Windows 11 host→viewer file clipboard (CFSTR_SHELLIDLIST fix) |
