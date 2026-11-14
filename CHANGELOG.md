@@ -2,6 +2,12 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.11 (14 Nov 2026)
+
+Builds on v0.3.10. The About screen shows **0.3.11**.
+
+- **Fix Windows build** (Shell IDList Array code now compiles on the Windows runner — corrected `SHGetPathFromIDListW` return-type handling and `ILFree` argument; added `Win32_UI_Shell_Common` feature).
+
 ## v0.3.10 (14 Nov 2026)
 
 Builds on v0.3.9. The About screen shows **0.3.10**.

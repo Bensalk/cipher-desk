@@ -721,9 +721,9 @@ mod winclip {
                 let mut path_buf = vec![0u16; 32_768];
                 let ok =
                     SHGetPathFromIDListW(abs_pidl as *const _, PWSTR(path_buf.as_mut_ptr()));
-                ILFree(Some(abs_pidl as *const ITEMIDLIST));
+                ILFree(Some(abs_pidl));
 
-                if ok.is_ok() {
+                if ok.as_bool() {
                     let len = path_buf
                         .iter()
                         .position(|&c| c == 0)
