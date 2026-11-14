@@ -489,12 +489,16 @@ mod winclip {
     use anyhow::Context as _;
     use windows::Win32::Foundation::{HANDLE, HGLOBAL};
     use windows::Win32::System::DataExchange::{
-        CloseClipboard, EmptyClipboard, GetClipboardData, GetClipboardSequenceNumber,
-        IsClipboardFormatAvailable, OpenClipboard, SetClipboardData,
+        CloseClipboard, EmptyClipboard, EnumClipboardFormats, GetClipboardData,
+        GetClipboardSequenceNumber, IsClipboardFormatAvailable, OpenClipboard,
+        RegisterClipboardFormatW, SetClipboardData,
     };
     use windows::Win32::System::Memory::{
         GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE,
     };
+    use windows::Win32::UI::Shell::{ILCombine, ILFree, SHGetPathFromIDListW};
+    use windows::Win32::UI::Shell::Common::ITEMIDLIST;
+    use windows::core::PWSTR;
 
     const CF_UNICODETEXT: u32 = 13;
     /// A list of files (what Explorer puts there on Ctrl+C).
@@ -580,37 +584,161 @@ mod winclip {
 
     /// The files on the clipboard (copied in Explorer), or `None` if it holds
     /// no files.
+    ///
+    /// Two strategies are tried in order:
+    ///
+    /// 1. **CF_HDROP** (format 15) — the classic drop-files format.  On older
+    ///    Windows versions Explorer sets this directly; on Windows 11 it may be
+    ///    absent or only present as delayed rendering.
+    ///
+    /// 2. **CFSTR_SHELLIDLIST** ("Shell IDList Array") — always present when
+    ///    files are copied in Explorer regardless of OS version.  Each item is a
+    ///    PIDL that `SHGetPathFromIDListW` converts to a filesystem path.
+    ///
+    /// If CF_HDROP is absent we also log every format that *is* present so the
+    /// log tells us exactly what Explorer put on the clipboard.
     pub fn read_files() -> Option<Vec<std::path::PathBuf>> {
-        // Open the clipboard before checking format availability.
-        // On modern Windows (10 22H2+ / 11), Explorer uses virtual-clipboard
-        // formats such as CFSTR_SHELLIDLIST; CF_HDROP is synthesised lazily
-        // the first time a caller requests it via GetClipboardData.
-        // IsClipboardFormatAvailable(CF_HDROP) returns false in that case even
-        // though files are on the clipboard, so we skip the early-exit check
-        // and let GetClipboardData trigger synthesis instead.
+        // Keep the clipboard open for the duration; both strategies need it.
         let _guard = Guard::open().ok()?;
-        // SAFETY: the handle is owned by the clipboard and only read while it
-        // is open; the bytes are copied out (bounded by GlobalSize) before the
-        // lock is released, and parsed from the copy.
-        let bytes = unsafe {
-            let Ok(handle) = GetClipboardData(CF_HDROP) else {
-                return None; // no CF_HDROP (direct or synthesised)
-            };
+
+        // --- Strategy 1: CF_HDROP -------------------------------------------
+        // SAFETY: clipboard is open; handle, global memory, and lock follow the
+        // standard MSDN "Clipboard Operations" pattern.
+        let hdrop = unsafe {
+            GetClipboardData(CF_HDROP).ok().and_then(|handle| {
+                if handle.is_invalid() {
+                    return None;
+                }
+                let hg = HGLOBAL(handle.0);
+                let size = GlobalSize(hg);
+                let ptr = GlobalLock(hg) as *const u8;
+                if ptr.is_null() || size == 0 {
+                    return None;
+                }
+                let v = core::slice::from_raw_parts(ptr, size).to_vec();
+                let _ = GlobalUnlock(hg);
+                Some(v)
+            })
+        };
+        if let Some(bytes) = hdrop {
+            let files = rdpv_core::xfer::parse_dropfiles(&bytes, MAX_FILES);
+            if !files.is_empty() {
+                return Some(files);
+            }
+        }
+
+        // --- Diagnostic: log every format that is on the clipboard -----------
+        // This runs only when CF_HDROP is absent, so it costs nothing in the
+        // common (text-only) case.
+        // SAFETY: clipboard is open; EnumClipboardFormats is a read-only walk.
+        let present: Vec<u32> = unsafe {
+            let mut fmt = 0u32;
+            let mut v = Vec::new();
+            loop {
+                fmt = EnumClipboardFormats(fmt);
+                if fmt == 0 {
+                    break;
+                }
+                v.push(fmt);
+            }
+            v
+        };
+        tracing::info!(
+            "host clip: CF_HDROP absent; formats on clipboard: {:?}",
+            present
+        );
+
+        // --- Strategy 2: CFSTR_SHELLIDLIST -----------------------------------
+        // Explorer always places a Shell IDList Array (CIDA) on the clipboard
+        // when files are copied, even when CF_HDROP is not present.
+        // SAFETY: RegisterClipboardFormatW is a one-time idempotent registration
+        // using a literal name; the returned ID is used only while the clipboard
+        // is still open.
+        let cf_shell_idlist =
+            unsafe { RegisterClipboardFormatW(windows::core::w!("Shell IDList Array")) };
+        if cf_shell_idlist == 0 || !present.contains(&cf_shell_idlist) {
+            return None;
+        }
+
+        // SAFETY: clipboard is still open; we lock the global memory, walk the
+        // CIDA structure to build absolute PIDLs, convert each PIDL to a path,
+        // and unlock before returning.
+        unsafe {
+            let handle = GetClipboardData(cf_shell_idlist).ok()?;
             if handle.is_invalid() {
                 return None;
             }
             let hg = HGLOBAL(handle.0);
             let size = GlobalSize(hg);
-            let ptr = GlobalLock(hg) as *const u8;
-            if ptr.is_null() || size == 0 {
+            if size < 8 {
                 return None;
             }
-            let v = core::slice::from_raw_parts(ptr, size).to_vec();
+            let ptr = GlobalLock(hg) as *const u8;
+            if ptr.is_null() {
+                return None;
+            }
+
+            // CIDA layout: { cidl: u32, aoffset[cidl+1]: u32, raw_pidl_data }
+            // aoffset[0] = parent folder PIDL; aoffset[1..=cidl] = item PIDLs.
+            let cidl = {
+                let b = core::slice::from_raw_parts(ptr, 4);
+                u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize
+            };
+            if cidl == 0 || cidl > MAX_FILES || size < 4 + (cidl + 1) * 4 {
+                let _ = GlobalUnlock(hg);
+                return None;
+            }
+
+            let parent_offset = {
+                let b = core::slice::from_raw_parts(ptr.add(4), 4);
+                u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize
+            };
+            if parent_offset >= size {
+                let _ = GlobalUnlock(hg);
+                return None;
+            }
+
+            let mut paths = Vec::new();
+            for i in 1..=cidl {
+                let off_idx = 4 + i * 4;
+                let item_off = {
+                    let b = core::slice::from_raw_parts(ptr.add(off_idx), 4);
+                    u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize
+                };
+                if item_off >= size {
+                    continue;
+                }
+
+                // Combine parent + relative item PIDL into an absolute PIDL.
+                let parent_pidl = ptr.add(parent_offset) as *const ITEMIDLIST;
+                let item_pidl = ptr.add(item_off) as *const ITEMIDLIST;
+                let abs_pidl: *mut ITEMIDLIST = ILCombine(parent_pidl, item_pidl);
+                if abs_pidl.is_null() {
+                    continue;
+                }
+
+                // Convert the absolute PIDL to a filesystem path.
+                let mut path_buf = vec![0u16; 32_768];
+                let ok =
+                    SHGetPathFromIDListW(abs_pidl as *const _, PWSTR(path_buf.as_mut_ptr()));
+                ILFree(Some(abs_pidl as *const ITEMIDLIST));
+
+                if ok.is_ok() {
+                    let len = path_buf
+                        .iter()
+                        .position(|&c| c == 0)
+                        .unwrap_or(path_buf.len());
+                    if let Ok(s) = String::from_utf16(&path_buf[..len]) {
+                        if !s.is_empty() {
+                            paths.push(std::path::PathBuf::from(s));
+                        }
+                    }
+                }
+            }
+
             let _ = GlobalUnlock(hg);
-            v
-        };
-        let files = rdpv_core::xfer::parse_dropfiles(&bytes, MAX_FILES);
-        (!files.is_empty()).then_some(files)
+            (!paths.is_empty()).then_some(paths)
+        }
     }
 
     /// Replaces the clipboard's contents with these files, so Ctrl+V in

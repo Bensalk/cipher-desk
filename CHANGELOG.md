@@ -2,6 +2,21 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.10 (14 Nov 2026)
+
+Builds on v0.3.9. The About screen shows **0.3.10**.
+
+- **Fix host→viewer file clipboard (second attempt).** Windows 11 Explorer
+  puts files on the clipboard using the Shell IDList Array format
+  (`CFSTR_SHELLIDLIST`) rather than `CF_HDROP`. The host poller now reads
+  the Shell IDList Array as a fallback: each item is a PIDL that
+  `SHGetPathFromIDListW` converts to a full path. `CF_HDROP` is still tried
+  first for compatibility with older Windows versions. When `CF_HDROP` is
+  absent the log now lists every format that *is* on the clipboard, which
+  confirmed the root cause and will help diagnose edge cases.
+
+---
+
 ## v0.3.9 (14 Nov 2026)
 
 Builds on v0.3.8. The About screen shows **0.3.9**.
