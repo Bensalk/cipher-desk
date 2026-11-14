@@ -2619,6 +2619,10 @@ sse_encode_i_32(self.index, serializer); }
  Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality , required bool shareScreen , required String authCode })=>RustLib.instance.api.crateApiSessionRdpSessionStartWithSavedPassword(that: this, connectionId: connectionId, host: host, port: port, username: username, width: width, height: height, pinsPath: pinsPath, clipboardDirection: clipboardDirection, downloadDir: downloadDir, idleMinutes: idleMinutes, quality: quality, shareScreen: shareScreen, authCode: authCode);
 
 
+/// Syncs CapsLock / NumLock / ScrollLock state to the remote.
+ void  syncLockKeys({required bool capsLock , required bool numLock , required bool scrollLock })=>RustLib.instance.api.crateApiSessionRdpSessionSyncLockKeys(that: this, capsLock: capsLock, numLock: numLock, scrollLock: scrollLock);
+
+
 /// Types text (on-screen keyboards, IMEs, pasted text is NOT sent this way).
  void  typeText({required String text })=>RustLib.instance.api.crateApiSessionRdpSessionTypeText(that: this, text: text);
 
