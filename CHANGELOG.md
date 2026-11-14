@@ -2,6 +2,22 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.9 (14 Nov 2026)
+
+Builds on v0.3.8. The About screen shows **0.3.9**.
+
+- **Fix host→viewer file clipboard.** On modern Windows (10 22H2+ / 11),
+  Explorer stores copied files using virtual clipboard formats; CF_HDROP
+  is synthesised on demand the first time `GetClipboardData` is called.
+  The host clipboard poller was checking `IsClipboardFormatAvailable(CF_HDROP)`
+  first and exiting early when it returned false, so it never triggered the
+  synthesis and always missed host-side file copies. Fixed by opening the
+  clipboard and calling `GetClipboardData(CF_HDROP)` directly, which causes
+  Windows to synthesise CF_HDROP from the shell format.
+- **Auto-clean Received folder.** Files received from the viewer are now
+  deleted at the start of each new session, so the Received folder no longer
+  accumulates duplicates across connections.
+
 ## v0.3.8 (14 Nov 2026)
 
 Builds on v0.3.7. The About screen shows **0.3.8**.

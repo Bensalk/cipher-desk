@@ -185,6 +185,26 @@ impl CliprdrBackendFactory for HostClipboard {
 
 impl CliprdrServerFactory for HostClipboard {}
 
+/// Deletes files left in `dir` from previous sessions so the Received folder
+/// does not accumulate duplicates across connections. Silently ignores errors.
+fn cleanup_received_dir(dir: &std::path::Path) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let mut removed = 0usize;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_file() {
+            if std::fs::remove_file(&path).is_ok() {
+                removed += 1;
+            }
+        }
+    }
+    if removed > 0 {
+        tracing::info!(removed, "host clip: cleaned up received files from previous session");
+    }
+}
+
 /// Sends the files copied here (Explorer) to the viewer, if the clipboard
 /// holds files. Returns whether it did.
 fn offer_copied_files(inner: &Inner) -> bool {
@@ -322,6 +342,9 @@ impl CliprdrBackend for Backend {
 
     fn on_ready(&mut self) {
         tracing::info!("host clip: clipboard channel ready, starting poller");
+        // Clean up leftover files from previous sessions so the Received
+        // folder doesn't accumulate duplicates across connections.
+        cleanup_received_dir(&self.inner.receive_dir);
         if self.poller.is_none() {
             self.poller = Some(spawn_poller(Arc::clone(&self.inner)));
         }
@@ -558,16 +581,21 @@ mod winclip {
     /// The files on the clipboard (copied in Explorer), or `None` if it holds
     /// no files.
     pub fn read_files() -> Option<Vec<std::path::PathBuf>> {
-        // SAFETY: queries format availability only.
-        if unsafe { IsClipboardFormatAvailable(CF_HDROP).is_err() } {
-            return None;
-        }
+        // Open the clipboard before checking format availability.
+        // On modern Windows (10 22H2+ / 11), Explorer uses virtual-clipboard
+        // formats such as CFSTR_SHELLIDLIST; CF_HDROP is synthesised lazily
+        // the first time a caller requests it via GetClipboardData.
+        // IsClipboardFormatAvailable(CF_HDROP) returns false in that case even
+        // though files are on the clipboard, so we skip the early-exit check
+        // and let GetClipboardData trigger synthesis instead.
         let _guard = Guard::open().ok()?;
         // SAFETY: the handle is owned by the clipboard and only read while it
         // is open; the bytes are copied out (bounded by GlobalSize) before the
         // lock is released, and parsed from the copy.
         let bytes = unsafe {
-            let handle = GetClipboardData(CF_HDROP).ok()?;
+            let Ok(handle) = GetClipboardData(CF_HDROP) else {
+                return None; // no CF_HDROP (direct or synthesised)
+            };
             if handle.is_invalid() {
                 return None;
             }
