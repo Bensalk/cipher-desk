@@ -115,6 +115,8 @@ Stream<SessionUpdate> crateApiSessionRdpSessionStartVncWithSavedPassword({requir
 
 Stream<SessionUpdate> crateApiSessionRdpSessionStartWithSavedPassword({required RdpSession that , required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality , required bool shareScreen , required String authCode });
 
+void crateApiSessionRdpSessionSyncLockKeys({required RdpSession that , required bool capsLock , required bool numLock , required bool scrollLock });
+
 void crateApiSessionRdpSessionTypeText({required RdpSession that , required String text });
 
 void crateApiSessionRdpSessionWheel({required RdpSession that , required bool vertical , required int delta });
@@ -638,6 +640,34 @@ sse_encode_StreamSink_session_update_Sse(sink, serializer);
             argNames: ["that", "connectionId", "host", "port", "username", "width", "height", "pinsPath", "clipboardDirection", "downloadDir", "idleMinutes", "quality", "shareScreen", "authCode", "sink"],
         );
         
+
+@override void crateApiSessionRdpSessionSyncLockKeys({required RdpSession that , required bool capsLock , required bool numLock , required bool scrollLock })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
+sse_encode_bool(capsLock, serializer);
+sse_encode_bool(numLock, serializer);
+sse_encode_bool(scrollLock, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 57)!;
+
+            },
+            codec:
+        SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiSessionRdpSessionSyncLockKeysConstMeta,
+            argValues: [that, capsLock, numLock, scrollLock],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiSessionRdpSessionSyncLockKeysConstMeta => const TaskConstMeta(
+            debugName: "RdpSession_sync_lock_keys",
+            argNames: ["that", "capsLock", "numLock", "scrollLock"],
+        );
+
 
 @override void crateApiSessionRdpSessionTypeText({required RdpSession that , required String text })  { return handler.executeSync(SyncTask(
             callFfi: () {

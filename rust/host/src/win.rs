@@ -19,11 +19,12 @@ use windows::Win32::UI::HiDpi::{
     SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYBD_EVENT_FLAGS,
-    KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE, KEYEVENTF_UNICODE,
-    MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN,
-    MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_MOVE, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP,
-    MOUSEEVENTF_WHEEL, MOUSEINPUT, MOUSE_EVENT_FLAGS, VIRTUAL_KEY,
+    GetKeyState, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT,
+    KEYBD_EVENT_FLAGS, KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE,
+    KEYEVENTF_UNICODE, MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
+    MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_MOVE, MOUSEEVENTF_RIGHTDOWN,
+    MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEINPUT, MOUSE_EVENT_FLAGS, VIRTUAL_KEY,
+    VK_CAPITAL, VK_NUMLOCK, VK_SCROLL,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     DrawIconEx, GetCursorInfo, GetIconInfo, GetSystemMetrics, CURSORINFO, CURSOR_SHOWING,
@@ -222,6 +223,37 @@ fn key(scan: u16, flags: KEYBD_EVENT_FLAGS) -> INPUT {
     }
 }
 
+/// Returns `true` when a toggle key is currently on (low bit of `GetKeyState`).
+fn lock_active(vk: VIRTUAL_KEY) -> bool {
+    // SAFETY: GetKeyState is always safe to call.
+    (unsafe { GetKeyState(i32::from(vk.0)) } & 1) != 0
+}
+
+/// Toggles a lock key (press + release) to flip its state.
+fn toggle_lock(vk: VIRTUAL_KEY) {
+    // VK_CAPITAL  = 0x14 → scancode 0x3A, not extended
+    // VK_NUMLOCK  = 0x90 → scancode 0x45, extended
+    // VK_SCROLL   = 0x91 → scancode 0x46, not extended
+    let (scan, extended) = match vk {
+        VK_CAPITAL => (0x3A_u16, false),
+        VK_NUMLOCK => (0x45_u16, true),
+        VK_SCROLL => (0x46_u16, false),
+        _ => return,
+    };
+    let ext = if extended { KEYEVENTF_EXTENDEDKEY } else { KEYBD_EVENT_FLAGS(0) };
+    send(&[
+        key(scan, KEYEVENTF_SCANCODE | ext),
+        key(scan, KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP | ext),
+    ]);
+}
+
+/// Syncs one lock key: if `want` differs from the current state, toggle it.
+fn sync_lock(vk: VIRTUAL_KEY, want: bool) {
+    if lock_active(vk) != want {
+        toggle_lock(vk);
+    }
+}
+
 fn mouse(dx: i32, dy: i32, data: i32, flags: MOUSE_EVENT_FLAGS) -> INPUT {
     INPUT {
         r#type: INPUT_MOUSE,
@@ -300,6 +332,11 @@ impl InputSink for SendInputSink {
             }
             Input::Wheel { delta } => {
                 send(&[mouse(0, 0, i32::from(delta), MOUSEEVENTF_WHEEL)]);
+            }
+            Input::SyncLockKeys { caps_lock, num_lock, scroll_lock } => {
+                sync_lock(VK_CAPITAL, caps_lock);
+                sync_lock(VK_NUMLOCK, num_lock);
+                sync_lock(VK_SCROLL, scroll_lock);
             }
         }
     }

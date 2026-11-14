@@ -85,6 +85,11 @@ static RdpSession  create()=>RustLib.instance.api.crateApiSessionRdpSessionCreat
  Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality , required bool shareScreen , required String authCode });
 
 
+/// Sends the viewer's lock-key state to the host so both keyboards are in
+/// sync. Call once right after the session connects.
+ void  syncLockKeys({required bool capsLock , required bool numLock , required bool scrollLock });
+
+
 /// Types text (on-screen keyboards, IMEs, pasted text is NOT sent this way).
  void  typeText({required String text });
 

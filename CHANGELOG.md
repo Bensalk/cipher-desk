@@ -2,6 +2,11 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.14 (14 Nov 2026)
+
+### Fixed
+- **CapsLock / NumLock / ScrollLock sync** — when you connect to a remote PC, Cipher Desk now sends your keyboard's current lock-key state to the host immediately. The host adjusts its own lock keys to match, so typing is correct from the first keystroke. Previously the host ignored the viewer's lock state, causing CapsLock or NumLock to appear active on the remote even when it was off locally (or vice versa).
+
 ## v0.3.13 (14 Nov 2026)
 
 Fix Windows build: correct `ILCombine` and `SHGetPathFromIDListW` call signatures for

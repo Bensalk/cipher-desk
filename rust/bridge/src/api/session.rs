@@ -383,6 +383,17 @@ impl RdpSession {
         self.send(vec![e]);
     }
 
+    /// Sends the viewer's lock-key state to the host so both keyboards are in
+    /// sync. Call once right after the session connects.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn sync_lock_keys(&self, caps_lock: bool, num_lock: bool, scroll_lock: bool) {
+        self.send(vec![InputEvent::SyncLockKeys {
+            caps_lock,
+            num_lock,
+            scroll_lock,
+        }]);
+    }
+
     /// Types text (on-screen keyboards, IMEs, pasted text is NOT sent this way).
     #[flutter_rust_bridge::frb(sync)]
     pub fn type_text(&self, text: String) {

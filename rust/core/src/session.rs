@@ -833,7 +833,37 @@ impl Session {
             return Err(ConnectionError::ConnectionLost);
         }
         let (w, h) = self.size();
-        let ops = ops.into_iter().filter_map(|op| op.into_operation(w, h));
+
+        // SyncLockKeys is handled separately: it produces a Synchronize PDU
+        // directly rather than going through the input Database.
+        let mut extra: Vec<ironrdp_pdu::input::fast_path::FastPathInputEvent> = Vec::new();
+        let regular: Vec<_> = ops
+            .into_iter()
+            .filter(|op| {
+                if let InputEvent::SyncLockKeys { caps_lock, num_lock, scroll_lock } = *op {
+                    extra.push(ironrdp_input::synchronize_event(
+                        scroll_lock, num_lock, caps_lock,
+                        false, // kana_lock — not used
+                    ));
+                    false
+                } else {
+                    true
+                }
+            })
+            .collect();
+
+        // Send the Synchronize PDU first so the host aligns its lock state
+        // before it receives any keystrokes.
+        if !extra.is_empty() {
+            let outputs = self
+                .stage
+                .process_fastpath_input(&mut self.image, &extra)
+                .map_err(|_| ConnectionError::Unexpected)?;
+            let mut ignored = Vec::new();
+            self.handle_outputs(outputs, &mut ignored)?;
+        }
+
+        let ops = regular.into_iter().filter_map(|op| op.into_operation(w, h));
         let events = self.input.apply(ops);
         if events.is_empty() {
             return Ok(());
@@ -916,6 +946,13 @@ pub enum InputEvent {
         ch: char,
         down: bool,
     },
+    /// Sends the viewer's lock-key state to the host so it can align its own
+    /// keyboard (CapsLock, NumLock, ScrollLock). Called once at session start.
+    SyncLockKeys {
+        caps_lock: bool,
+        num_lock: bool,
+        scroll_lock: bool,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -956,6 +993,8 @@ impl InputEvent {
             }
             Self::Unicode { ch, down: true } => Operation::UnicodeKeyPressed(ch),
             Self::Unicode { ch, down: false } => Operation::UnicodeKeyReleased(ch),
+            // Handled before this call in send_input; never reaches here.
+            Self::SyncLockKeys { .. } => return None,
         })
     }
 }

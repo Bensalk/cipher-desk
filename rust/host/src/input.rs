@@ -36,6 +36,13 @@ pub enum Input {
     Wheel {
         delta: i16,
     },
+    /// Sync the toggle-key state (CapsLock, NumLock, ScrollLock) to match the
+    /// viewer's keyboard at the moment the session starts.
+    SyncLockKeys {
+        caps_lock: bool,
+        num_lock: bool,
+        scroll_lock: bool,
+    },
 }
 
 /// Something that performs input on this computer.
@@ -82,8 +89,14 @@ impl<S: InputSink> RdpServerInputHandler for Handler<S> {
             },
             KeyboardEvent::UnicodePressed(unit) => Input::Unicode { unit, down: true },
             KeyboardEvent::UnicodeReleased(unit) => Input::Unicode { unit, down: false },
-            // Lock-key state from the viewer is not forced onto this computer.
-            KeyboardEvent::Synchronize(_) => return,
+            KeyboardEvent::Synchronize(flags) => {
+                use ironrdp_pdu::input::fast_path::SynchronizeFlags;
+                Input::SyncLockKeys {
+                    caps_lock: flags.contains(SynchronizeFlags::CAPS_LOCK),
+                    num_lock: flags.contains(SynchronizeFlags::NUM_LOCK),
+                    scroll_lock: flags.contains(SynchronizeFlags::SCROLL_LOCK),
+                }
+            }
         };
         self.sink.send(input);
     }

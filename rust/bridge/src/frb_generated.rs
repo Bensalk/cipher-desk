@@ -2283,6 +2283,63 @@ fn wire__crate__api__log__session_log_clear_impl(
     )
 }
 
+fn wire__crate__api__session__RdpSession_sync_lock_keys_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "RdpSession_sync_lock_keys",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RdpSession>,
+            >>::sse_decode(&mut deserializer);
+            let api_caps_lock = <bool>::sse_decode(&mut deserializer);
+            let api_num_lock = <bool>::sse_decode(&mut deserializer);
+            let api_scroll_lock = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let mut api_that_guard = None;
+                let decode_indices_ =
+                    flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                        flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                            &api_that, 0, false,
+                        ),
+                    ]);
+                for i in decode_indices_ {
+                    match i {
+                        0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                        _ => unreachable!(),
+                    }
+                }
+                let api_that_guard = api_that_guard.unwrap();
+                let output_ok = Ok::<_, ()>({
+                    crate::api::session::RdpSession::sync_lock_keys(
+                        &*api_that_guard,
+                        api_caps_lock,
+                        api_num_lock,
+                        api_scroll_lock,
+                    );
+                })?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+
 // Section: related_funcs
 
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
@@ -3008,6 +3065,7 @@ fn pde_ffi_dispatcher_sync_impl(
         54 => wire__crate__api__log__init_logging_impl(ptr, rust_vec_len, data_len),
         55 => wire__crate__api__log__session_log_export_impl(ptr, rust_vec_len, data_len),
         56 => wire__crate__api__log__session_log_clear_impl(ptr, rust_vec_len, data_len),
+        57 => wire__crate__api__session__RdpSession_sync_lock_keys_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

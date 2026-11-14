@@ -195,6 +195,17 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     WidgetsBinding.instance.addPostFrameCallback((_) => _start());
   }
 
+  /// Send the viewer's current CapsLock / NumLock / ScrollLock state to the
+  /// host immediately after connecting, so both sides start in sync.
+  void _syncLockKeys() {
+    final locks = HardwareKeyboard.instance.lockModesEnabled;
+    _session.syncLockKeys(
+      capsLock: locks.contains(KeyboardLockMode.capsLock),
+      numLock: locks.contains(KeyboardLockMode.numLock),
+      scrollLock: locks.contains(KeyboardLockMode.scrollLock),
+    );
+  }
+
   /// Desktop: check this device's clipboard every second while connected.
   /// Android: only when the app comes back to the foreground or on request,
   /// because Android shows a notice every time an app reads the clipboard.
@@ -436,6 +447,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
           }
           if (_inBackground) _armBackgroundTimer();
           _focus.requestFocus();
+          _syncLockKeys();
           _startClipboardSync();
         }
       case UpdateKind.certificateApproval:
