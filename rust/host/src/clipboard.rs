@@ -510,19 +510,34 @@ mod winclip {
 
     impl Guard {
         fn open() -> anyhow::Result<Self> {
-            // Another program (Explorer, right after Ctrl+C) may still hold the
-            // clipboard for a moment: try again briefly instead of giving up,
-            // which would silently lose that copy.
+            // Another program (Explorer, clipboard manager, Windows Clipboard
+            // History, antivirus) may hold the clipboard for an extended period.
+            // Retry up to 4 seconds (80 × 50 ms) before giving up.  The old
+            // 500 ms window was not enough — real-world logs showed the lock
+            // being held for >500 ms, causing "Access is denied." (0x80070005).
+            let start = std::time::Instant::now();
             let mut last = None;
-            for _ in 0..20 {
+            for attempt in 0..80u32 {
                 // SAFETY: opens the clipboard with no owner window; Drop closes it.
                 match unsafe { OpenClipboard(None) } {
-                    Ok(()) => return Ok(Self),
+                    Ok(()) => {
+                        if attempt > 0 {
+                            tracing::debug!(
+                                attempt,
+                                elapsed_ms = start.elapsed().as_millis(),
+                                "open clipboard succeeded after retries"
+                            );
+                        }
+                        return Ok(Self);
+                    }
                     Err(e) => last = Some(e),
                 }
-                std::thread::sleep(std::time::Duration::from_millis(25));
+                std::thread::sleep(std::time::Duration::from_millis(50));
             }
-            Err(anyhow::anyhow!("open clipboard: {last:?}"))
+            Err(anyhow::anyhow!(
+                "open clipboard: {last:?} (gave up after {} ms)",
+                start.elapsed().as_millis()
+            ))
         }
     }
 

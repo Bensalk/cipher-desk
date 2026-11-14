@@ -2,6 +2,11 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.15 (14 Nov 2026)
+
+### Fixed
+- **Paste to host (viewer→host file clipboard) — "Access is denied." fix** — the Windows host worker retries opening the clipboard for up to 4 seconds now (up from 0.5 s). Windows Clipboard History, clipboard managers, and antivirus software can hold the clipboard lock for over 500 ms; the old limit caused `OpenClipboard` to give up and silently discard the pasted files. The error `write_files (CF_HDROP) FAILED — Access is denied.` should no longer appear.
+
 ## v0.3.14 (14 Nov 2026)
 
 ### Fixed
