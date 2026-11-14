@@ -14,6 +14,7 @@ rdpv-core = { path = "../core" }
 ironrdp-server = { path = "../third_party/ironrdp-server", features = ["qoiz"] }
 ironrdp-cliprdr.workspace = true
 ironrdp-core.workspace = true
+ironrdp-pdu.workspace = true
 anyhow = "1"
 async-trait = "0.1"
 bytes = "1"
