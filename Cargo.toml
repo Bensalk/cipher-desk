@@ -23,7 +23,7 @@ ironrdp-cliprdr = "0.9"
 ironrdp-svc = "0.10"
 sspi = { version = "0.23", features = ["network_client"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
-x509-cert = { version = "0.2", default-features = false, features = ["std"] }
+x509-cert = { version = "0.3", default-features = false, features = ["std"] }
 sha2 = "0.10"
 bytes = "1"
 serde = { version = "1", features = ["derive"] }
