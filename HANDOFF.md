@@ -9,23 +9,32 @@ _Last updated: 15 Nov 2026._
 
 - **Work is now on `main`** — the `connection-methods` branch was merged.
   All releases now dispatch from `main`.
-- **v0.3.20** — build dispatched (run 43694307259, 15 Nov 2026). Building now.
-  **What is in it:** Deeper HOST→VIEWER clipboard diagnostics (logs every step of
-  the text paste path: FormatDataRequest sent, bytes received, decode result,
-  host error response).
+- **v0.3.21** — build dispatched (run 43703352686, 15 Nov 2026).
+  **What is in it:** Two fixes to `rust/host/src/clipboard.rs`:
+  1. **Quiet-window bug fixed** — after the viewer sent files to the host, the host
+     suppressed ALL clipboard changes for 5 seconds (including genuine text copies).
+     Now only file-clipboard echoes are suppressed; text is advertised immediately
+     even during the quiet window.
+  2. **Host clipboard advertising now logged** — the host log now shows
+     `host clip: advertising clipboard state to viewer has_text=true/false` every
+     time it tells the viewer what is on the clipboard. Previously `advertise()` was
+     completely silent.
   **To test (host→viewer clipboard):**
-  1. Install v0.3.20 on viewer Windows PC.
-  2. Connect to host PC. Set clipboard to "Both directions".
-  3. Copy text on the HOST (Ctrl+C in Notepad).
+  1. Install v0.3.21 on **both** PCs.
+  2. Connect viewer to host. Set clipboard to "Both directions".
+  3. Copy text on the HOST (Ctrl+C in Notepad or any app).
   4. Try to paste on viewer — does it work?
-  5. **If still fails:** Session menu → Export session log, send me the file.
-     Look for these lines in the log:
-     - `clip: session starting with clipboard policy host_to_local=true` ← confirms setting
-     - `clip: host clipboard changed (RemoteChanged) has_text=true` ← Windows told us
-     - `clip: sent FormatDataRequest for text` ← we asked for the data
-     - `clip: received format data from host bytes=N` ← Windows sent data
-     - `clip: host returned error for FormatDataRequest` ← Windows refused (the bug)
-     The first missing line in the chain above is where it breaks.
+  5. **Share both logs:**
+     - **HOST log** (`worker.log` on the host PC) — look for:
+       `host clip: advertising clipboard state to viewer has_text=true`
+     - **VIEWER session log** (tap "Copy Diagnostic Log" in the Cipher Desk app
+       while STILL CONNECTED to the session, NOT worker.log) — look for:
+       `clip: host clipboard changed (RemoteChanged) has_text=true`
+       `clip: sent FormatDataRequest for text`
+       `clip: received format data from host bytes=N`
+     The first missing line is where the chain breaks.
+- **v0.3.20** — **PUBLISHED** at https://github.com/Bensalk/cipher-desk/releases/tag/v0.3.20
+  What was in it: Deeper HOST→VIEWER clipboard diagnostics in the viewer session log.
 - **v0.3.19** — **PUBLISHED** at https://github.com/Bensalk/cipher-desk/releases/tag/v0.3.19
   Build all green (run 43692597749). Published. Contains clipboard policy logging.
 - **v0.3.18** — build dispatched (run 43644585250, 15 Nov 2026). Wait for the
@@ -89,44 +98,26 @@ _Last updated: 15 Nov 2026._
 
 ## Active investigation: host→viewer clipboard broken
 
-Bensal reported: "Pasting From viewer pc to host pc working. Problem is cant paste
-from host to viewer."
+Bensal confirmed both PCs are on v0.3.20. HOST→VIEWER text clipboard still broken.
+v0.3.21 fixes two bugs found in `rust/host/src/clipboard.rs`:
 
-**Root cause identified (not yet confirmed by live test):**
+1. **5-second quiet window** — after the viewer sent files to the host, the host
+   suppressed ALL clipboard changes for 5 seconds. Text copies during that window
+   were silently dropped. Now only file-clipboard echoes are suppressed.
+2. **advertise() was completely silent** — the host log never showed whether text
+   was being advertised to the viewer. Now it logs `has_text=true/false` on every
+   advertising call.
 
-All HOST→VIEWER paths in `rust/core/src/session.rs` are gated by `policy.host_to_local`.
-When `host_to_local = false`, the host clipboard events arrive at the viewer but are
-silently discarded. No error. `host_to_local = false` happens only with
-`ClipboardMode.toRemoteOnly` ("To remote only") on the connection settings.
-Since VIEWER→HOST works, `local_to_host = true` — which is consistent with either
-`both` or `toRemoteOnly`. If it's `toRemoteOnly`, HOST→VIEWER is blocked by policy.
+The viewer PC has **no worker.log** — that file only exists on the HOST PC (which
+runs the Windows host service). The viewer's diagnostics are in the **session log**
+inside the Cipher Desk app: tap "Copy Diagnostic Log" while STILL CONNECTED to a
+session. This is not worker.log — it is different.
 
-**v0.3.19 adds diagnostic logging** to confirm this. The session log will show:
-- `clip: session starting with clipboard policy local_to_host=X host_to_local=Y`
-- `clip: host clipboard changed (RemoteChanged) has_text=true host_to_local=Y`
-
-**Expected fix** (once confirmed): Tell Bensal to change his connection's
-clipboard setting from "To remote only" to "Both directions". No code fix needed.
-
-**If `host_to_local=true` in the log but paste still fails**: there is a code bug
-in the HOST→VIEWER path that needs further investigation. The poller → `advertise()`
-→ viewer `on_remote_copy()` → `RemoteChanged` → `initiate_paste()` → host
-`on_format_data_request()` → viewer `DataReceived` → Flutter `setText()` path
-was reviewed and appears correct — but a timing or CLIPRDR handshake issue
-cannot be ruled out without live logs.
-
-## Waiting for Bensal's test results
-
-1. **v0.3.19** — Diagnostic build. Connect, copy text on host, try to paste on viewer.
-   If still broken: export session log and share. Looking for `host_to_local=false`
-   which would confirm the clipboard mode is set to "To remote only".
-2. **v0.3.18** — VIEWER→HOST CF_HDROP fix. Copy files on viewer, they arrive on host,
-   then Ctrl+V in Explorer on host — files should paste. Test even after waiting
-   30 seconds before pasting.
-3. **v0.3.17** — CapsLock desync fix. Turn CapsLock ON before connecting,
-   connect, then press CapsLock once — both sides should toggle together.
-4. **Reconnect storm** (known issue, next fix): ~20 disconnect events fire
-   within 1 second when the connection drops. Not addressed yet.
+**Next step after v0.3.21 installed:** Need both logs to find where the chain breaks:
+- Host `worker.log`: should show `host clip: advertising clipboard state to viewer has_text=true`
+- Viewer session log (from "Copy Diagnostic Log" button in app): should show
+  `clip: host clipboard changed (RemoteChanged) has_text=true` and
+  `clip: sent FormatDataRequest for text`
 
 ## Sandbox gotcha: spurious draft v0.3.9 release
 
@@ -139,6 +130,8 @@ API returns 403 from the cloud session. Use Chrome automation
 
 | Version | What |
 | --- | --- |
+| v0.3.21 | Host clipboard quiet-window bug fix; advertise() logging added |
+| v0.3.20 | Viewer-side clipboard diagnostic logging (session log) |
 | v0.3.19 | Clipboard-direction diagnostic logging |
 | v0.3.18 | VIEWER→HOST CF_HDROP fix — block on_remote_copy from wiping clipboard |
 | v0.3.17 | CapsLock desync fix — removed sync-at-connect |
