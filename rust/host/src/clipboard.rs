@@ -1032,7 +1032,7 @@ mod winclip {
         // locked for the copy below, then unlocked before the medium (which
         // owns the handle) is released.
         let text = unsafe {
-            let hg = medium.Anonymous.hGlobal;
+            let hg = medium.u.hGlobal;
             if hg.is_invalid() {
                 None
             } else {
