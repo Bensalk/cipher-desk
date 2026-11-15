@@ -59,8 +59,8 @@ _Last updated: 15 Nov 2026._
   both keyboards are in sync from the first keystroke.
   **After the build finishes** (draft release at
   https://github.com/Bensalk/cipher-desk/releases):
-  1. Install the APK on your phone (or MSI on Windows).
-  2. Turn CapsLock ON on your phone/PC before connecting.
+  1. Install the MSI on both Windows PCs.
+  2. Turn CapsLock ON on the viewer PC before connecting.
   3. Connect to the host — type a few letters. They should be uppercase.
   4. Try the same with NumLock off on your side.
   5. Tell me if it works.
