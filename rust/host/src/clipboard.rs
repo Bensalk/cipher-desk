@@ -170,7 +170,10 @@ impl Inner {
                 }
                 match winclip::write_files(&done) {
                     Ok(()) => {
-                        tracing::info!(count = done.len(), "host clip: wrote CF_HDROP to clipboard");
+                        tracing::info!(
+                            count = done.len(),
+                            "host clip: wrote CF_HDROP to clipboard"
+                        );
                         self.own_seq
                             .store(winclip::sequence_number(), Ordering::Relaxed);
                         let now_ms = SystemTime::now()
@@ -234,7 +237,10 @@ fn cleanup_received_dir(dir: &std::path::Path) {
         }
     }
     if removed > 0 {
-        tracing::info!(removed, "host clip: cleaned up received files from previous session");
+        tracing::info!(
+            removed,
+            "host clip: cleaned up received files from previous session"
+        );
     }
 }
 
@@ -245,7 +251,11 @@ fn offer_copied_files(inner: &Inner) -> bool {
         tracing::info!("host clip: clipboard changed but no CF_HDROP files found");
         return false;
     };
-    tracing::info!(count = paths.len(), ?paths, "host clip: CF_HDROP files found on clipboard");
+    tracing::info!(
+        count = paths.len(),
+        ?paths,
+        "host clip: CF_HDROP files found on clipboard"
+    );
     // Files we received from the viewer and put there ourselves: not a new
     // copy (sending them back would duplicate them on the viewer).
     if paths.iter().all(|p| p.starts_with(&inner.receive_dir)) {
@@ -330,7 +340,10 @@ fn spawn_poller(inner: Arc<Inner>) -> Poller {
                         .as_millis() as u64;
                     let in_quiet_window = write_ms > 0 && now_ms.saturating_sub(write_ms) < 5_000;
                     if is_own_echo {
-                        tracing::info!(is_own_echo, "host clip: clipboard change is our own echo, skipping");
+                        tracing::info!(
+                            is_own_echo,
+                            "host clip: clipboard change is our own echo, skipping"
+                        );
                         continue;
                     }
                     if in_quiet_window {
@@ -379,11 +392,8 @@ fn spawn_poller(inner: Arc<Inner>) -> Poller {
                             .as_millis() as u64;
                         let rdp_recent = rdp_ms > 0 && now_ms.saturating_sub(rdp_ms) < 15_000;
                         if rdp_recent && !winclip::has_text() {
-                            let cache_ok = inner
-                                .last_text
-                                .lock()
-                                .ok()
-                                .map_or(false, |g| g.is_some());
+                            let cache_ok =
+                                inner.last_text.lock().ok().map_or(false, |g| g.is_some());
                             if cache_ok {
                                 tracing::info!(
                                     "host clip: IronRDP wiped Windows clipboard during \
@@ -512,7 +522,11 @@ impl CliprdrBackend for Backend {
 
     fn on_remote_file_list(&mut self, files: &[FileDescriptor], clip_data_id: Option<u32>) {
         // The viewer is sending files and folders: receive them in pieces.
-        tracing::info!(count = files.len(), ?clip_data_id, "host clip: got file list from viewer, starting receive");
+        tracing::info!(
+            count = files.len(),
+            ?clip_data_id,
+            "host clip: got file list from viewer, starting receive"
+        );
         let items = files
             .iter()
             .map(xfer::RemoteItem::from_descriptor)
@@ -525,7 +539,11 @@ impl CliprdrBackend for Backend {
             // A new copy replaces one still arriving.
             *r = None;
             let (rx, step) = xfer::Receiver::start(items, clip_data_id, &self.inner.receive_dir);
-            tracing::info!(file_count = rx.file_count(), total_bytes = rx.total_bytes, "host clip: receiver started");
+            tracing::info!(
+                file_count = rx.file_count(),
+                total_bytes = rx.total_bytes,
+                "host clip: receiver started"
+            );
             *r = Some(rx);
             step
         };
@@ -575,7 +593,11 @@ impl CliprdrBackend for Backend {
 
     fn on_file_contents_request(&mut self, request: FileContentsRequest) {
         // The viewer is downloading (a piece of) a file we offered.
-        tracing::info!(stream_id = request.stream_id, index = request.index, "host clip: viewer requesting file contents");
+        tracing::info!(
+            stream_id = request.stream_id,
+            index = request.index,
+            "host clip: viewer requesting file contents"
+        );
         let answer = self
             .inner
             .outgoing
@@ -584,15 +606,27 @@ impl CliprdrBackend for Backend {
             .and_then(|out| xfer::answer(&out, &request));
         let response = match answer {
             Some(xfer::FileContentsAnswer::Size(size)) => {
-                tracing::info!(stream_id = request.stream_id, size, "host clip: answering SIZE request");
+                tracing::info!(
+                    stream_id = request.stream_id,
+                    size,
+                    "host clip: answering SIZE request"
+                );
                 FileContentsResponse::new_size_response(request.stream_id, size)
             }
             Some(xfer::FileContentsAnswer::Data(bytes)) => {
-                tracing::info!(stream_id = request.stream_id, len = bytes.len(), "host clip: answering DATA request");
+                tracing::info!(
+                    stream_id = request.stream_id,
+                    len = bytes.len(),
+                    "host clip: answering DATA request"
+                );
                 FileContentsResponse::new_data_response(request.stream_id, bytes)
             }
             None => {
-                tracing::error!(stream_id = request.stream_id, index = request.index, "host clip: no answer for file request (outgoing empty?)");
+                tracing::error!(
+                    stream_id = request.stream_id,
+                    index = request.index,
+                    "host clip: no answer for file request (outgoing empty?)"
+                );
                 FileContentsResponse::new_error(request.stream_id)
             }
         };
@@ -644,8 +678,8 @@ mod winclip {
     use windows::Win32::System::Memory::{
         GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE,
     };
-    use windows::Win32::UI::Shell::{ILCombine, ILFree, SHGetPathFromIDListW};
     use windows::Win32::UI::Shell::Common::ITEMIDLIST;
+    use windows::Win32::UI::Shell::{ILCombine, ILFree, SHGetPathFromIDListW};
 
     const CF_UNICODETEXT: u32 = 13;
     /// A list of files (what Explorer puts there on Ctrl+C).
@@ -875,8 +909,7 @@ mod winclip {
                 let parent_pidl = ptr.add(parent_offset) as *const ITEMIDLIST;
                 let item_pidl = ptr.add(item_off) as *const ITEMIDLIST;
                 // ILCombine takes Option<*const ITEMIDLIST> in windows 0.62.
-                let abs_pidl: *mut ITEMIDLIST =
-                    ILCombine(Some(parent_pidl), Some(item_pidl));
+                let abs_pidl: *mut ITEMIDLIST = ILCombine(Some(parent_pidl), Some(item_pidl));
                 if abs_pidl.is_null() {
                     continue;
                 }
@@ -884,8 +917,7 @@ mod winclip {
                 // Convert the absolute PIDL to a filesystem path.
                 // SHGetPathFromIDListW takes &mut [u16; 260] (MAX_PATH) in windows 0.62.
                 let mut path_buf = [0u16; 260];
-                let ok =
-                    SHGetPathFromIDListW(abs_pidl as *const _, &mut path_buf);
+                let ok = SHGetPathFromIDListW(abs_pidl as *const _, &mut path_buf);
                 // ILFree takes Option<*const ITEMIDLIST>; abs_pidl is *mut, cast needed.
                 ILFree(Some(abs_pidl as *const _));
 

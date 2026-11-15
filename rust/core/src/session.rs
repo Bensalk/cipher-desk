@@ -488,10 +488,12 @@ impl Session {
             .stage
             .get_svc_processor_mut::<CliprdrClient>()
             .ok_or(ConnectionError::Unexpected)
-            .and_then(|c| c.initiate_file_copy(descriptors).map_err(|e| {
-                tracing::error!(?e, "send_files: initiate_file_copy failed");
-                ConnectionError::Unexpected
-            }));
+            .and_then(|c| {
+                c.initiate_file_copy(descriptors).map_err(|e| {
+                    tracing::error!(?e, "send_files: initiate_file_copy failed");
+                    ConnectionError::Unexpected
+                })
+            });
         match result {
             Ok(msgs) => {
                 tracing::info!("send_files: initiate_file_copy ok, sending FormatList");
@@ -519,7 +521,10 @@ impl Session {
                 self.send_svc(msgs)
             }
             crate::xfer::Step::Done(top_level) => {
-                tracing::info!(count = top_level.len(), "clip: file receive done, writing to events");
+                tracing::info!(
+                    count = top_level.len(),
+                    "clip: file receive done, writing to events"
+                );
                 if let Some(clip) = self.clip.as_mut() {
                     clip.receiving = None;
                 }
@@ -661,11 +666,17 @@ impl Session {
                     }
                 }
                 ClipAction::DataReceived(None) if policy.host_to_local => {
-                    tracing::warn!("clip: host returned error for FormatDataRequest (DataReceived None)");
+                    tracing::warn!(
+                        "clip: host returned error for FormatDataRequest (DataReceived None)"
+                    );
                 }
                 ClipAction::DataReceived(_) => {}
                 ClipAction::RemoteFiles(format) => {
-                    tracing::info!(?format, host_to_local = policy.host_to_local, "clip: host offered files (RemoteFiles)");
+                    tracing::info!(
+                        ?format,
+                        host_to_local = policy.host_to_local,
+                        "clip: host offered files (RemoteFiles)"
+                    );
                     if policy.host_to_local {
                         let msgs = self
                             .stage
@@ -695,7 +706,11 @@ impl Session {
                             let (rx, step) =
                                 crate::xfer::Receiver::start(files, clip_data_id, &dir);
                             let count = rx.file_count();
-                            tracing::info!(count, total_bytes = rx.total_bytes, "clip: starting file receive");
+                            tracing::info!(
+                                count,
+                                total_bytes = rx.total_bytes,
+                                "clip: starting file receive"
+                            );
                             if count > 0 {
                                 events.push(SessionEvent::FilesIncoming {
                                     files: count,
@@ -705,7 +720,9 @@ impl Session {
                             clip.receiving = Some(rx);
                             self.receive_step(step, events)?;
                         } else {
-                            tracing::warn!("clip: FileList received but receive_dir is None, cannot receive");
+                            tracing::warn!(
+                                "clip: FileList received but receive_dir is None, cannot receive"
+                            );
                         }
                     }
                 }
@@ -863,9 +880,16 @@ impl Session {
         let regular: Vec<_> = ops
             .into_iter()
             .filter(|op| {
-                if let InputEvent::SyncLockKeys { caps_lock, num_lock, scroll_lock } = *op {
+                if let InputEvent::SyncLockKeys {
+                    caps_lock,
+                    num_lock,
+                    scroll_lock,
+                } = *op
+                {
                     extra.push(ironrdp_input::synchronize_event(
-                        scroll_lock, num_lock, caps_lock,
+                        scroll_lock,
+                        num_lock,
+                        caps_lock,
                         false, // kana_lock — not used
                     ));
                     false

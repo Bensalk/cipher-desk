@@ -23,8 +23,8 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     KEYBD_EVENT_FLAGS, KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE,
     KEYEVENTF_UNICODE, MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
     MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_MOVE, MOUSEEVENTF_RIGHTDOWN,
-    MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEINPUT, MOUSE_EVENT_FLAGS, VIRTUAL_KEY,
-    VK_CAPITAL, VK_NUMLOCK, VK_SCROLL,
+    MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEINPUT, MOUSE_EVENT_FLAGS, VIRTUAL_KEY, VK_CAPITAL,
+    VK_NUMLOCK, VK_SCROLL,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     DrawIconEx, GetCursorInfo, GetIconInfo, GetSystemMetrics, CURSORINFO, CURSOR_SHOWING,
@@ -240,7 +240,11 @@ fn toggle_lock(vk: VIRTUAL_KEY) {
         VK_SCROLL => (0x46_u16, false),
         _ => return,
     };
-    let ext = if extended { KEYEVENTF_EXTENDEDKEY } else { KEYBD_EVENT_FLAGS(0) };
+    let ext = if extended {
+        KEYEVENTF_EXTENDEDKEY
+    } else {
+        KEYBD_EVENT_FLAGS(0)
+    };
     send(&[
         key(scan, KEYEVENTF_SCANCODE | ext),
         key(scan, KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP | ext),
@@ -333,7 +337,11 @@ impl InputSink for SendInputSink {
             Input::Wheel { delta } => {
                 send(&[mouse(0, 0, i32::from(delta), MOUSEEVENTF_WHEEL)]);
             }
-            Input::SyncLockKeys { caps_lock, num_lock, scroll_lock } => {
+            Input::SyncLockKeys {
+                caps_lock,
+                num_lock,
+                scroll_lock,
+            } => {
                 sync_lock(VK_CAPITAL, caps_lock);
                 sync_lock(VK_NUMLOCK, num_lock);
                 sync_lock(VK_SCROLL, scroll_lock);

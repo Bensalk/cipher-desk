@@ -104,8 +104,8 @@ pub fn export(app_version: &str) -> String {
         let h = (total_s / 3600) % 24;
         let level = match e.level {
             Level::ERROR => "ERROR",
-            Level::WARN  => "WARN ",
-            Level::INFO  => "INFO ",
+            Level::WARN => "WARN ",
+            Level::INFO => "INFO ",
             Level::DEBUG => "DEBUG",
             Level::TRACE => "TRACE",
         };
@@ -115,11 +115,18 @@ pub fn export(app_version: &str) -> String {
         } else {
             &e.target
         };
-        let _ = writeln!(out, "{h:02}:{m:02}:{s:02}.{ms:03} {level} {target:<30}  {}", e.message);
+        let _ = writeln!(
+            out,
+            "{h:02}:{m:02}:{s:02}.{ms:03} {level} {target:<30}  {}",
+            e.message
+        );
     }
 
     if entries.is_empty() {
-        let _ = writeln!(out, "(no events recorded — connect and reproduce the problem first)");
+        let _ = writeln!(
+            out,
+            "(no events recorded — connect and reproduce the problem first)"
+        );
     }
 
     out
