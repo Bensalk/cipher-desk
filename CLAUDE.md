@@ -80,7 +80,7 @@ Secure, open-source Remote Desktop (RDP) viewer by Bensal for Windows, Linux and
 
 ## Working style
 
-- Bensal installs from GitHub (MSI/ZIP on Windows). He tests with two Windows PCs: a viewer PC and a host PC, not a phone. Never write test steps for a phone. He does not use an IDE. A broken build means no app.
+- Bensal installs from GitHub (MSI/ZIP on Windows). He tests with two Windows PCs: a viewer PC and a host PC. Write all test steps for these two Windows PCs. He does not use an IDE. A broken build means no app.
 - Keep explanations short and non-technical.
 - Start every reply with a `Model:` line (Sonnet for routine/support, Opus for hard coding, design decisions, demanding work) and a one-line reason; Bensal can't judge difficulty himself.
 - About screen: "Created by Bensal" is the last item, small and not highlighted.
