@@ -230,10 +230,8 @@ fn cleanup_received_dir(dir: &std::path::Path) {
     let mut removed = 0usize;
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.is_file() {
-            if std::fs::remove_file(&path).is_ok() {
-                removed += 1;
-            }
+        if path.is_file() && std::fs::remove_file(&path).is_ok() {
+            removed += 1;
         }
     }
     if removed > 0 {
@@ -655,11 +653,9 @@ impl CliprdrBackend for Backend {
             return;
         }
         if let Some(text) = decode_unicode_text(data) {
-            if !text.is_empty() {
-                if winclip::write_text(&text).is_ok() {
-                    // Text from viewer replaced the clipboard; CF_HDROP is gone.
-                    self.inner.hdrop_pending.store(false, Ordering::Relaxed);
-                }
+            if !text.is_empty() && winclip::write_text(&text).is_ok() {
+                // Text from viewer replaced the clipboard; CF_HDROP is gone.
+                self.inner.hdrop_pending.store(false, Ordering::Relaxed);
             }
         }
     }
