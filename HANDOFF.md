@@ -9,23 +9,25 @@ _Last updated: 15 Nov 2026._
 
 - **Work is now on `main`** — the `connection-methods` branch was merged.
   All releases now dispatch from `main`.
-- **v0.3.19** — build dispatched (run 43646894239, 15 Nov 2026). Wait for the
-  draft release at https://github.com/Bensalk/cipher-desk/releases; then publish it.
-  **What is in it:** Diagnostic logging for the clipboard direction investigation.
-  **To test (clipboard root-cause check):**
-  1. Install v0.3.19 on viewer (Android or Windows).
-  2. Connect to host PC.
-  3. Copy some text on the HOST PC (Ctrl+C a word in Notepad).
-  4. Try to paste on VIEWER PC — does it paste?
-  5. **If it still fails:** go to Session menu → Export session log, send me the log.
-     The log will show:
-     - `clip: session starting with clipboard policy local_to_host=... host_to_local=...`
-     - `clip: host clipboard changed (RemoteChanged) has_text=true host_to_local=...`
-     If `host_to_local=false` appears in the log, your connection is set to
-     "To remote only" clipboard mode — that is the root cause. Change the
-     connection's clipboard setting to **"Both directions"** and reconnect.
-  6. Also test: **If host_to_local=true in the log but paste still fails**, report
-     what the log shows after the RemoteChanged line — that would mean a code bug.
+- **v0.3.20** — build dispatched (run 43694307259, 15 Nov 2026). Building now.
+  **What is in it:** Deeper HOST→VIEWER clipboard diagnostics (logs every step of
+  the text paste path: FormatDataRequest sent, bytes received, decode result,
+  host error response).
+  **To test (host→viewer clipboard):**
+  1. Install v0.3.20 on viewer Windows PC.
+  2. Connect to host PC. Set clipboard to "Both directions".
+  3. Copy text on the HOST (Ctrl+C in Notepad).
+  4. Try to paste on viewer — does it work?
+  5. **If still fails:** Session menu → Export session log, send me the file.
+     Look for these lines in the log:
+     - `clip: session starting with clipboard policy host_to_local=true` ← confirms setting
+     - `clip: host clipboard changed (RemoteChanged) has_text=true` ← Windows told us
+     - `clip: sent FormatDataRequest for text` ← we asked for the data
+     - `clip: received format data from host bytes=N` ← Windows sent data
+     - `clip: host returned error for FormatDataRequest` ← Windows refused (the bug)
+     The first missing line in the chain above is where it breaks.
+- **v0.3.19** — **PUBLISHED** at https://github.com/Bensalk/cipher-desk/releases/tag/v0.3.19
+  Build all green (run 43692597749). Published. Contains clipboard policy logging.
 - **v0.3.18** — build dispatched (run 43644585250, 15 Nov 2026). Wait for the
   draft release at https://github.com/Bensalk/cipher-desk/releases; then publish it.
   **What was fixed:**
