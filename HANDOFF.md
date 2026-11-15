@@ -110,7 +110,13 @@ _Last updated: 15 Nov 2026._
   What's in it: Quality switch (Low/Medium/High) no longer triggers 15-min
   lockout; diagnostic logging for host→viewer file clipboard.
 
-## Active investigation: host→viewer clipboard
+## Active investigation: host→viewer FILE TRANSFER (not text)
+
+**The bug Bensal cares about is FILE TRANSFER host→viewer** (Ctrl+C a file in
+File Explorer on the host PC, Ctrl+V in File Explorer on the viewer PC). He
+asked earlier to drop text clipboard work and focus on files. v0.3.22–v0.3.24
+wrongly worked on text; do not go back to text unless he asks.
+
 
 v0.3.22's theory ("IronRDP wipes the clipboard") was **wrong**: nothing in our
 host or IronRDP writes to the Windows clipboard except `write_text`/`write_files`
