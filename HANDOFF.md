@@ -9,12 +9,21 @@ _Last updated: 15 Nov 2026._
 
 - **Work is now on `main`** — the `connection-methods` branch was merged.
   All releases now dispatch from `main`.
-- **v0.3.26 — FILE TRANSFER WORKS BOTH WAYS** (Bensal, 15 Nov 2026, both PCs
-  Windows 11 Pro): viewer→host and host→viewer PDF copies pasted fine. The
-  very first try right after restarting both PCs failed; cause unknown (no log
-  of that attempt). Changelog does not say "fixed" yet — wait until Bensal
-  confirms it is stable over more tests. If the first-try failure repeats, get
-  the host `worker.log` from that exact attempt.
+- **v0.3.26 test result (15 Nov 2026, from host worker.log):**
+  - **Viewer→host file copy WORKS** in Cipher Desk (log: "got file list from
+    viewer" → 195 KB received → CF_HDROP written). Failed once in the first
+    session after restart (no file list arrived at all; cause unknown).
+  - **Host→viewer still does NOT work in Cipher Desk.** Every host copy logs
+    `owner=explorer.exe; formats=[49161 "DataObject"]; ole_formats=[none]` and
+    the host never offers files. Bensal's successful host→viewer pastes were
+    almost certainly **AnyDesk's** clipboard sync (AnyDesk was open; log shows
+    `owner=AnyDesk.exe`). Test with AnyDesk closed.
+  - **Root cause (host→viewer):** the worker runs as SYSTEM (launch.rs dups the
+    service's own token into the user's session). "DataObject" is OLE's own
+    marker; Explorer's real formats live in its COM object, which the SYSTEM
+    worker cannot read (`ole_formats=[none]`). Fix: read the host's copied
+    files from a helper running **as the signed-in user** (WTSQueryUserToken +
+    CreateProcessAsUser, or the user-session app) and pass paths to the worker.
 - **v0.3.26** — build dispatched from `main` (15 Nov 2026). Both PCs are
   Windows 11 Pro. v0.3.25 log: host OLE answered has_files=no for CF_HDROP
   (still only `49161 "DataObject"` from explorer.exe). Text now works both
