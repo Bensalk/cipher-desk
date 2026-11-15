@@ -2,6 +2,14 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.21 (15 Nov 2026)
+
+### Fixed
+- **Host→viewer clipboard quiet-window bug** — after the viewer sent files to the host, the host's clipboard poller suppressed ALL clipboard changes for 5 seconds (including genuine text copies by the user). Text copied on the host within 5 seconds of a file transfer arriving would never be advertised to the viewer. Now the poller only suppresses file-clipboard echoes; if the clipboard holds text during the quiet window, the viewer is notified immediately.
+
+### Diagnostic
+- **Host clipboard advertising is now logged** — the host log now shows every time it tells the viewer what is on the clipboard (`has_text=true` or `has_text=false`). Previously `advertise()` was completely silent; this made it impossible to tell from logs whether text was ever sent to the viewer.
+
 ## v0.3.20 (15 Nov 2026)
 
 ### Diagnostic

@@ -263,7 +263,9 @@ fn offer_copied_files(inner: &Inner) -> bool {
 
 /// Advertises to the viewer whether this computer's clipboard holds text.
 fn advertise(inner: &Inner) {
-    let formats = if winclip::has_text() {
+    let has_text = winclip::has_text();
+    tracing::info!(has_text, "host clip: advertising clipboard state to viewer");
+    let formats = if has_text {
         vec![ClipboardFormat::new(ClipboardFormatId::CF_UNICODETEXT)]
     } else {
         Vec::new()
@@ -309,18 +311,33 @@ fn spawn_poller(inner: Arc<Inner>) -> Poller {
                         .unwrap_or_default()
                         .as_millis() as u64;
                     let in_quiet_window = write_ms > 0 && now_ms.saturating_sub(write_ms) < 5_000;
-                    if is_own_echo || in_quiet_window {
-                        tracing::info!(
-                            is_own_echo,
-                            in_quiet_window,
-                            "host clip: clipboard change is our own echo, skipping"
-                        );
+                    if is_own_echo {
+                        tracing::info!(is_own_echo, "host clip: clipboard change is our own echo, skipping");
+                        continue;
+                    }
+                    if in_quiet_window {
+                        // We wrote received files recently. Skip file clipboard
+                        // announcements to prevent echo, but if the user has
+                        // now copied TEXT, still advertise it — text is a
+                        // genuine new copy, not an echo of our CF_HDROP write.
+                        if winclip::has_text() {
+                            tracing::info!(
+                                "host clip: in quiet window but text found — advertising text"
+                            );
+                            inner.hdrop_pending.store(false, Ordering::Relaxed);
+                            advertise(&inner);
+                        } else {
+                            tracing::info!(
+                                in_quiet_window,
+                                "host clip: clipboard change suppressed by quiet window"
+                            );
+                        }
                         continue;
                     }
                     // A genuine new copy on the host: clear the flag so the
                     // viewer's format list can be accepted again next time.
                     inner.hdrop_pending.store(false, Ordering::Relaxed);
-                    tracing::info!(seq, "host clip: clipboard sequence changed, checking for files");
+                    tracing::info!(seq, "host clip: clipboard changed — checking format");
                     // Files copied here go to the viewer; otherwise text (or
                     // nothing). Files already on the clipboard when the viewer
                     // connected are not sent: only a new copy is.
