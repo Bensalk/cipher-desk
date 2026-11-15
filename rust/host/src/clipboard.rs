@@ -832,8 +832,17 @@ mod winclip {
             }
             Err(_) => "clipboard busy".into(),
         };
-        let ole_text = if ole_has_text() { "yes" } else { "no" };
-        format!("owner={owner}; formats=[{formats}]; ole_has_text={ole_text}")
+        let ole = if ole_clipboard().is_some() {
+            let yn = |b: bool| if b { "yes" } else { "no" };
+            format!(
+                "ole=ok, has_text={}, has_files={}",
+                yn(ole_has_format(CF_UNICODETEXT)),
+                yn(ole_has_format(CF_HDROP))
+            )
+        } else {
+            "ole=unavailable".to_string()
+        };
+        format!("owner={owner}; formats=[{formats}]; {ole}")
     }
 
     /// A format's number plus its name, e.g. `49161 "DataObject"`.
@@ -996,9 +1005,9 @@ mod winclip {
         unsafe { OleGetClipboard().ok() }
     }
 
-    fn unicode_text_format() -> FORMATETC {
+    fn hglobal_format(cf: u32) -> FORMATETC {
         FORMATETC {
-            cfFormat: CF_UNICODETEXT as u16,
+            cfFormat: cf as u16,
             ptd: std::ptr::null_mut(),
             dwAspect: DVASPECT_CONTENT.0,
             lindex: -1,
@@ -1006,24 +1015,31 @@ mod winclip {
         }
     }
 
-    /// Whether the OLE clipboard data object (if any) offers CF_UNICODETEXT.
-    fn ole_has_text() -> bool {
+    /// Whether the OLE clipboard data object (if any) offers this format.
+    fn ole_has_format(cf: u32) -> bool {
         let Some(data_obj) = ole_clipboard() else {
             return false;
         };
-        let fmt = unicode_text_format();
+        let fmt = hglobal_format(cf);
         // SAFETY: QueryGetData only asks whether the format is available; it
         // does not render or return any data.
         unsafe { data_obj.QueryGetData(&fmt).is_ok() }
     }
 
-    /// Reads CF_UNICODETEXT through the OLE clipboard (`IDataObject`), for
-    /// text that a program placed there with `OleSetClipboard` instead of
-    /// the classic `SetClipboardData`. This is the only way to reach that
-    /// text: it never appears to `EnumClipboardFormats` or `GetClipboardData`.
-    fn ole_read_text(max_bytes: usize) -> Option<String> {
+    fn ole_has_text() -> bool {
+        ole_has_format(CF_UNICODETEXT)
+    }
+
+    /// Asks the OLE clipboard data object to render `cf` into memory and
+    /// returns a copy of the bytes (at most `max_bytes`).
+    ///
+    /// Programs that copy with `OleSetClipboard` (File Explorer on recent
+    /// Windows 11 does, for files) may leave only the private "DataObject"
+    /// format on the classic clipboard; the real formats are reachable only
+    /// through this data object.
+    fn ole_read_bytes(cf: u32, max_bytes: usize) -> Option<Vec<u8>> {
         let data_obj = ole_clipboard()?;
-        let fmt = unicode_text_format();
+        let fmt = hglobal_format(cf);
         // SAFETY: GetData renders the format into a medium this call owns;
         // it is released below with ReleaseStgMedium.
         let mut medium = unsafe { data_obj.GetData(&fmt).ok()? };
@@ -1031,27 +1047,19 @@ mod winclip {
         // hGlobal field is the one GetData filled in. The memory is only
         // locked for the copy below, then unlocked before the medium (which
         // owns the handle) is released.
-        let text = unsafe {
+        let bytes = unsafe {
             let hg = medium.u.hGlobal;
-            if hg.is_invalid() {
+            let size = if hg.is_invalid() { 0 } else { GlobalSize(hg) };
+            if size == 0 || size > max_bytes {
                 None
             } else {
-                let size = GlobalSize(hg);
-                if size == 0 || size > max_bytes + 2 {
+                let ptr = GlobalLock(hg) as *const u8;
+                if ptr.is_null() {
                     None
                 } else {
-                    let ptr = GlobalLock(hg) as *const u16;
-                    if ptr.is_null() {
-                        None
-                    } else {
-                        let units = size / 2;
-                        let mut buf: Vec<u16> = core::slice::from_raw_parts(ptr, units).to_vec();
-                        let _ = GlobalUnlock(hg);
-                        if let Some(end) = buf.iter().position(|&u| u == 0) {
-                            buf.truncate(end);
-                        }
-                        String::from_utf16(&buf).ok()
-                    }
+                    let v = core::slice::from_raw_parts(ptr, size).to_vec();
+                    let _ = GlobalUnlock(hg);
+                    Some(v)
                 }
             }
         };
@@ -1060,11 +1068,50 @@ mod winclip {
         unsafe {
             ReleaseStgMedium(&mut medium);
         }
-        text
+        bytes
+    }
+
+    /// Reads CF_UNICODETEXT through the OLE clipboard (`IDataObject`).
+    fn ole_read_text(max_bytes: usize) -> Option<String> {
+        let bytes = ole_read_bytes(CF_UNICODETEXT, max_bytes + 2)?;
+        let mut buf: Vec<u16> = bytes
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .collect();
+        if let Some(end) = buf.iter().position(|&u| u == 0) {
+            buf.truncate(end);
+        }
+        String::from_utf16(&buf).ok()
+    }
+
+    /// The files on the clipboard via OLE: asks the data object for CF_HDROP,
+    /// which shell data objects render on request even when it is not listed
+    /// on the classic clipboard.
+    fn ole_read_files() -> Option<Vec<std::path::PathBuf>> {
+        // A DROPFILES block for 1000 long paths is well under 1 MiB.
+        let bytes = ole_read_bytes(CF_HDROP, 1 << 20)?;
+        let files = rdpv_core::xfer::parse_dropfiles(&bytes, MAX_FILES);
+        (!files.is_empty()).then_some(files)
     }
 
     /// The files on the clipboard (copied in Explorer), or `None` if it holds
-    /// no files.
+    /// no files. Tries the classic clipboard first, then OLE (after the
+    /// classic clipboard has been closed again, since OLE opens it itself).
+    pub fn read_files() -> Option<Vec<std::path::PathBuf>> {
+        if let Some(files) = read_files_plain() {
+            return Some(files);
+        }
+        let files = ole_read_files();
+        if let Some(f) = &files {
+            tracing::info!(
+                count = f.len(),
+                "host clip: files found through OLE clipboard"
+            );
+        }
+        files
+    }
+
+    /// The files on the classic clipboard, or `None` if it holds none.
     ///
     /// Two strategies are tried in order:
     ///
@@ -1078,7 +1125,7 @@ mod winclip {
     ///
     /// If CF_HDROP is absent we also log every format that *is* present so the
     /// log tells us exactly what Explorer put on the clipboard.
-    pub fn read_files() -> Option<Vec<std::path::PathBuf>> {
+    fn read_files_plain() -> Option<Vec<std::path::PathBuf>> {
         // Keep the clipboard open for the duration; both strategies need it.
         let _guard = Guard::open().ok()?;
 

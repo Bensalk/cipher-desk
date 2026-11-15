@@ -9,6 +9,20 @@ _Last updated: 15 Nov 2026._
 
 - **Work is now on `main`** — the `connection-methods` branch was merged.
   All releases now dispatch from `main`.
+- **v0.3.25** — build dispatched from `main` (15 Nov 2026).
+  **Big correction:** Bensal's test is a **FILE** copy (a small PDF, Ctrl+C in
+  File Explorer on host, Ctrl+V on viewer) — not text. v0.3.22–v0.3.24 chased
+  text. v0.3.24 log: `owner=explorer.exe; formats=[49161 "DataObject"];
+  ole_has_text=no` — Explorer used `OleSetClipboard`, leaving only "DataObject"
+  on the classic clipboard (no CF_HDROP, no Shell IDList Array), so
+  `read_files()` found nothing. v0.3.25: `winclip::read_files()` now falls back
+  to `ole_read_files()` → `IDataObject::GetData(CF_HDROP)` → `parse_dropfiles`.
+  `describe()` now logs `ole=ok, has_text=…, has_files=…` or `ole=unavailable`
+  (unavailable would mean the SYSTEM worker can't reach Explorer's data object
+  — next step would then be reading the clipboard from a user-session helper).
+  **To test:** install on viewer PC and host PC, restart host PC, connect,
+  copy a small file in File Explorer on host, paste in File Explorer on viewer.
+  If it fails, send host `worker.log` and check the `ole=` part.
 - **v0.3.24** — build dispatched from `main` (15 Nov 2026).
   Release link: https://github.com/Bensalk/cipher-desk/releases (draft; Bensal publishes).
   **Root cause confirmed from v0.3.23's `worker.log`** (this is the real one —
@@ -125,6 +139,7 @@ API returns 403 from the cloud session. Use Chrome automation
 
 | Version | What |
 | --- | --- |
+| v0.3.25 | HOST→VIEWER files: read CF_HDROP via OLE IDataObject when Explorer leaves only "DataObject" (awaiting test) |
 | v0.3.24 | HOST→VIEWER text: read via OLE IDataObject too (text copied via OleSetClipboard was invisible to plain Win32 clipboard calls) (awaiting test) |
 | v0.3.23 | HOST→VIEWER text: 15 ms text watcher + cache; clipboard owner/format names in host log (did not fix it — wrong theory) |
 | v0.3.22 | Offer host files at connect (text part did not work) |
