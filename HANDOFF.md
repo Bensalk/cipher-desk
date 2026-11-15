@@ -9,30 +9,29 @@ _Last updated: 15 Nov 2026._
 
 - **Work is now on `main`** — the `connection-methods` branch was merged.
   All releases now dispatch from `main`.
-- **v0.3.21** — build dispatched (run 43703352686, 15 Nov 2026).
-  **What is in it:** Two fixes to `rust/host/src/clipboard.rs`:
-  1. **Quiet-window bug fixed** — after the viewer sent files to the host, the host
-     suppressed ALL clipboard changes for 5 seconds (including genuine text copies).
-     Now only file-clipboard echoes are suppressed; text is advertised immediately
-     even during the quiet window.
-  2. **Host clipboard advertising now logged** — the host log now shows
-     `host clip: advertising clipboard state to viewer has_text=true/false` every
-     time it tells the viewer what is on the clipboard. Previously `advertise()` was
-     completely silent.
-  **To test (host→viewer clipboard):**
-  1. Install v0.3.21 on **both** PCs.
+- **v0.3.22** — build dispatched (run in progress, 15 Nov 2026).
+  Release link: https://github.com/Bensalk/cipher-desk/releases (wait for draft, then publish).
+  **What is in it:** Three fixes to `rust/host/src/clipboard.rs` (HOST→VIEWER direction):
+  1. **IronRDP clipboard wipe fix** — IronRDP's CLIPRDR handshake calls `EmptyClipboard`
+     on the Windows clipboard ~6 s after the viewer connects, wiping CF_UNICODETEXT.
+     The host's poller was sending `has_text=false` as a result. Now: text is cached at
+     `advertise()` time; the false `has_text=false` is suppressed for 15 s after the
+     handshake; `on_format_data_request` falls back to the cache if the clipboard was wiped.
+  2. **Files copied before connection** — files already on the host clipboard when the
+     viewer connects were invisible (poller only detects changes). `on_ready()` and
+     `on_request_format_list()` now call `offer_copied_files()` immediately at connect.
+  3. The `advertise()` call now also caches the text content for fallback in
+     `on_format_data_request`.
+  **To test:**
+  1. Install v0.3.22 on **both** PCs.
   2. Connect viewer to host. Set clipboard to "Both directions".
-  3. Copy text on the HOST (Ctrl+C in Notepad or any app).
-  4. Try to paste on viewer — does it work?
-  5. **Share both logs:**
-     - **HOST log** (`worker.log` on the host PC) — look for:
-       `host clip: advertising clipboard state to viewer has_text=true`
-     - **VIEWER session log** (tap "Copy Diagnostic Log" in the Cipher Desk app
-       while STILL CONNECTED to the session, NOT worker.log) — look for:
-       `clip: host clipboard changed (RemoteChanged) has_text=true`
-       `clip: sent FormatDataRequest for text`
-       `clip: received format data from host bytes=N`
-     The first missing line is where the chain breaks.
+  3. **Text test:** Copy text on HOST → try to paste on viewer. Should work.
+  4. **Pre-connection file test:** Copy a file on HOST → then connect viewer → try to
+     paste on viewer in Explorer. Should work immediately at connect.
+  5. **Post-connection file test:** Copy a file on HOST while connected → paste on viewer.
+  If anything still fails, share the HOST `worker.log` and viewer session log
+  ("Copy Diagnostic Log" in app while still connected).
+- **v0.3.21** — build dispatched (run 43703352686, 15 Nov 2026).
 - **v0.3.20** — **PUBLISHED** at https://github.com/Bensalk/cipher-desk/releases/tag/v0.3.20
   What was in it: Deeper HOST→VIEWER clipboard diagnostics in the viewer session log.
 - **v0.3.19** — **PUBLISHED** at https://github.com/Bensalk/cipher-desk/releases/tag/v0.3.19
@@ -96,28 +95,18 @@ _Last updated: 15 Nov 2026._
   What's in it: Quality switch (Low/Medium/High) no longer triggers 15-min
   lockout; diagnostic logging for host→viewer file clipboard.
 
-## Active investigation: host→viewer clipboard broken
+## Active investigation: host→viewer clipboard
 
-Bensal confirmed both PCs are on v0.3.20. HOST→VIEWER text clipboard still broken.
-v0.3.21 fixes two bugs found in `rust/host/src/clipboard.rs`:
+Root cause confirmed from Bensal's `worker.log` (15 Nov 2026):
+IronRDP's CLIPRDR handshake calls `EmptyClipboard + SetClipboardData(49161)` on the Windows
+clipboard ~6 s after connection, wiping CF_UNICODETEXT. The host poller then sent `has_text=false`.
 
-1. **5-second quiet window** — after the viewer sent files to the host, the host
-   suppressed ALL clipboard changes for 5 seconds. Text copies during that window
-   were silently dropped. Now only file-clipboard echoes are suppressed.
-2. **advertise() was completely silent** — the host log never showed whether text
-   was being advertised to the viewer. Now it logs `has_text=true/false` on every
-   advertising call.
+**v0.3.22 is the fix** — see test instructions above. Install on both PCs and test.
 
 The viewer PC has **no worker.log** — that file only exists on the HOST PC (which
 runs the Windows host service). The viewer's diagnostics are in the **session log**
 inside the Cipher Desk app: tap "Copy Diagnostic Log" while STILL CONNECTED to a
 session. This is not worker.log — it is different.
-
-**Next step after v0.3.21 installed:** Need both logs to find where the chain breaks:
-- Host `worker.log`: should show `host clip: advertising clipboard state to viewer has_text=true`
-- Viewer session log (from "Copy Diagnostic Log" button in app): should show
-  `clip: host clipboard changed (RemoteChanged) has_text=true` and
-  `clip: sent FormatDataRequest for text`
 
 ## Sandbox gotcha: spurious draft v0.3.9 release
 
@@ -130,6 +119,7 @@ API returns 403 from the cloud session. Use Chrome automation
 
 | Version | What |
 | --- | --- |
+| v0.3.22 | HOST→VIEWER text: suppress IronRDP clipboard wipe; cache text for fallback; offer files at connect |
 | v0.3.21 | Host clipboard quiet-window bug fix; advertise() logging added |
 | v0.3.20 | Viewer-side clipboard diagnostic logging (session log) |
 | v0.3.19 | Clipboard-direction diagnostic logging |
