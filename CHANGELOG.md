@@ -2,6 +2,11 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.24 (15 Nov 2026)
+
+### Changed
+- **Host clipboard text now also read through Windows' OLE clipboard** — some programs put copied text on the clipboard in a way the basic Windows clipboard check cannot see at all (it only ever showed a private placeholder format, never the text). The host now also asks Windows' OLE clipboard interface for the text, which can see it regardless of how the source program copied it.
+
 ## v0.3.23 (15 Nov 2026)
 
 ### Changed

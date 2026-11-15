@@ -9,21 +9,28 @@ _Last updated: 15 Nov 2026._
 
 - **Work is now on `main`** — the `connection-methods` branch was merged.
   All releases now dispatch from `main`.
-- **v0.3.23** — build dispatched from `main` (15 Nov 2026).
+- **v0.3.24** — build dispatched from `main` (15 Nov 2026).
   Release link: https://github.com/Bensalk/cipher-desk/releases (draft; Bensal publishes).
-  **What is in it** (`rust/host/src/clipboard.rs`, HOST→VIEWER text):
-  1. Fast text watcher thread (`spawn_fast_text_poller`, every 15 ms): on any
-     clipboard change it reads CF_UNICODETEXT immediately, caches it in
-     `last_text`, sets `text_cached_ms` and announces text to the viewer.
-  2. Main 400 ms poller: skips duplicate announcement if text was captured
-     < 2 s ago; if no text, logs `winclip::describe()` (format names + owning
-     program file name/pid, never contents) and keeps telling the viewer text
-     is available for 5 min after a capture. Cache cleared when files are copied.
-  3. Removed the wrong `rdp_copy_ms` suppression from v0.3.22.
-  **To test:** install on both devices, restart host PC, connect, copy text on
-  host, paste on viewer. If it fails, share host `worker.log` — look for lines
-  `host clip: no text on clipboard; owner=...; formats=[...]` and
-  `host clip: captured copied text`.
+  **Root cause confirmed from v0.3.23's `worker.log`** (this is the real one —
+  v0.3.22's and v0.3.23's theories were both wrong, see below):
+  every copy on the host leaves `owner=explorer.exe; formats=[49161 "DataObject"]`
+  and NEVER CF_UNICODETEXT, at every poll rate including 15 ms. "DataObject" is
+  OLE's private clipboard format — whatever copies text on Bensal's host PC uses
+  `OleSetClipboard`, not the classic `SetClipboardData`. The classic Win32
+  clipboard functions (`IsClipboardFormatAvailable`, `GetClipboardData`,
+  `EnumClipboardFormats`) structurally cannot see text placed that way, at any
+  speed — this was never a timing race. Fixed by also reading through OLE's
+  `IDataObject` (`OleGetClipboard` → `QueryGetData`/`GetData` for
+  CF_UNICODETEXT), which is how AnyDesk/TeamViewer-style tools read clipboards
+  reliably. See `winclip::ole_has_text` / `winclip::ole_read_text` in
+  `rust/host/src/clipboard.rs`. `winclip::describe()` now also logs
+  `ole_has_text=yes/no` so the next log confirms whether this was the real fix.
+  **To test:** install on both PCs, restart host PC, connect, copy text on
+  host, paste on viewer. If it still fails, share host `worker.log` — look for
+  `ole_has_text=` in the "no text on clipboard" line.
+- **v0.3.23** — released, did NOT fix host→viewer text (wrong theory: timing,
+  not a format-visibility problem). Still useful: the 15 ms watcher and
+  `winclip::describe()` diagnostic logging stay in place.
 - **v0.3.22** — released, did NOT fix host→viewer text (Bensal: "still same").
 - **v0.3.21** — build dispatched (run 43703352686, 15 Nov 2026).
 - **v0.3.20** — **PUBLISHED** at https://github.com/Bensalk/cipher-desk/releases/tag/v0.3.20
@@ -118,7 +125,8 @@ API returns 403 from the cloud session. Use Chrome automation
 
 | Version | What |
 | --- | --- |
-| v0.3.23 | HOST→VIEWER text: 15 ms text watcher + cache; clipboard owner/format names in host log (awaiting test) |
+| v0.3.24 | HOST→VIEWER text: read via OLE IDataObject too (text copied via OleSetClipboard was invisible to plain Win32 clipboard calls) (awaiting test) |
+| v0.3.23 | HOST→VIEWER text: 15 ms text watcher + cache; clipboard owner/format names in host log (did not fix it — wrong theory) |
 | v0.3.22 | Offer host files at connect (text part did not work) |
 | v0.3.21 | Host clipboard quiet-window bug fix; advertise() logging added |
 | v0.3.20 | Viewer-side clipboard diagnostic logging (session log) |

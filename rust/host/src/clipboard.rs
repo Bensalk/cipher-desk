@@ -739,6 +739,9 @@ fn decode_unicode_text(bytes: &[u8]) -> Option<String> {
 mod winclip {
     use anyhow::Context as _;
     use windows::Win32::Foundation::{HANDLE, HGLOBAL};
+    use windows::Win32::System::Com::{
+        IDataObject, ReleaseStgMedium, DVASPECT_CONTENT, FORMATETC, TYMED_HGLOBAL,
+    };
     use windows::Win32::System::DataExchange::{
         CloseClipboard, EmptyClipboard, EnumClipboardFormats, GetClipboardData,
         GetClipboardFormatNameW, GetClipboardOwner, GetClipboardSequenceNumber,
@@ -747,6 +750,7 @@ mod winclip {
     use windows::Win32::System::Memory::{
         GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE,
     };
+    use windows::Win32::System::Ole::OleGetClipboard;
     use windows::Win32::UI::Shell::Common::ITEMIDLIST;
     use windows::Win32::UI::Shell::{ILCombine, ILFree, SHGetPathFromIDListW};
 
@@ -830,7 +834,8 @@ mod winclip {
             }
             Err(_) => "clipboard busy".into(),
         };
-        format!("owner={owner}; formats=[{formats}]")
+        let ole_text = if ole_has_text() { "yes" } else { "no" };
+        format!("owner={owner}; formats=[{formats}]; ole_has_text={ole_text}")
     }
 
     /// A format's number plus its name, e.g. `49161 "DataObject"`.
@@ -899,15 +904,35 @@ mod winclip {
     }
 
     /// Whether the clipboard currently holds plain text.
+    ///
+    /// Checks the classic clipboard first, then falls back to OLE. Some
+    /// programs put data on the clipboard only through `OleSetClipboard`
+    /// (confirmed from a host log: every copy left just one private format,
+    /// "DataObject", and no CF_UNICODETEXT) — the plain `IsClipboardFormatAvailable`
+    /// / `GetClipboardData` calls above can never see that text at all, no
+    /// matter how fast or how often they are polled. The OLE clipboard
+    /// (`IDataObject`) is the only way to reach it.
     pub fn has_text() -> bool {
         // SAFETY: queries format availability only.
-        unsafe { IsClipboardFormatAvailable(CF_UNICODETEXT).is_ok() }
+        if unsafe { IsClipboardFormatAvailable(CF_UNICODETEXT).is_ok() } {
+            return true;
+        }
+        ole_has_text()
     }
 
     /// Reads the clipboard's text, or `None` if there is none, it is too large,
     /// or it cannot be read. `max_bytes` is the UTF-16 size limit.
     pub fn read_text(max_bytes: usize) -> Option<String> {
-        if !has_text() {
+        if let Some(text) = read_text_plain(max_bytes) {
+            return Some(text);
+        }
+        ole_read_text(max_bytes)
+    }
+
+    /// Reads CF_UNICODETEXT via the classic clipboard functions only.
+    fn read_text_plain(max_bytes: usize) -> Option<String> {
+        // SAFETY: queries format availability only.
+        if !unsafe { IsClipboardFormatAvailable(CF_UNICODETEXT).is_ok() } {
             return None;
         }
         let _guard = Guard::open().ok()?;
@@ -936,6 +961,108 @@ mod winclip {
             }
             String::from_utf16(&buf).ok()
         }
+    }
+
+    thread_local! {
+        // OLE requires one-time, per-thread initialization before
+        // OleGetClipboard works. The clipboard poller threads and the RDP
+        // runtime's callback threads are all separate OS threads, so this
+        // runs once on each the first time it touches the OLE clipboard.
+        static OLE_READY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    }
+
+    /// Initializes OLE on this thread if it has not been already. Safe to
+    /// call repeatedly; cheap after the first call.
+    fn ensure_ole_ready() {
+        OLE_READY.with(|ready| {
+            if !ready.get() {
+                // SAFETY: OleInitialize has no preconditions beyond being
+                // called once per thread before other OLE calls on it. We
+                // never pair it with OleUninitialize: these threads run for
+                // the life of the connection or the process and Windows
+                // reclaims COM state when a thread exits.
+                unsafe {
+                    let _ = windows::Win32::System::Ole::OleInitialize(None);
+                }
+                ready.set(true);
+            }
+        });
+    }
+
+    /// The current OLE clipboard contents, if any program has registered an
+    /// `IDataObject` there (via `OleSetClipboard`).
+    fn ole_clipboard() -> Option<IDataObject> {
+        ensure_ole_ready();
+        // SAFETY: returns a new reference to the clipboard's data object, or
+        // an error if nothing has used OLE for the clipboard; no state kept.
+        unsafe { OleGetClipboard().ok() }
+    }
+
+    fn unicode_text_format() -> FORMATETC {
+        FORMATETC {
+            cfFormat: CF_UNICODETEXT as u16,
+            ptd: std::ptr::null_mut(),
+            dwAspect: DVASPECT_CONTENT.0 as u32,
+            lindex: -1,
+            tymed: TYMED_HGLOBAL.0 as u32,
+        }
+    }
+
+    /// Whether the OLE clipboard data object (if any) offers CF_UNICODETEXT.
+    fn ole_has_text() -> bool {
+        let Some(data_obj) = ole_clipboard() else {
+            return false;
+        };
+        let fmt = unicode_text_format();
+        // SAFETY: QueryGetData only asks whether the format is available; it
+        // does not render or return any data.
+        unsafe { data_obj.QueryGetData(&fmt).is_ok() }
+    }
+
+    /// Reads CF_UNICODETEXT through the OLE clipboard (`IDataObject`), for
+    /// text that a program placed there with `OleSetClipboard` instead of
+    /// the classic `SetClipboardData`. This is the only way to reach that
+    /// text: it never appears to `EnumClipboardFormats` or `GetClipboardData`.
+    fn ole_read_text(max_bytes: usize) -> Option<String> {
+        let data_obj = ole_clipboard()?;
+        let fmt = unicode_text_format();
+        // SAFETY: GetData renders the format into a medium this call owns;
+        // it is released below with ReleaseStgMedium.
+        let mut medium = unsafe { data_obj.GetData(&fmt).ok()? };
+        // SAFETY: tymed is TYMED_HGLOBAL (what we asked for), so the union's
+        // hGlobal field is the one GetData filled in. The memory is only
+        // locked for the copy below, then unlocked before the medium (which
+        // owns the handle) is released.
+        let text = unsafe {
+            let hg = medium.Anonymous.hGlobal;
+            if hg.is_invalid() {
+                None
+            } else {
+                let size = GlobalSize(hg);
+                if size == 0 || size > max_bytes + 2 {
+                    None
+                } else {
+                    let ptr = GlobalLock(hg) as *const u16;
+                    if ptr.is_null() {
+                        None
+                    } else {
+                        let units = size / 2;
+                        let mut buf: Vec<u16> = core::slice::from_raw_parts(ptr, units).to_vec();
+                        let _ = GlobalUnlock(hg);
+                        if let Some(end) = buf.iter().position(|&u| u == 0) {
+                            buf.truncate(end);
+                        }
+                        String::from_utf16(&buf).ok()
+                    }
+                }
+            }
+        };
+        // SAFETY: medium was returned by GetData above; we own it and must
+        // release it exactly once, which frees the hGlobal handle.
+        unsafe {
+            let _ = ReleaseStgMedium(&mut medium);
+        }
+        text
     }
 
     /// The files on the clipboard (copied in Explorer), or `None` if it holds
