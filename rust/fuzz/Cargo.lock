@@ -2534,7 +2534,7 @@ dependencies = [
 
 [[package]]
 name = "rdpv-core"
-version = "0.3.20"
+version = "0.3.23"
 dependencies = [
  "bytes",
  "ironrdp-blocking",

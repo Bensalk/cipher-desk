@@ -9,28 +9,22 @@ _Last updated: 15 Nov 2026._
 
 - **Work is now on `main`** — the `connection-methods` branch was merged.
   All releases now dispatch from `main`.
-- **v0.3.22** — build dispatched (run in progress, 15 Nov 2026).
-  Release link: https://github.com/Bensalk/cipher-desk/releases (wait for draft, then publish).
-  **What is in it:** Three fixes to `rust/host/src/clipboard.rs` (HOST→VIEWER direction):
-  1. **IronRDP clipboard wipe fix** — IronRDP's CLIPRDR handshake calls `EmptyClipboard`
-     on the Windows clipboard ~6 s after the viewer connects, wiping CF_UNICODETEXT.
-     The host's poller was sending `has_text=false` as a result. Now: text is cached at
-     `advertise()` time; the false `has_text=false` is suppressed for 15 s after the
-     handshake; `on_format_data_request` falls back to the cache if the clipboard was wiped.
-  2. **Files copied before connection** — files already on the host clipboard when the
-     viewer connects were invisible (poller only detects changes). `on_ready()` and
-     `on_request_format_list()` now call `offer_copied_files()` immediately at connect.
-  3. The `advertise()` call now also caches the text content for fallback in
-     `on_format_data_request`.
-  **To test:**
-  1. Install v0.3.22 on **both** PCs.
-  2. Connect viewer to host. Set clipboard to "Both directions".
-  3. **Text test:** Copy text on HOST → try to paste on viewer. Should work.
-  4. **Pre-connection file test:** Copy a file on HOST → then connect viewer → try to
-     paste on viewer in Explorer. Should work immediately at connect.
-  5. **Post-connection file test:** Copy a file on HOST while connected → paste on viewer.
-  If anything still fails, share the HOST `worker.log` and viewer session log
-  ("Copy Diagnostic Log" in app while still connected).
+- **v0.3.23** — build dispatched from `main` (15 Nov 2026).
+  Release link: https://github.com/Bensalk/cipher-desk/releases (draft; Bensal publishes).
+  **What is in it** (`rust/host/src/clipboard.rs`, HOST→VIEWER text):
+  1. Fast text watcher thread (`spawn_fast_text_poller`, every 15 ms): on any
+     clipboard change it reads CF_UNICODETEXT immediately, caches it in
+     `last_text`, sets `text_cached_ms` and announces text to the viewer.
+  2. Main 400 ms poller: skips duplicate announcement if text was captured
+     < 2 s ago; if no text, logs `winclip::describe()` (format names + owning
+     program file name/pid, never contents) and keeps telling the viewer text
+     is available for 5 min after a capture. Cache cleared when files are copied.
+  3. Removed the wrong `rdp_copy_ms` suppression from v0.3.22.
+  **To test:** install on both devices, restart host PC, connect, copy text on
+  host, paste on viewer. If it fails, share host `worker.log` — look for lines
+  `host clip: no text on clipboard; owner=...; formats=[...]` and
+  `host clip: captured copied text`.
+- **v0.3.22** — released, did NOT fix host→viewer text (Bensal: "still same").
 - **v0.3.21** — build dispatched (run 43703352686, 15 Nov 2026).
 - **v0.3.20** — **PUBLISHED** at https://github.com/Bensalk/cipher-desk/releases/tag/v0.3.20
   What was in it: Deeper HOST→VIEWER clipboard diagnostics in the viewer session log.
@@ -97,11 +91,16 @@ _Last updated: 15 Nov 2026._
 
 ## Active investigation: host→viewer clipboard
 
-Root cause confirmed from Bensal's `worker.log` (15 Nov 2026):
-IronRDP's CLIPRDR handshake calls `EmptyClipboard + SetClipboardData(49161)` on the Windows
-clipboard ~6 s after connection, wiping CF_UNICODETEXT. The host poller then sent `has_text=false`.
-
-**v0.3.22 is the fix** — see test instructions above. Install on both PCs and test.
+v0.3.22's theory ("IronRDP wipes the clipboard") was **wrong**: nothing in our
+host or IronRDP writes to the Windows clipboard except `write_text`/`write_files`
+(grep confirmed). Bensal's v0.3.22 `worker.log` shows every change leaves only
+one registered format `[49161]` on the clipboard and never CF_UNICODETEXT —
+so **another program on Bensal's host PC replaces the clipboard** within ~0.5 s
+of a copy. The worker runs as SYSTEM in the user's session on `winsta0\default`,
+so it sees the real user clipboard. v0.3.23 captures text within 15 ms and logs
+the owning program + format names; the next `worker.log` should name the culprit.
+If the fast watcher still misses it, next step: `AddClipboardFormatListener`
+on a message-only window (event-driven, no polling gap).
 
 The viewer PC has **no worker.log** — that file only exists on the HOST PC (which
 runs the Windows host service). The viewer's diagnostics are in the **session log**
@@ -119,7 +118,8 @@ API returns 403 from the cloud session. Use Chrome automation
 
 | Version | What |
 | --- | --- |
-| v0.3.22 | HOST→VIEWER text: suppress IronRDP clipboard wipe; cache text for fallback; offer files at connect |
+| v0.3.23 | HOST→VIEWER text: 15 ms text watcher + cache; clipboard owner/format names in host log (awaiting test) |
+| v0.3.22 | Offer host files at connect (text part did not work) |
 | v0.3.21 | Host clipboard quiet-window bug fix; advertise() logging added |
 | v0.3.20 | Viewer-side clipboard diagnostic logging (session log) |
 | v0.3.19 | Clipboard-direction diagnostic logging |

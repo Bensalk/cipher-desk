@@ -74,15 +74,14 @@ struct Inner {
     /// EmptyClipboard + SetClipboardData(49161) and wiping our CF_HDROP entry
     /// before the user can paste.
     hdrop_pending: AtomicBool,
-    /// Milliseconds since UNIX epoch of the last `on_remote_copy` for a file
-    /// format.  IronRDP calls EmptyClipboard on the Windows clipboard shortly
-    /// after, wiping CF_UNICODETEXT and triggering a spurious `has_text=false`
-    /// from the poller.  We suppress that false advertisement for 15 s.
-    rdp_copy_ms: AtomicU64,
-    /// Text cached at the last `has_text=true` advertisement.  IronRDP wipes
-    /// CF_UNICODETEXT during CLIPRDR handshake; this lets `on_format_data_request`
-    /// serve the text to the viewer even after the Windows clipboard is cleared.
+    /// Text from the last capture of this computer's clipboard. On some hosts
+    /// another program replaces the clipboard a fraction of a second after a
+    /// copy; this lets `on_format_data_request` still serve the copied text.
     last_text: Mutex<Option<String>>,
+    /// When `last_text` was captured (ms since the UNIX epoch; 0 = never).
+    /// While recent, the poller keeps telling the viewer text is available
+    /// even if the clipboard itself no longer holds it.
+    text_cached_ms: AtomicU64,
 }
 
 impl HostClipboard {
@@ -106,8 +105,8 @@ impl HostClipboard {
                 own_seq: AtomicU32::new(0),
                 own_write_ms: AtomicU64::new(0),
                 hdrop_pending: AtomicBool::new(false),
-                rdp_copy_ms: AtomicU64::new(0),
                 last_text: Mutex::new(None),
+                text_cached_ms: AtomicU64::new(0),
             }),
         }
     }
@@ -215,6 +214,7 @@ impl CliprdrBackendFactory for HostClipboard {
         Box::new(Backend {
             inner: Arc::clone(&self.inner),
             poller: None,
+            text_poller: None,
         })
     }
 }
@@ -284,7 +284,7 @@ fn offer_copied_files(inner: &Inner) -> bool {
 
 /// Advertises to the viewer whether this computer's clipboard holds text.
 /// Also caches the text so `on_format_data_request` can serve it even if
-/// IronRDP later calls `EmptyClipboard` as part of the CLIPRDR handshake.
+/// another program replaces the clipboard before the viewer asks for it.
 fn advertise(inner: &Inner) {
     let has_text = winclip::has_text();
     tracing::info!(has_text, "host clip: advertising clipboard state to viewer");
@@ -292,6 +292,7 @@ fn advertise(inner: &Inner) {
         if let Ok(mut cache) = inner.last_text.lock() {
             *cache = winclip::read_text(inner.max_bytes);
         }
+        inner.text_cached_ms.store(epoch_ms(), Ordering::Relaxed);
     }
     let formats = if has_text {
         vec![ClipboardFormat::new(ClipboardFormatId::CF_UNICODETEXT)]
@@ -377,28 +378,30 @@ fn spawn_poller(inner: Arc<Inner>) -> Poller {
                         if let Ok(mut cache) = inner.last_text.lock() {
                             *cache = None;
                         }
+                        inner.text_cached_ms.store(0, Ordering::Relaxed);
                     } else {
-                        // No files. Check whether IronRDP just wiped the clipboard:
-                        // when on_remote_copy fires for a file format, IronRDP calls
-                        // EmptyClipboard + SetClipboardData(49161) a moment later,
-                        // making CF_UNICODETEXT disappear. If we have a cached text
-                        // from an earlier has_text=true advertisement and the wipe
-                        // happened within the last 15 s, don't send has_text=false —
-                        // the viewer's existing has_text=true is still correct.
-                        let rdp_ms = inner.rdp_copy_ms.load(Ordering::Relaxed);
-                        let now_ms = SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .unwrap_or_default()
-                            .as_millis() as u64;
-                        let rdp_recent = rdp_ms > 0 && now_ms.saturating_sub(rdp_ms) < 15_000;
-                        if rdp_recent && !winclip::has_text() {
-                            let cache_ok =
-                                inner.last_text.lock().ok().map_or(false, |g| g.is_some());
-                            if cache_ok {
+                        // No files. The fast watcher captures copied text the
+                        // moment it appears, because a program on some hosts
+                        // replaces the clipboard a fraction of a second later.
+                        let cached_ms = inner.text_cached_ms.load(Ordering::Relaxed);
+                        let age_ms = epoch_ms().saturating_sub(cached_ms);
+                        let cache_ok = cached_ms > 0
+                            && inner.last_text.lock().ok().is_some_and(|g| g.is_some());
+                        if cache_ok && age_ms < 2_000 {
+                            // Already captured and announced for this copy.
+                            tracing::info!(age_ms, "host clip: text already captured");
+                            continue;
+                        }
+                        if !winclip::has_text() {
+                            // Record what replaced the text, and which program.
+                            tracing::info!(
+                                "host clip: no text on clipboard; {}",
+                                winclip::describe()
+                            );
+                            if cache_ok && age_ms < 300_000 {
                                 tracing::info!(
-                                    "host clip: IronRDP wiped Windows clipboard during \
-                                     CLIPRDR handshake — cached text valid, \
-                                     keeping has_text=true"
+                                    age_ms,
+                                    "host clip: keeping captured text for the viewer"
                                 );
                                 continue;
                             }
@@ -419,11 +422,84 @@ fn spawn_poller(inner: Arc<Inner>) -> Poller {
     }
 }
 
+/// How often the fast text watcher checks the clipboard counter. Cheap: it
+/// only reads a number unless the clipboard changed.
+const FAST_POLL_INTERVAL: Duration = Duration::from_millis(15);
+
+/// Milliseconds since the UNIX epoch.
+fn epoch_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
+
+/// Reads the clipboard's text right now, caches it and tells the viewer this
+/// computer has text. Returns false when there is no text to read.
+///
+/// Some host programs replace the clipboard a fraction of a second after a
+/// copy (logs showed a single registered format left behind). Reading the
+/// text immediately means the viewer can still paste it afterwards.
+fn capture_text_now(inner: &Inner) -> bool {
+    let Some(text) = winclip::read_text(inner.max_bytes) else {
+        return false;
+    };
+    let units = text.encode_utf16().count();
+    if let Ok(mut cache) = inner.last_text.lock() {
+        *cache = Some(text);
+    }
+    inner.text_cached_ms.store(epoch_ms(), Ordering::Relaxed);
+    tracing::info!(units, "host clip: captured copied text");
+    inner.send(ClipboardMessage::SendInitiateCopy(vec![
+        ClipboardFormat::new(ClipboardFormatId::CF_UNICODETEXT),
+    ]));
+    true
+}
+
+/// Watches the clipboard counter every few milliseconds and captures text the
+/// moment it appears. Files and everything else stay with the main poller.
+fn spawn_fast_text_poller(inner: Arc<Inner>) -> Poller {
+    let running = Arc::new(AtomicBool::new(true));
+    let flag = Arc::clone(&running);
+    let join = std::thread::Builder::new()
+        .name("cipher-desk-clip-text".into())
+        .spawn(move || {
+            let mut prev = winclip::sequence_number();
+            while flag.load(Ordering::Relaxed) {
+                std::thread::sleep(FAST_POLL_INTERVAL);
+                if !flag.load(Ordering::Relaxed) {
+                    break;
+                }
+                let seq = winclip::sequence_number();
+                if seq == prev {
+                    continue;
+                }
+                prev = seq;
+                // Our own write of text received from the viewer: not a copy.
+                if seq == inner.own_seq.load(Ordering::Relaxed) {
+                    continue;
+                }
+                if winclip::has_text() && capture_text_now(&inner) {
+                    tracing::info!(seq, "host clip: text captured by fast watcher");
+                }
+            }
+        })
+        .ok();
+    if join.is_none() {
+        running.store(false, Ordering::Relaxed);
+    }
+    Poller {
+        running,
+        _join: join,
+    }
+}
+
 /// One connection's clipboard bridge. Created per viewer; dropped when they
 /// leave, which stops the poller.
 struct Backend {
     inner: Arc<Inner>,
     poller: Option<Poller>,
+    text_poller: Option<Poller>,
 }
 
 impl core::fmt::Debug for Backend {
@@ -436,9 +512,12 @@ ironrdp_core::impl_as_any!(Backend);
 
 impl Drop for Backend {
     fn drop(&mut self) {
-        if let Some(p) = self.poller.take() {
+        // Not joined: the threads may be mid-sleep and will exit on their own.
+        for p in [self.poller.take(), self.text_poller.take()]
+            .into_iter()
+            .flatten()
+        {
             p.running.store(false, Ordering::Relaxed);
-            // Not joined: the thread may be mid-sleep and will exit on its own.
         }
     }
 }
@@ -466,6 +545,9 @@ impl CliprdrBackend for Backend {
         if self.poller.is_none() {
             self.poller = Some(spawn_poller(Arc::clone(&self.inner)));
         }
+        if self.text_poller.is_none() {
+            self.text_poller = Some(spawn_fast_text_poller(Arc::clone(&self.inner)));
+        }
         // Offer files if the host clipboard already has them; otherwise
         // advertise text. Without this, files copied before the viewer
         // connects are invisible to the viewer (the poller only detects
@@ -488,9 +570,8 @@ impl CliprdrBackend for Backend {
         // The viewer copied something: pull files if offered, else text.
         if let Some(file_format) = formats.iter().find(|f| is_file_list(f)) {
             // If we just wrote received files to CF_HDROP, skip the paste
-            // initiation. Calling SendInitiatePaste here would cause IronRDP's
-            // CLIPRDR backend to call EmptyClipboard + SetClipboardData(49161),
-            // wiping our CF_HDROP before the user can Ctrl+V in Explorer.
+            // initiation so a new transfer does not replace them before the
+            // user can Ctrl+V in Explorer.
             if self.inner.hdrop_pending.load(Ordering::Relaxed) {
                 tracing::info!(
                     "host clip: viewer announced files but hdrop_pending — \
@@ -498,14 +579,6 @@ impl CliprdrBackend for Backend {
                 );
                 return;
             }
-            // Record when we trigger SendInitiatePaste so the poller knows to
-            // suppress the spurious has_text=false that follows IronRDP's
-            // EmptyClipboard + SetClipboardData(49161) call.
-            let now_ms = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis() as u64;
-            self.inner.rdp_copy_ms.store(now_ms, Ordering::Relaxed);
             self.inner
                 .send(ClipboardMessage::SendInitiatePaste(file_format.id()));
             return;
@@ -554,7 +627,7 @@ impl CliprdrBackend for Backend {
         // The viewer wants this computer's clipboard text.
         let response = if request.format == ClipboardFormatId::CF_UNICODETEXT {
             // Try the live Windows clipboard first. Fall back to the cached
-            // copy if IronRDP has wiped CF_UNICODETEXT since we advertised.
+            // copy if another program replaced the text since we captured it.
             let text = winclip::read_text(self.inner.max_bytes).or_else(|| {
                 self.inner
                     .last_text
@@ -672,8 +745,8 @@ mod winclip {
     use windows::Win32::Foundation::{HANDLE, HGLOBAL};
     use windows::Win32::System::DataExchange::{
         CloseClipboard, EmptyClipboard, EnumClipboardFormats, GetClipboardData,
-        GetClipboardSequenceNumber, IsClipboardFormatAvailable, OpenClipboard,
-        RegisterClipboardFormatW, SetClipboardData,
+        GetClipboardFormatNameW, GetClipboardOwner, GetClipboardSequenceNumber,
+        IsClipboardFormatAvailable, OpenClipboard, RegisterClipboardFormatW, SetClipboardData,
     };
     use windows::Win32::System::Memory::{
         GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE,
@@ -736,6 +809,97 @@ mod winclip {
     pub fn sequence_number() -> u32 {
         // SAFETY: reads a global counter, no state kept.
         unsafe { GetClipboardSequenceNumber() }
+    }
+
+    /// A short description of the clipboard for the log: the program that
+    /// owns it (file name only) and each format with its name. Never
+    /// includes the clipboard's contents.
+    pub fn describe() -> String {
+        let owner = owner_program().unwrap_or_else(|| "unknown".into());
+        let formats = match Guard::open() {
+            Ok(_guard) => {
+                let mut v = Vec::new();
+                // SAFETY: clipboard is open (held by `_guard`); a read-only walk.
+                unsafe {
+                    let mut fmt = 0u32;
+                    loop {
+                        fmt = EnumClipboardFormats(fmt);
+                        if fmt == 0 || v.len() >= 32 {
+                            break;
+                        }
+                        v.push(format_label(fmt));
+                    }
+                }
+                v.join(", ")
+            }
+            Err(_) => "clipboard busy".into(),
+        };
+        format!("owner={owner}; formats=[{formats}]")
+    }
+
+    /// A format's number plus its name, e.g. `49161 "DataObject"`.
+    fn format_label(fmt: u32) -> String {
+        let standard = match fmt {
+            1 => "CF_TEXT",
+            2 => "CF_BITMAP",
+            3 => "CF_METAFILEPICT",
+            7 => "CF_OEMTEXT",
+            8 => "CF_DIB",
+            13 => "CF_UNICODETEXT",
+            14 => "CF_ENHMETAFILE",
+            15 => "CF_HDROP",
+            16 => "CF_LOCALE",
+            17 => "CF_DIBV5",
+            _ => "",
+        };
+        if !standard.is_empty() {
+            return format!("{fmt} {standard}");
+        }
+        if fmt >= 0xC000 {
+            let mut buf = [0u16; 128];
+            // SAFETY: writes at most buf.len() units into our own buffer.
+            let n = unsafe { GetClipboardFormatNameW(fmt, &mut buf) };
+            if n > 0 {
+                let name = String::from_utf16_lossy(&buf[..n as usize]);
+                return format!("{fmt} \"{name}\"");
+            }
+        }
+        fmt.to_string()
+    }
+
+    /// The file name and process id of the program that owns the clipboard.
+    fn owner_program() -> Option<String> {
+        use windows::Win32::Foundation::CloseHandle;
+        use windows::Win32::System::Threading::{
+            OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
+            PROCESS_QUERY_LIMITED_INFORMATION,
+        };
+        use windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
+        // SAFETY: read-only queries; the process handle is closed before
+        // returning and the name is read only up to the length Windows reports.
+        unsafe {
+            let hwnd = GetClipboardOwner().ok()?;
+            let mut pid = 0u32;
+            GetWindowThreadProcessId(hwnd, Some(&mut pid as *mut u32));
+            if pid == 0 {
+                return None;
+            }
+            let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+            let mut buf = [0u16; 512];
+            let mut len = buf.len() as u32;
+            let res = QueryFullProcessImageNameW(
+                process,
+                PROCESS_NAME_WIN32,
+                windows::core::PWSTR(buf.as_mut_ptr()),
+                &mut len,
+            );
+            let _ = CloseHandle(process);
+            res.ok()?;
+            let path = String::from_utf16_lossy(&buf[..(len as usize).min(buf.len())]);
+            // File name only: the full path can contain the user's name.
+            let name = path.rsplit(['\\', '/']).next().unwrap_or("").to_string();
+            Some(format!("{name} (pid {pid})"))
+        }
     }
 
     /// Whether the clipboard currently holds plain text.
