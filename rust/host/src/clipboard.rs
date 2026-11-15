@@ -1000,7 +1000,7 @@ mod winclip {
         FORMATETC {
             cfFormat: CF_UNICODETEXT as u16,
             ptd: std::ptr::null_mut(),
-            dwAspect: DVASPECT_CONTENT.0 as u32,
+            dwAspect: DVASPECT_CONTENT.0,
             lindex: -1,
             tymed: TYMED_HGLOBAL.0 as u32,
         }
@@ -1058,7 +1058,7 @@ mod winclip {
         // SAFETY: medium was returned by GetData above; we own it and must
         // release it exactly once, which frees the hGlobal handle.
         unsafe {
-            let _ = ReleaseStgMedium(&mut medium);
+            ReleaseStgMedium(&mut medium);
         }
         text
     }
