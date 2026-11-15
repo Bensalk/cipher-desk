@@ -74,6 +74,15 @@ struct Inner {
     /// EmptyClipboard + SetClipboardData(49161) and wiping our CF_HDROP entry
     /// before the user can paste.
     hdrop_pending: AtomicBool,
+    /// Milliseconds since UNIX epoch of the last `on_remote_copy` for a file
+    /// format.  IronRDP calls EmptyClipboard on the Windows clipboard shortly
+    /// after, wiping CF_UNICODETEXT and triggering a spurious `has_text=false`
+    /// from the poller.  We suppress that false advertisement for 15 s.
+    rdp_copy_ms: AtomicU64,
+    /// Text cached at the last `has_text=true` advertisement.  IronRDP wipes
+    /// CF_UNICODETEXT during CLIPRDR handshake; this lets `on_format_data_request`
+    /// serve the text to the viewer even after the Windows clipboard is cleared.
+    last_text: Mutex<Option<String>>,
 }
 
 impl HostClipboard {
@@ -97,6 +106,8 @@ impl HostClipboard {
                 own_seq: AtomicU32::new(0),
                 own_write_ms: AtomicU64::new(0),
                 hdrop_pending: AtomicBool::new(false),
+                rdp_copy_ms: AtomicU64::new(0),
+                last_text: Mutex::new(None),
             }),
         }
     }
@@ -262,9 +273,16 @@ fn offer_copied_files(inner: &Inner) -> bool {
 }
 
 /// Advertises to the viewer whether this computer's clipboard holds text.
+/// Also caches the text so `on_format_data_request` can serve it even if
+/// IronRDP later calls `EmptyClipboard` as part of the CLIPRDR handshake.
 fn advertise(inner: &Inner) {
     let has_text = winclip::has_text();
     tracing::info!(has_text, "host clip: advertising clipboard state to viewer");
+    if has_text {
+        if let Ok(mut cache) = inner.last_text.lock() {
+            *cache = winclip::read_text(inner.max_bytes);
+        }
+    }
     let formats = if has_text {
         vec![ClipboardFormat::new(ClipboardFormatId::CF_UNICODETEXT)]
     } else {
@@ -341,7 +359,40 @@ fn spawn_poller(inner: Arc<Inner>) -> Poller {
                     // Files copied here go to the viewer; otherwise text (or
                     // nothing). Files already on the clipboard when the viewer
                     // connected are not sent: only a new copy is.
-                    if !offer_copied_files(&inner) {
+                    if offer_copied_files(&inner) {
+                        // User copied files: clear the text cache (new clipboard content).
+                        if let Ok(mut cache) = inner.last_text.lock() {
+                            *cache = None;
+                        }
+                    } else {
+                        // No files. Check whether IronRDP just wiped the clipboard:
+                        // when on_remote_copy fires for a file format, IronRDP calls
+                        // EmptyClipboard + SetClipboardData(49161) a moment later,
+                        // making CF_UNICODETEXT disappear. If we have a cached text
+                        // from an earlier has_text=true advertisement and the wipe
+                        // happened within the last 15 s, don't send has_text=false —
+                        // the viewer's existing has_text=true is still correct.
+                        let rdp_ms = inner.rdp_copy_ms.load(Ordering::Relaxed);
+                        let now_ms = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64;
+                        let rdp_recent = rdp_ms > 0 && now_ms.saturating_sub(rdp_ms) < 15_000;
+                        if rdp_recent && !winclip::has_text() {
+                            let cache_ok = inner
+                                .last_text
+                                .lock()
+                                .ok()
+                                .map_or(false, |g| g.is_some());
+                            if cache_ok {
+                                tracing::info!(
+                                    "host clip: IronRDP wiped Windows clipboard during \
+                                     CLIPRDR handshake — cached text valid, \
+                                     keeping has_text=true"
+                                );
+                                continue;
+                            }
+                        }
                         advertise(&inner);
                     }
                 }
@@ -405,11 +456,20 @@ impl CliprdrBackend for Backend {
         if self.poller.is_none() {
             self.poller = Some(spawn_poller(Arc::clone(&self.inner)));
         }
-        advertise(&self.inner);
+        // Offer files if the host clipboard already has them; otherwise
+        // advertise text. Without this, files copied before the viewer
+        // connects are invisible to the viewer (the poller only detects
+        // changes, so a pre-existing CF_HDROP is never sent).
+        if !offer_copied_files(&self.inner) {
+            advertise(&self.inner);
+        }
     }
 
     fn on_request_format_list(&mut self) {
-        advertise(&self.inner);
+        // Same logic as on_ready: offer files if present, else advertise text.
+        if !offer_copied_files(&self.inner) {
+            advertise(&self.inner);
+        }
     }
 
     fn on_process_negotiated_capabilities(&mut self, _: ClipboardGeneralCapabilityFlags) {}
@@ -428,6 +488,14 @@ impl CliprdrBackend for Backend {
                 );
                 return;
             }
+            // Record when we trigger SendInitiatePaste so the poller knows to
+            // suppress the spurious has_text=false that follows IronRDP's
+            // EmptyClipboard + SetClipboardData(49161) call.
+            let now_ms = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64;
+            self.inner.rdp_copy_ms.store(now_ms, Ordering::Relaxed);
             self.inner
                 .send(ClipboardMessage::SendInitiatePaste(file_format.id()));
             return;
@@ -467,8 +535,17 @@ impl CliprdrBackend for Backend {
     fn on_format_data_request(&mut self, request: FormatDataRequest) {
         // The viewer wants this computer's clipboard text.
         let response = if request.format == ClipboardFormatId::CF_UNICODETEXT {
-            match winclip::read_text(self.inner.max_bytes) {
-                Some(text) => OwnedFormatDataResponse::new_unicode_string(&text),
+            // Try the live Windows clipboard first. Fall back to the cached
+            // copy if IronRDP has wiped CF_UNICODETEXT since we advertised.
+            let text = winclip::read_text(self.inner.max_bytes).or_else(|| {
+                self.inner
+                    .last_text
+                    .lock()
+                    .ok()
+                    .and_then(|guard| guard.clone())
+            });
+            match text {
+                Some(t) => OwnedFormatDataResponse::new_unicode_string(&t),
                 None => OwnedFormatDataResponse::new_error(),
             }
         } else {

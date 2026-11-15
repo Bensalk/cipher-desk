@@ -2,6 +2,12 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.22 (15 Nov 2026)
+
+### Fixed
+- **Host→viewer clipboard text** — IronRDP's CLIPRDR handshake calls `EmptyClipboard` on the Windows clipboard shortly after the viewer connects, wiping CF_UNICODETEXT and causing the host to tell the viewer there is no text to paste. The host now caches the text at the moment it advertises it, suppresses the false `has_text=false` that follows the IronRDP wipe (for 15 s after the handshake), and serves the cached copy when the viewer asks for the text — so copy on host → paste on viewer now works even though IronRDP has cleared the Windows clipboard in between.
+- **Host→viewer file transfer** — files copied on the host PC before (or at the moment) the viewer connects were invisible to the viewer because the clipboard poller only detects changes after the connection is established. The host now checks the clipboard for files at connection time and offers them immediately.
+
 ## v0.3.21 (15 Nov 2026)
 
 ### Improved
