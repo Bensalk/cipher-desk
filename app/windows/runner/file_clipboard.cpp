@@ -4,6 +4,7 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <shlobj.h>
+#include <ole2.h>
 
 #include <cstring>
 #include <string>
@@ -47,29 +48,60 @@ bool OpenClipboardPatiently() {
   return false;
 }
 
+// Appends the file paths in a DROPFILES block to `out`.
+void AppendDropFiles(HDROP drop, flutter::EncodableList& out) {
+  UINT count = DragQueryFileW(drop, 0xFFFFFFFF, nullptr, 0);
+  if (count > kMaxFiles) count = kMaxFiles;
+  for (UINT i = 0; i < count; ++i) {
+    UINT len = DragQueryFileW(drop, i, nullptr, 0);
+    if (len == 0) continue;
+    std::wstring path(len + 1, L'\0');
+    DragQueryFileW(drop, i, path.data(), len + 1);
+    path.resize(len);
+    out.push_back(flutter::EncodableValue(ToUtf8(path)));
+  }
+}
+
+// Files via the OLE clipboard. On Windows 11, File Explorer may copy files
+// with OleSetClipboard and leave only a private "DataObject" format on the
+// classic clipboard, so CF_HDROP is not listed there; the OLE data object
+// still renders it on request.
+flutter::EncodableList ReadFilesOle() {
+  flutter::EncodableList out;
+  OleInitialize(nullptr);  // no-op if this thread already has OLE/COM
+  IDataObject* data_obj = nullptr;
+  if (FAILED(OleGetClipboard(&data_obj)) || data_obj == nullptr) return out;
+  FORMATETC fmt = {CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
+  STGMEDIUM medium = {};
+  if (SUCCEEDED(data_obj->GetData(&fmt, &medium))) {
+    if (medium.tymed == TYMED_HGLOBAL && medium.hGlobal != nullptr) {
+      HDROP drop = static_cast<HDROP>(GlobalLock(medium.hGlobal));
+      if (drop != nullptr) {
+        AppendDropFiles(drop, out);
+        GlobalUnlock(medium.hGlobal);
+      }
+    }
+    ReleaseStgMedium(&medium);
+  }
+  data_obj->Release();
+  return out;
+}
+
 // Paths of the files on the clipboard; empty if it holds none.
 flutter::EncodableList ReadFiles() {
   flutter::EncodableList out;
-  if (!IsClipboardFormatAvailable(CF_HDROP)) return out;
-  if (!OpenClipboardPatiently()) return out;
-  HANDLE data = GetClipboardData(CF_HDROP);
-  if (data != nullptr) {
-    HDROP drop = static_cast<HDROP>(GlobalLock(data));
-    if (drop != nullptr) {
-      UINT count = DragQueryFileW(drop, 0xFFFFFFFF, nullptr, 0);
-      if (count > kMaxFiles) count = kMaxFiles;
-      for (UINT i = 0; i < count; ++i) {
-        UINT len = DragQueryFileW(drop, i, nullptr, 0);
-        if (len == 0) continue;
-        std::wstring path(len + 1, L'\0');
-        DragQueryFileW(drop, i, path.data(), len + 1);
-        path.resize(len);
-        out.push_back(flutter::EncodableValue(ToUtf8(path)));
+  if (IsClipboardFormatAvailable(CF_HDROP) && OpenClipboardPatiently()) {
+    HANDLE data = GetClipboardData(CF_HDROP);
+    if (data != nullptr) {
+      HDROP drop = static_cast<HDROP>(GlobalLock(data));
+      if (drop != nullptr) {
+        AppendDropFiles(drop, out);
+        GlobalUnlock(data);
       }
-      GlobalUnlock(data);
     }
+    CloseClipboard();
   }
-  CloseClipboard();
+  if (out.empty()) out = ReadFilesOle();
   return out;
 }
 

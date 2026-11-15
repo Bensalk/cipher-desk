@@ -2,6 +2,15 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.26 (15 Nov 2026)
+
+### Changed
+- **Copied files are now also read through Windows' OLE clipboard on the viewer** — on Windows 11, File Explorer can put copied files on the clipboard in a way the basic clipboard check cannot see. The viewer now also asks the OLE clipboard for the file list, as the host already does.
+- **Host tries one more file format** — the host now also asks the OLE clipboard for File Explorer's own file-list format ("Shell IDList Array").
+
+### Diagnostic
+- The host log now lists every format the OLE clipboard offers, by name.
+
 ## v0.3.25 (15 Nov 2026)
 
 ### Changed

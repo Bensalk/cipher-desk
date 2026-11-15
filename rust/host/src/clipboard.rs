@@ -739,7 +739,9 @@ fn decode_unicode_text(bytes: &[u8]) -> Option<String> {
 mod winclip {
     use anyhow::Context as _;
     use windows::Win32::Foundation::{HANDLE, HGLOBAL};
-    use windows::Win32::System::Com::{IDataObject, DVASPECT_CONTENT, FORMATETC, TYMED_HGLOBAL};
+    use windows::Win32::System::Com::{
+        IDataObject, DATADIR_GET, DVASPECT_CONTENT, FORMATETC, TYMED_HGLOBAL,
+    };
     use windows::Win32::System::DataExchange::{
         CloseClipboard, EmptyClipboard, EnumClipboardFormats, GetClipboardData,
         GetClipboardFormatNameW, GetClipboardOwner, GetClipboardSequenceNumber,
@@ -833,12 +835,7 @@ mod winclip {
             Err(_) => "clipboard busy".into(),
         };
         let ole = if ole_clipboard().is_some() {
-            let yn = |b: bool| if b { "yes" } else { "no" };
-            format!(
-                "ole=ok, has_text={}, has_files={}",
-                yn(ole_has_format(CF_UNICODETEXT)),
-                yn(ole_has_format(CF_HDROP))
-            )
+            format!("ole_formats=[{}]", ole_format_list().join(", "))
         } else {
             "ole=unavailable".to_string()
         };
@@ -1030,6 +1027,47 @@ mod winclip {
         ole_has_format(CF_UNICODETEXT)
     }
 
+    /// Every format the OLE clipboard data object offers, with its medium,
+    /// e.g. `"49 \"FileGroupDescriptorW\" tymed=1"`. Diagnostic only — lists
+    /// what is really available instead of guessing one format at a time.
+    fn ole_format_list() -> Vec<String> {
+        let Some(data_obj) = ole_clipboard() else {
+            return vec!["unavailable".into()];
+        };
+        // SAFETY: EnumFormatEtc(DATADIR_GET) returns an enumerator this call
+        // owns; windows-rs releases it (Drop -> Release) when it goes out of
+        // scope below.
+        let Ok(enum_fmt) = (unsafe { data_obj.EnumFormatEtc(DATADIR_GET.0 as u32) }) else {
+            return vec!["enum unavailable".into()];
+        };
+        let mut out = Vec::new();
+        loop {
+            let mut one = FORMATETC {
+                cfFormat: 0,
+                ptd: std::ptr::null_mut(),
+                dwAspect: 0,
+                lindex: 0,
+                tymed: 0,
+            };
+            let mut fetched = 0u32;
+            // SAFETY: writes at most one FORMATETC into `one` and reports how
+            // many in `fetched`; we stop once it reports none.
+            let hr = unsafe { enum_fmt.Next(core::slice::from_mut(&mut one), Some(&mut fetched)) };
+            if hr.is_err() || fetched == 0 || out.len() >= 24 {
+                break;
+            }
+            out.push(format!(
+                "{} tymed={}",
+                format_label(one.cfFormat as u32),
+                one.tymed
+            ));
+        }
+        if out.is_empty() {
+            out.push("none".into());
+        }
+        out
+    }
+
     /// Asks the OLE clipboard data object to render `cf` into memory and
     /// returns a copy of the bytes (at most `max_bytes`).
     ///
@@ -1084,14 +1122,29 @@ mod winclip {
         String::from_utf16(&buf).ok()
     }
 
-    /// The files on the clipboard via OLE: asks the data object for CF_HDROP,
-    /// which shell data objects render on request even when it is not listed
-    /// on the classic clipboard.
+    /// The files on the clipboard via OLE: asks the data object for CF_HDROP
+    /// first, then the Shell IDList Array, either of which a shell data
+    /// object may render on request even when neither is listed on the
+    /// classic clipboard (confirmed from a host log: Explorer's own
+    /// IDataObject answered "no" for both when asked directly for CF_HDROP —
+    /// this also tries the format Explorer actually uses internally).
     fn ole_read_files() -> Option<Vec<std::path::PathBuf>> {
         // A DROPFILES block for 1000 long paths is well under 1 MiB.
-        let bytes = ole_read_bytes(CF_HDROP, 1 << 20)?;
-        let files = rdpv_core::xfer::parse_dropfiles(&bytes, MAX_FILES);
-        (!files.is_empty()).then_some(files)
+        if let Some(bytes) = ole_read_bytes(CF_HDROP, 1 << 20) {
+            let files = rdpv_core::xfer::parse_dropfiles(&bytes, MAX_FILES);
+            if !files.is_empty() {
+                return Some(files);
+            }
+        }
+        // SAFETY: RegisterClipboardFormatW is a one-time idempotent
+        // registration using a literal name; no clipboard access here.
+        let cf_shell_idlist =
+            unsafe { RegisterClipboardFormatW(windows::core::w!("Shell IDList Array")) };
+        if cf_shell_idlist == 0 {
+            return None;
+        }
+        let bytes = ole_read_bytes(cf_shell_idlist, 1 << 20)?;
+        parse_shell_idlist(&bytes)
     }
 
     /// The files on the clipboard (copied in Explorer), or `None` if it holds
@@ -1188,9 +1241,8 @@ mod winclip {
             return None;
         }
 
-        // SAFETY: clipboard is still open; we lock the global memory, walk the
-        // CIDA structure to build absolute PIDLs, convert each PIDL to a path,
-        // and unlock before returning.
+        // SAFETY: clipboard is still open; we lock the global memory just long
+        // enough to copy it out, then hand the bytes to the format-agnostic parser.
         unsafe {
             let handle = GetClipboardData(cf_shell_idlist).ok()?;
             if handle.is_invalid() {
@@ -1198,41 +1250,55 @@ mod winclip {
             }
             let hg = HGLOBAL(handle.0);
             let size = GlobalSize(hg);
-            if size < 8 {
-                return None;
-            }
             let ptr = GlobalLock(hg) as *const u8;
-            if ptr.is_null() {
+            if ptr.is_null() || size == 0 {
                 return None;
             }
+            let bytes = core::slice::from_raw_parts(ptr, size).to_vec();
+            let _ = GlobalUnlock(hg);
+            parse_shell_idlist(&bytes)
+        }
+    }
+
+    /// Parses a Shell IDList Array ("CIDA") blob — the format Explorer uses
+    /// to represent copied files/folders — into filesystem paths. Works on a
+    /// plain byte copy, so it is shared by the classic clipboard read above
+    /// and the OLE read below.
+    fn parse_shell_idlist(bytes: &[u8]) -> Option<Vec<std::path::PathBuf>> {
+        let size = bytes.len();
+        if size < 8 {
+            return None;
+        }
+        // SAFETY: `ptr` points into `bytes`, which outlives every use below;
+        // every offset is checked against `size` before it is read.
+        unsafe {
+            let ptr = bytes.as_ptr();
 
             // CIDA layout: { cidl: u32, aoffset[cidl+1]: u32, raw_pidl_data }
             // aoffset[0] = parent folder PIDL; aoffset[1..=cidl] = item PIDLs.
-            let cidl = {
-                let b = core::slice::from_raw_parts(ptr, 4);
-                u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize
-            };
+            let cidl = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize;
             if cidl == 0 || cidl > MAX_FILES || size < 4 + (cidl + 1) * 4 {
-                let _ = GlobalUnlock(hg);
                 return None;
             }
 
-            let parent_offset = {
-                let b = core::slice::from_raw_parts(ptr.add(4), 4);
-                u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize
-            };
+            let parent_offset =
+                u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]) as usize;
             if parent_offset >= size {
-                let _ = GlobalUnlock(hg);
                 return None;
             }
 
             let mut paths = Vec::new();
             for i in 1..=cidl {
                 let off_idx = 4 + i * 4;
-                let item_off = {
-                    let b = core::slice::from_raw_parts(ptr.add(off_idx), 4);
-                    u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize
-                };
+                if off_idx + 4 > size {
+                    continue;
+                }
+                let item_off = u32::from_le_bytes([
+                    bytes[off_idx],
+                    bytes[off_idx + 1],
+                    bytes[off_idx + 2],
+                    bytes[off_idx + 3],
+                ]) as usize;
                 if item_off >= size {
                     continue;
                 }
@@ -1266,7 +1332,6 @@ mod winclip {
                 }
             }
 
-            let _ = GlobalUnlock(hg);
             (!paths.is_empty()).then_some(paths)
         }
     }

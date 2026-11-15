@@ -9,6 +9,20 @@ _Last updated: 15 Nov 2026._
 
 - **Work is now on `main`** — the `connection-methods` branch was merged.
   All releases now dispatch from `main`.
+- **v0.3.26** — build dispatched from `main` (15 Nov 2026). Both PCs are
+  Windows 11 Pro. v0.3.25 log: host OLE answered has_files=no for CF_HDROP
+  (still only `49161 "DataObject"` from explorer.exe). Text now works both
+  ways. v0.3.26:
+  1. Viewer (`app/windows/runner/file_clipboard.cpp`) `ReadFiles()` falls back
+     to `OleGetClipboard` → `GetData(CF_HDROP)` (links ole32.lib). The viewer
+     had the same classic-only bug; the host log showed no "got file list from
+     viewer", so viewer→host file copy never started.
+  2. Host `ole_read_files()` also tries "Shell IDList Array" via OLE
+     (`parse_shell_idlist`, shared with the classic path).
+  3. Host `describe()` lists every OLE format: `ole_formats=[... tymed=N]`.
+     If OLE still shows nothing useful on the host, suspect the worker runs as
+     SYSTEM and cannot get data from the user's Explorer object — next step
+     would be reading the clipboard from a helper running as the signed-in user.
 - **v0.3.25** — build dispatched from `main` (15 Nov 2026).
   **Big correction:** Bensal's test is a **FILE** copy (a small PDF, Ctrl+C in
   File Explorer on host, Ctrl+V on viewer) — not text. v0.3.22–v0.3.24 chased
@@ -145,6 +159,7 @@ API returns 403 from the cloud session. Use Chrome automation
 
 | Version | What |
 | --- | --- |
+| v0.3.26 | Files: viewer reads copied files via OLE too; host also tries Shell IDList via OLE; OLE format list in host log (awaiting test) |
 | v0.3.25 | HOST→VIEWER files: read CF_HDROP via OLE IDataObject when Explorer leaves only "DataObject" (awaiting test) |
 | v0.3.24 | HOST→VIEWER text: read via OLE IDataObject too (text copied via OleSetClipboard was invisible to plain Win32 clipboard calls) (awaiting test) |
 | v0.3.23 | HOST→VIEWER text: 15 ms text watcher + cache; clipboard owner/format names in host log (did not fix it — wrong theory) |
