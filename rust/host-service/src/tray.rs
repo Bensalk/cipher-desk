@@ -25,8 +25,8 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Shell::{
-    ShellExecuteW, Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE,
-    NIM_MODIFY, NOTIFYICONDATAW, NOTIFY_ICON_MESSAGE,
+    ShellExecuteW, Shell_NotifyIconW, NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_TIP, NIIF_INFO, NIM_ADD,
+    NIM_DELETE, NIM_MODIFY, NOTIFYICONDATAW, NOTIFY_ICON_MESSAGE,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreateIconIndirect, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu,
@@ -153,7 +153,7 @@ pub fn run() -> anyhow::Result<()> {
         TRAY.with(|t| {
             if let Ok(guard) = t.try_borrow() {
                 if let Some(tray) = guard.as_ref() {
-                    notify(tray, NIM_DELETE);
+                    notify(tray, NIM_DELETE, None);
                 }
             }
         });
@@ -180,7 +180,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
         }
         _ if msg != 0 && msg == TASKBAR_CREATED.load(Ordering::SeqCst) => {
             // Explorer restarted: the icon is gone, add it again.
-            with_tray(|tray| tray.shown = notify(tray, NIM_ADD));
+            with_tray(|tray| tray.shown = notify(tray, NIM_ADD, None));
             LRESULT(0)
         }
         // SAFETY: the default handling for every other message.
@@ -203,12 +203,24 @@ fn poll() {
         let status = ask_worker(tray);
         if !tray.shown {
             tray.status = status;
-            tray.shown = notify(tray, NIM_ADD);
+            tray.shown = notify(tray, NIM_ADD, None);
         } else if status != tray.status {
+            let previous = tray.status;
             tray.status = status;
-            notify(tray, NIM_MODIFY);
+            notify(tray, NIM_MODIFY, popup_for(previous, status));
         }
     });
+}
+
+/// The pop-up text for a status change a person should be told about right
+/// away (a viewer connecting or leaving), or `None` for a change that should
+/// stay quiet (for example going offline, which the person just asked for).
+fn popup_for(previous: Status, status: Status) -> Option<(&'static str, &'static str)> {
+    match (previous, status) {
+        (_, Status::Connected) => Some(("Cipher Desk", "Someone connected to this computer.")),
+        (Status::Connected, Status::Online) => Some(("Cipher Desk", "The viewer disconnected.")),
+        _ => None,
+    }
 }
 
 fn ask_worker(tray: &mut Tray) -> Status {
@@ -247,7 +259,10 @@ fn ask_worker(tray: &mut Tray) -> Status {
 }
 
 /// Adds, updates or removes the icon. Returns whether Windows accepted it.
-fn notify(tray: &Tray, message: NOTIFY_ICON_MESSAGE) -> bool {
+/// `popup`: (title, text) to also pop up above the icon, like AnyDesk does
+/// when someone connects — Windows shows this even while the Action Center
+/// is closed and the tray icon is just sitting in the overflow tray.
+fn notify(tray: &Tray, message: NOTIFY_ICON_MESSAGE, popup: Option<(&str, &str)>) -> bool {
     let mut nid = NOTIFYICONDATAW {
         cbSize: u32::try_from(core::mem::size_of::<NOTIFYICONDATAW>()).unwrap_or(0),
         hWnd: tray.hwnd,
@@ -262,6 +277,17 @@ fn notify(tray: &Tray, message: NOTIFY_ICON_MESSAGE) -> bool {
         .take(nid.szTip.len() - 1)
         .collect();
     nid.szTip[..tip.len()].copy_from_slice(&tip);
+    if let Some((title, text)) = popup {
+        nid.uFlags |= NIF_INFO;
+        nid.dwInfoFlags = NIIF_INFO;
+        let t: Vec<u16> = title
+            .encode_utf16()
+            .take(nid.szInfoTitle.len() - 1)
+            .collect();
+        nid.szInfoTitle[..t.len()].copy_from_slice(&t);
+        let b: Vec<u16> = text.encode_utf16().take(nid.szInfo.len() - 1).collect();
+        nid.szInfo[..b.len()].copy_from_slice(&b);
+    }
     // SAFETY: `nid` is a fully initialised NOTIFYICONDATAW that outlives the call.
     unsafe { Shell_NotifyIconW(message, &nid) }.as_bool()
 }
@@ -324,7 +350,7 @@ fn command(id: usize) {
                 tray.link = None;
                 tray.retry_at = Instant::now() + RECONNECT;
                 tray.status = Status::Offline;
-                notify(tray, NIM_MODIFY);
+                notify(tray, NIM_MODIFY, None);
             });
         }
         CMD_ONLINE => go_online(),
