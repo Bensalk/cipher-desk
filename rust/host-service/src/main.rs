@@ -5,6 +5,8 @@
 //!   install | uninstall [--purge] | start | stop | status | new-password | show-password
 //!   run-service   (used by Windows to start the service)
 //!   worker        (started by the service in the active session)
+//!   tray          (the status icon, started by the service as the signed-in person)
+//!   go-online     (from the tray icon, with the administrator prompt)
 //!
 //! This whole binary is Windows-only; on other systems it just says so.
 #![allow(clippy::print_stdout, clippy::print_stderr)]
@@ -14,9 +16,13 @@ mod config;
 #[cfg(windows)]
 mod launch;
 #[cfg(windows)]
+mod link;
+#[cfg(windows)]
 mod manage;
 #[cfg(windows)]
 mod service;
+#[cfg(windows)]
+mod tray;
 #[cfg(windows)]
 mod worker;
 
@@ -31,13 +37,15 @@ fn main() {
     let command = std::env::args().nth(1).unwrap_or_default();
     // The service and worker run without a console; log to a file. The admin
     // commands print to the console the app captures.
-    if matches!(command.as_str(), "run-service" | "worker") {
+    if matches!(command.as_str(), "run-service" | "worker" | "tray") {
         init_file_logging(&command);
     }
 
     let result = match command.as_str() {
         "run-service" => service::run(),
         "worker" => worker::run(),
+        "tray" => tray::run(),
+        "go-online" => manage::go_online(),
         "install" => manage::install(),
         "uninstall" | "remove" => {
             let purge = std::env::args().any(|a| a == "--purge");
@@ -74,32 +82,59 @@ fn init_file_logging(which: &str) {
 
     let Ok(dir) = config::data_dir() else { return };
     let path = dir.join(format!("{which}.log"));
-    let Ok(file) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-    else {
+    let open = |path: &std::path::Path| {
+        std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .ok()
+    };
+    let Some(file) = open(&path) else {
         return;
     };
 
+    /// Appends to the log file; if the file was deleted or moved while we
+    /// run, starts a new one at the same place (checked every few seconds).
+    struct Log {
+        path: std::path::PathBuf,
+        file: std::fs::File,
+        checked: std::time::Instant,
+    }
+
     #[derive(Clone)]
-    struct FileWriter(Arc<Mutex<std::fs::File>>);
+    struct FileWriter(Arc<Mutex<Log>>);
     impl std::io::Write for FileWriter {
         fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            self.0
-                .lock()
-                .map(|mut f| std::io::Write::write(&mut *f, buf))
-                .unwrap_or(Ok(0))
+            let Ok(mut log) = self.0.lock() else {
+                return Ok(0);
+            };
+            if log.checked.elapsed() >= std::time::Duration::from_secs(5) {
+                log.checked = std::time::Instant::now();
+                if !log.path.exists() {
+                    if let Ok(f) = std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(&log.path)
+                    {
+                        log.file = f;
+                    }
+                }
+            }
+            std::io::Write::write(&mut log.file, buf)
         }
         fn flush(&mut self) -> std::io::Result<()> {
             self.0
                 .lock()
-                .map(|mut f| std::io::Write::flush(&mut *f))
+                .map(|mut log| std::io::Write::flush(&mut log.file))
                 .unwrap_or(Ok(()))
         }
     }
 
-    let writer = FileWriter(Arc::new(Mutex::new(file)));
+    let writer = FileWriter(Arc::new(Mutex::new(Log {
+        path,
+        file,
+        checked: std::time::Instant::now(),
+    })));
     let _ = tracing_subscriber::fmt()
         .with_ansi(false)
         .with_max_level(tracing::Level::INFO)

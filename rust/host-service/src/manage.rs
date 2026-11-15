@@ -158,6 +158,37 @@ pub fn stop() -> anyhow::Result<()> {
 }
 
 /// Prints whether the service is installed and running, and the details the app shows.
+/// "Go online…" from the tray icon (run with the administrator prompt):
+/// turns sharing back on after "Go offline", or starts the service if it is
+/// not running.
+pub fn go_online() -> anyhow::Result<()> {
+    use windows_service::service::UserEventCode;
+
+    let mgr = manager(ServiceManagerAccess::CONNECT)?;
+    let service = mgr
+        .open_service(
+            SERVICE_NAME,
+            ServiceAccess::START
+                | ServiceAccess::QUERY_STATUS
+                | ServiceAccess::USER_DEFINED_CONTROL,
+        )
+        .map_err(|e| anyhow::anyhow!("open the service: {e}"))?;
+    let running = service
+        .query_status()
+        .is_ok_and(|s| s.current_state == ServiceState::Running);
+    if !running {
+        return service
+            .start::<OsString>(&[])
+            .map_err(|e| anyhow::anyhow!("start the service: {e}"));
+    }
+    let code = UserEventCode::from_raw(crate::service::GO_ONLINE_CONTROL)
+        .map_err(|e| anyhow::anyhow!("control code: {e:?}"))?;
+    service
+        .notify(code)
+        .map_err(|e| anyhow::anyhow!("turn sharing back on: {e}"))?;
+    Ok(())
+}
+
 pub fn status() -> anyhow::Result<()> {
     let mgr = manager(ServiceManagerAccess::CONNECT)?;
     let installed = mgr.open_service(SERVICE_NAME, ServiceAccess::QUERY_STATUS);

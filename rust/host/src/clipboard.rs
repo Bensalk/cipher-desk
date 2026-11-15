@@ -129,7 +129,7 @@ impl ClipHandle {
     /// Offers these local files to the viewer, which downloads them. Files that
     /// are missing or too large are skipped; if none qualify, nothing is sent.
     pub fn offer_files(&self, paths: Vec<PathBuf>) {
-        let files = xfer::offer(&paths);
+        let files = with_file_rights(|| xfer::offer(&paths)).unwrap_or_default();
         if files.is_empty() {
             return;
         }
@@ -242,10 +242,64 @@ fn cleanup_received_dir(dir: &std::path::Path) {
     }
 }
 
+/// Asks someone else for the files copied here, when this process cannot see
+/// them itself (see [`set_copied_files_source`]).
+type CopiedFilesSource = Box<dyn Fn() -> Option<Vec<PathBuf>> + Send + Sync>;
+
+static COPIED_FILES_SOURCE: std::sync::OnceLock<CopiedFilesSource> = std::sync::OnceLock::new();
+
+/// Read and send files as the signed-in user, not as this process.
+static READ_AS_SIGNED_IN_USER: AtomicBool = AtomicBool::new(false);
+
+/// For the Windows service host, which runs as the system account: Windows
+/// hides what the signed-in person copies in Explorer from that account, so
+/// a helper running as the person reads it and `source` asks that helper.
+/// Called once; later calls are ignored.
+pub fn set_copied_files_source(source: CopiedFilesSource) {
+    let _ = COPIED_FILES_SOURCE.set(source);
+}
+
+/// For the Windows service host: open the files the viewer downloads with
+/// the rights of the person signed in at this computer, never with the
+/// system account's (which could read files that person may not). With
+/// nobody signed in, no files are sent.
+pub fn read_files_as_signed_in_user() {
+    READ_AS_SIGNED_IN_USER.store(true, Ordering::SeqCst);
+}
+
+/// The files copied in Explorer in this session (classic or OLE clipboard),
+/// or `None`. Used by the helper that runs as the signed-in person.
+pub fn copied_files() -> Option<Vec<PathBuf>> {
+    winclip::read_files()
+}
+
+/// Runs `f` with the file access rights chosen above. `None` if it must not
+/// run (the service host with nobody signed in).
+fn with_file_rights<T>(f: impl FnOnce() -> T) -> Option<T> {
+    if !READ_AS_SIGNED_IN_USER.load(Ordering::SeqCst) {
+        return Some(f());
+    }
+    let Some(_as_user) = winclip::SignedInUser::impersonate() else {
+        tracing::warn!("host clip: nobody signed in to read files as; not sending files");
+        return None;
+    };
+    Some(f())
+}
+
 /// Sends the files copied here (Explorer) to the viewer, if the clipboard
 /// holds files. Returns whether it did.
 fn offer_copied_files(inner: &Inner) -> bool {
-    let Some(paths) = winclip::read_files() else {
+    let from_helper = || {
+        let files = COPIED_FILES_SOURCE.get().and_then(|source| source());
+        if let Some(f) = &files {
+            tracing::info!(
+                count = f.len(),
+                "host clip: files copied here (from the helper)"
+            );
+        }
+        files
+    };
+    let Some(paths) = winclip::read_files().or_else(from_helper) else {
         tracing::info!("host clip: clipboard changed but no CF_HDROP files found");
         return false;
     };
@@ -260,7 +314,7 @@ fn offer_copied_files(inner: &Inner) -> bool {
         tracing::info!("host clip: all clipboard files are own-received, skipping echo");
         return true;
     }
-    let files = xfer::offer(&paths);
+    let files = with_file_rights(|| xfer::offer(&paths)).unwrap_or_default();
     if files.is_empty() {
         tracing::info!(
             count = paths.len(),
@@ -672,7 +726,7 @@ impl CliprdrBackend for Backend {
             .outgoing
             .lock()
             .ok()
-            .and_then(|out| xfer::answer(&out, &request));
+            .and_then(|out| with_file_rights(|| xfer::answer(&out, &request)).flatten());
         let response = match answer {
             Some(xfer::FileContentsAnswer::Size(size)) => {
                 tracing::info!(
@@ -801,6 +855,45 @@ mod winclip {
             // SAFETY: closes the clipboard opened in `open`.
             unsafe {
                 let _ = CloseClipboard();
+            }
+        }
+    }
+
+    /// While alive, this thread acts with the rights of the person signed in
+    /// to this process's session; dropping it goes back to the process's own.
+    pub struct SignedInUser;
+
+    impl SignedInUser {
+        /// `None` when nobody is signed in to this session (or the token
+        /// cannot be had).
+        pub fn impersonate() -> Option<Self> {
+            use windows::Win32::Foundation::CloseHandle;
+            use windows::Win32::Security::ImpersonateLoggedOnUser;
+            use windows::Win32::System::RemoteDesktop::{ProcessIdToSessionId, WTSQueryUserToken};
+            use windows::Win32::System::Threading::GetCurrentProcessId;
+
+            // SAFETY: out-pointers are valid locals; the token is closed on
+            // every path; impersonation is undone in Drop on this thread.
+            unsafe {
+                let mut session = 0u32;
+                ProcessIdToSessionId(GetCurrentProcessId(), &mut session).ok()?;
+                let mut token = HANDLE::default();
+                WTSQueryUserToken(session, &mut token).ok()?;
+                let done = ImpersonateLoggedOnUser(token);
+                let _ = CloseHandle(token);
+                done.ok()?;
+            }
+            Some(Self)
+        }
+    }
+
+    impl Drop for SignedInUser {
+        fn drop(&mut self) {
+            use windows::Win32::Security::RevertToSelf;
+            // SAFETY: undoes the impersonation started in `impersonate` on
+            // this same thread.
+            unsafe {
+                let _ = RevertToSelf();
             }
         }
     }

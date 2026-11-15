@@ -35,6 +35,16 @@ pub fn run() -> anyhow::Result<()> {
         crate::config::load_password()?.context("no sharing password is set for the service")?;
     let (username, port) = crate::config::load_settings();
 
+    // The tray icon (running as the signed-in person) reads the files copied
+    // here for us, and copied files are opened with that person's rights.
+    let link = std::sync::Arc::new(crate::link::Link::default());
+    crate::link::serve(std::sync::Arc::clone(&link));
+    {
+        let link = std::sync::Arc::clone(&link);
+        rdpv_host::clipboard::set_copied_files_source(Box::new(move || link.copied_files()));
+    }
+    rdpv_host::clipboard::read_files_as_signed_in_user();
+
     let (tx, rx) = mpsc::channel::<(Door, HostEvent)>();
     let password_host = start(
         Door::Password,
@@ -83,9 +93,11 @@ pub fn run() -> anyhow::Result<()> {
             }
             Ok((door, HostEvent::ViewerConnected { .. })) => {
                 tracing::info!(?door, "viewer connected");
+                link.viewer_connected(door as u32);
             }
             Ok((door, HostEvent::ViewerDisconnected)) => {
                 tracing::info!(?door, "viewer disconnected");
+                link.viewer_disconnected(door as u32);
             }
             Ok((Door::Password, HostEvent::ApprovalRequested)) => {
                 // The password door never asks; allow so nobody waits forever.

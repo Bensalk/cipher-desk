@@ -2,6 +2,19 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.27 (16 Nov 2026)
+
+### Added
+- **Cipher Desk icon next to the clock on the shared computer** (Windows, when the background sharing service is installed). Teal: online, waiting for a connection. Amber: someone is connected. Grey: offline. Right-click it for:
+  - **Disconnect viewer**: ends the current connection.
+  - **Go offline**: drops any connection and closes both connection ports, so nobody can connect. Sharing comes back on by itself when the computer restarts.
+  - **Go online…**: turns sharing back on (asks for an administrator's OK).
+
+### Changed
+- **Copying files from the shared computer to the viewer**: the background service runs under the Windows system account, and Windows does not let that account see what the signed-in person copies in File Explorer. The new icon runs as the signed-in person, reads the copied files for the service, and does so only while a viewer is connected.
+- **Files sent to the viewer are opened with the signed-in person's own rights**, never with the system account's. With nobody signed in, no files are sent.
+- **Host logs keep working if a log file is deleted or moved** while the service runs. A new file is started within a few seconds.
+
 ## v0.3.26 (15 Nov 2026)
 
 ### Changed
