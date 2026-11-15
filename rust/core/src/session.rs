@@ -459,7 +459,11 @@ impl Session {
     /// if clipboard sharing to the remote is off for this connection, or if no
     /// path is a readable file within the size limit.
     pub fn send_files(&mut self, paths: Vec<PathBuf>) -> Result<(), ConnectionError> {
-        tracing::info!(count = paths.len(), ?paths, "send_files: viewer→host file copy");
+        tracing::info!(
+            count = paths.len(),
+            ?paths,
+            "send_files: viewer→host file copy"
+        );
         let descriptors = {
             let Some(clip) = self.clip.as_mut() else {
                 tracing::info!("send_files: no clip state, skipping");

@@ -2245,8 +2245,7 @@ fn wire__crate__api__log__session_log_export_impl(
             let api_app_version = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             transform_result_sse::<_, ()>((move || {
-                let output_ok =
-                    Ok::<_, ()>(crate::api::log::session_log_export(api_app_version))?;
+                let output_ok = Ok::<_, ()>(crate::api::log::session_log_export(api_app_version))?;
                 std::result::Result::Ok(output_ok)
             })())
         },
@@ -3065,7 +3064,9 @@ fn pde_ffi_dispatcher_sync_impl(
         54 => wire__crate__api__log__init_logging_impl(ptr, rust_vec_len, data_len),
         55 => wire__crate__api__log__session_log_export_impl(ptr, rust_vec_len, data_len),
         56 => wire__crate__api__log__session_log_clear_impl(ptr, rust_vec_len, data_len),
-        57 => wire__crate__api__session__RdpSession_sync_lock_keys_impl(ptr, rust_vec_len, data_len),
+        57 => {
+            wire__crate__api__session__RdpSession_sync_lock_keys_impl(ptr, rust_vec_len, data_len)
+        }
         _ => unreachable!(),
     }
 }
