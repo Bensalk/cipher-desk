@@ -21,7 +21,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ironrdp_cliprdr::backend::{ClipboardMessage, CliprdrBackend, CliprdrBackendFactory};
 use ironrdp_cliprdr::pdu::{
@@ -739,9 +739,7 @@ fn decode_unicode_text(bytes: &[u8]) -> Option<String> {
 mod winclip {
     use anyhow::Context as _;
     use windows::Win32::Foundation::{HANDLE, HGLOBAL};
-    use windows::Win32::System::Com::{
-        IDataObject, ReleaseStgMedium, DVASPECT_CONTENT, FORMATETC, TYMED_HGLOBAL,
-    };
+    use windows::Win32::System::Com::{IDataObject, DVASPECT_CONTENT, FORMATETC, TYMED_HGLOBAL};
     use windows::Win32::System::DataExchange::{
         CloseClipboard, EmptyClipboard, EnumClipboardFormats, GetClipboardData,
         GetClipboardFormatNameW, GetClipboardOwner, GetClipboardSequenceNumber,
@@ -750,7 +748,7 @@ mod winclip {
     use windows::Win32::System::Memory::{
         GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE,
     };
-    use windows::Win32::System::Ole::OleGetClipboard;
+    use windows::Win32::System::Ole::{OleGetClipboard, ReleaseStgMedium};
     use windows::Win32::UI::Shell::Common::ITEMIDLIST;
     use windows::Win32::UI::Shell::{ILCombine, ILFree, SHGetPathFromIDListW};
 
