@@ -3,12 +3,40 @@
 Read this with `CLAUDE.md` at the start of a new chat. Update it at the end of
 every working session (newest state first; drop what is no longer true).
 
-_Last updated: 15 Nov 2026._
+_Last updated: 16 Nov 2026._
 
 ## Current branch and build
 
 - **Work is now on `main`** — the `connection-methods` branch was merged.
   All releases now dispatch from `main`.
+- **v0.3.27 (16 Nov 2026) — waiting for Bensal's test.** Fix for host→viewer
+  file copy + tray icon:
+  - Clean v0.3.26 retest (AnyDesk disconnected) confirmed the cause: host copy
+    logs `ole_formats=[none]`; viewer→host still works.
+  - New `tray` command (`rust/host-service/src/tray.rs`), started by the service
+    **as the signed-in user** (`launch::spawn_tray`, WTSQueryUserToken). Icon:
+    teal online / amber connected / grey offline. Menu: Disconnect viewer, Go
+    offline, Go online… (runs `go-online` elevated → service user control 130,
+    or starts the service).
+  - Worker ↔ tray link (`link.rs`): named pipe `\\.\pipe\CipherDeskHost-<session>`,
+    SDDL SY + IU, same-session checks both ways. Tray polls every 400 ms; the
+    worker asks for copied files (`want` id) only from the clipboard poller,
+    i.e. only while a viewer is connected (Bensal's choice).
+  - Worker reads/serves host files impersonating the signed-in user
+    (`clipboard::read_files_as_signed_in_user`, `winclip::SignedInUser`) —
+    also closes an old hole where SYSTEM could send files the user can't read.
+  - Go offline = worker exits 75 → service keeps it off **in memory only**:
+    back online after reboot (Bensal's choice: he needs remote access while
+    away). Disconnect viewer = worker exits 76 → fresh worker.
+  - Host logs reopen if the file is deleted (checked every 5 s). Tray logs to
+    `tray.log` in the same folder if it may write there.
+  - CI: Rust jobs pass. Flutter jobs fail on a **pre-existing** check
+    ("frb_generated.rs is out of date", failing since before v0.3.24; releases
+    still build). Worth fixing separately.
+  - Bensal's test: install on both PCs, AnyDesk closed. Tray icon on host?
+    Copy a file in Explorer on the host → paste on viewer. Viewer → host still
+    works? Try Disconnect viewer / Go offline / Go online. Send worker.log
+    (+ tray.log if present).
 - **v0.3.26 test result (15 Nov 2026, from host worker.log):**
   - **Viewer→host file copy WORKS** in Cipher Desk (log: "got file list from
     viewer" → 195 KB received → CF_HDROP written). Failed once in the first
