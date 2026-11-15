@@ -9,6 +9,12 @@ _Last updated: 15 Nov 2026._
 
 - **Work is now on `main`** — the `connection-methods` branch was merged.
   All releases now dispatch from `main`.
+- **v0.3.26 — FILE TRANSFER WORKS BOTH WAYS** (Bensal, 15 Nov 2026, both PCs
+  Windows 11 Pro): viewer→host and host→viewer PDF copies pasted fine. The
+  very first try right after restarting both PCs failed; cause unknown (no log
+  of that attempt). Changelog does not say "fixed" yet — wait until Bensal
+  confirms it is stable over more tests. If the first-try failure repeats, get
+  the host `worker.log` from that exact attempt.
 - **v0.3.26** — build dispatched from `main` (15 Nov 2026). Both PCs are
   Windows 11 Pro. v0.3.25 log: host OLE answered has_files=no for CF_HDROP
   (still only `49161 "DataObject"` from explorer.exe). Text now works both
