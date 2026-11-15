@@ -619,6 +619,7 @@ impl Session {
                             .ok_or(ConnectionError::Unexpected)?
                             .initiate_paste(ClipboardFormatId::CF_UNICODETEXT)
                             .map_err(|_| ConnectionError::Unexpected)?;
+                        tracing::info!("clip: sent FormatDataRequest for text");
                         self.send_svc(msgs)?;
                     }
                 }
@@ -639,6 +640,7 @@ impl Session {
                     self.send_svc(msgs)?;
                 }
                 ClipAction::DataReceived(Some(bytes)) if policy.host_to_local => {
+                    tracing::info!(bytes = bytes.len(), "clip: received format data from host");
                     if bytes.len() > policy.max_bytes + 2 {
                         events.push(SessionEvent::RemoteClipboardTooLarge);
                         return Ok(());
@@ -647,8 +649,15 @@ impl Session {
                         if !text.is_empty() {
                             clip.last_remote = Some(text.clone());
                             events.push(SessionEvent::RemoteClipboardText(text));
+                        } else {
+                            tracing::warn!("clip: received format data decoded to empty text");
                         }
+                    } else {
+                        tracing::warn!("clip: received format data but unicode decode failed");
                     }
+                }
+                ClipAction::DataReceived(None) if policy.host_to_local => {
+                    tracing::warn!("clip: host returned error for FormatDataRequest (DataReceived None)");
                 }
                 ClipAction::DataReceived(_) => {}
                 ClipAction::RemoteFiles(format) => {

@@ -2,6 +2,11 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.20 (15 Nov 2026)
+
+### Diagnostic
+- **Host→viewer clipboard — deeper diagnostics** — the session log now records every step of the host→viewer text paste path: whether the FormatDataRequest was sent, whether the host responded with data (and how many bytes), whether unicode decoding succeeded, and whether the host returned an error response. This pinpoints exactly where the flow breaks when copying text on the host PC and pasting on the viewer.
+
 ## v0.3.19 (15 Nov 2026)
 
 ### Diagnostic
