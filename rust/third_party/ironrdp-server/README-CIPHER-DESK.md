@@ -30,6 +30,12 @@ Changes from 0.13.0:
   password (CredSSP) is accepted, the client's Client Info cookie is checked
   (two-step verification); a refused client gets
   `ServerSetErrorInfo(ServerFreshCredentialsRequired)` and is closed.
+- `server.rs`: `ConnectionHandler::on_accept` also receives the accepted
+  connection's own local address (`stream.local_addr()`), not just the
+  listener's (which may be bound to all interfaces). Lets a handler check
+  which network interface a connection actually arrived on, not only what
+  address the peer claims — see `rust/host/src/limiter.rs`
+  `local_address_allowed` and `docs/THREAT_MODEL.md` H7.
 
 `scripts/check-vendored-ironrdp.sh` (run in CI on every push/PR) downloads the
 real 0.13.0 release from crates.io and fails if any file in `src/` differs

@@ -75,9 +75,16 @@ pub enum PostConnectionAction {
 pub trait ConnectionHandler: Send {
     /// Called after `accept()` returns but before `run_connection()`.
     ///
+    /// `local` is the address of the network interface this particular
+    /// connection arrived on (the accepted stream's own local address, not
+    /// the listener's — the listener may bind to all interfaces). A handler
+    /// can use this to tell a connection that merely *claims* a peer address
+    /// on some trusted network from one that actually arrived through that
+    /// network's own interface.
+    ///
     /// Return `false` to reject the connection (the TCP stream is dropped).
-    fn on_accept(&mut self, peer: SocketAddr) -> bool {
-        let _ = peer;
+    fn on_accept(&mut self, peer: SocketAddr, local: SocketAddr) -> bool {
+        let _ = (peer, local);
         true
     }
 
@@ -1001,9 +1008,12 @@ impl RdpServer {
                     debug!(?peer, "Received connection");
                     drop(ev_receiver);
 
+                    // Cipher Desk: the specific interface this connection came in
+                    // on, not just the listener's own (possibly 0.0.0.0) address.
+                    let conn_local = stream.local_addr().unwrap_or(local_addr);
                     let accepted = self.connection_handler
                         .as_mut()
-                        .is_none_or(|h| h.on_accept(peer));
+                        .is_none_or(|h| h.on_accept(peer, conn_local));
 
                     if !accepted {
                         debug!(?peer, "Connection rejected by handler");

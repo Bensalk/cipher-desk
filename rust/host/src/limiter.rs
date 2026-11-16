@@ -161,6 +161,23 @@ pub fn is_tailnet_or_local(ip: std::net::IpAddr) -> bool {
     }
 }
 
+/// Whether a connection that arrived on network interface `local` should be
+/// accepted when "Tailscale only" is (or isn't) turned on.
+///
+/// `is_tailnet_or_local` on the *peer*'s address only checks whether the peer
+/// *claims* an address in Tailscale's own IPv4 block — which a device on
+/// ordinary carrier-grade NAT can also have, with nothing to do with
+/// Tailscale. This checks the *local* side instead: which of this computer's
+/// own network interfaces actually received the connection. A connection
+/// that arrived on a LAN or public interface is refused in Tailscale-only
+/// mode even if the peer's address happens to look like a Tailscale one; one
+/// that arrived on this computer's own Tailscale interface (or on loopback)
+/// is accepted. When Tailscale-only mode is off, every interface is allowed,
+/// same as before.
+pub fn local_address_allowed(local: std::net::IpAddr, tailnet_only: bool) -> bool {
+    !tailnet_only || is_tailnet_or_local(local)
+}
+
 pub(crate) struct Limiter {
     devices: HashMap<IpAddr, Counter>,
     all: AllCounter,
@@ -230,9 +247,17 @@ impl Limiter {
 }
 
 impl ConnectionHandler for Limiter {
-    fn on_accept(&mut self, peer: SocketAddr) -> bool {
+    fn on_accept(&mut self, peer: SocketAddr, local: SocketAddr) -> bool {
         if self.tailnet_only && !is_tailnet_or_local(peer.ip()) {
             tracing::info!(address = %show_ip(peer), "refused: not from the Tailscale network");
+            return false;
+        }
+        if !local_address_allowed(local.ip(), self.tailnet_only) {
+            tracing::info!(
+                address = %show_ip(peer),
+                local = %show_ip(local),
+                "refused: did not arrive on the Tailscale interface"
+            );
             return false;
         }
         let allowed = !self.locked(peer.ip(), Instant::now());
@@ -324,8 +349,55 @@ mod tests {
         }
         let (tx, _rx) = mpsc::channel();
         let mut l = Limiter::new(tx, Peer::default(), true);
-        assert!(!l.on_accept("192.168.1.5:5000".parse().unwrap_or_else(|_| panic!())));
-        assert!(l.on_accept("100.112.147.20:5000".parse().unwrap_or_else(|_| panic!())));
+        let any_local: SocketAddr = "100.64.0.9:3389".parse().unwrap_or_else(|_| panic!());
+        assert!(!l.on_accept(
+            "192.168.1.5:5000".parse().unwrap_or_else(|_| panic!()),
+            any_local
+        ));
+        assert!(l.on_accept(
+            "100.112.147.20:5000".parse().unwrap_or_else(|_| panic!()),
+            any_local
+        ));
+    }
+
+    #[test]
+    fn local_address_allowed_checks_which_interface_the_connection_arrived_on() {
+        // Tailscale-only: a Tailscale or loopback local address is fine...
+        assert!(local_address_allowed(ip("100.64.0.1"), true));
+        assert!(local_address_allowed(ip("fd7a:115c:a1e0::1"), true));
+        assert!(local_address_allowed(ip("127.0.0.1"), true));
+        // ...but a LAN or public local address is refused, even though it
+        // would pass a check on the *peer*'s address alone.
+        assert!(!local_address_allowed(ip("192.168.1.5"), true));
+        assert!(!local_address_allowed(ip("10.0.0.2"), true));
+        assert!(!local_address_allowed(ip("8.8.8.8"), true));
+        // Carrier-grade NAT overlaps Tailscale's own IPv4 block, so a local
+        // address in it is treated the same as a real Tailscale one here —
+        // this check is about which interface received the connection, not
+        // about telling Tailscale apart from CGNAT on the IP alone.
+        assert!(local_address_allowed(ip("100.112.147.20"), true));
+        // "Any network": every interface is allowed, same as before.
+        assert!(local_address_allowed(ip("192.168.1.5"), false));
+        assert!(local_address_allowed(ip("8.8.8.8"), false));
+    }
+
+    #[test]
+    fn on_accept_refuses_a_connection_that_did_not_arrive_on_the_tailscale_interface() {
+        let (tx, _rx) = mpsc::channel();
+        let mut l = Limiter::new(tx, Peer::default(), true);
+        // The peer's address alone looks like Tailscale/CGNAT, but the
+        // connection actually came in on this computer's plain LAN address —
+        // refused.
+        assert!(!l.on_accept(
+            "100.112.147.20:5000".parse().unwrap_or_else(|_| panic!()),
+            "192.168.1.10:3389".parse().unwrap_or_else(|_| panic!())
+        ));
+        // Same peer address, but arriving on the Tailscale interface this
+        // time — accepted.
+        assert!(l.on_accept(
+            "100.112.147.20:5001".parse().unwrap_or_else(|_| panic!()),
+            "100.64.0.5:3389".parse().unwrap_or_else(|_| panic!())
+        ));
     }
 
     fn ip(s: &str) -> IpAddr {
