@@ -5,7 +5,7 @@ Download any version from the [Releases page](https://github.com/Bensalk/cipher-
 ## v0.3.28 (16 Nov 2026)
 
 ### Added
-- **A Windows pop-up on the shared computer when someone connects or disconnects**, like AnyDesk, so you know without looking at the tray icon.
+- **A Windows pop-up on the shared computer when someone connects or disconnects**, so you know without looking at the tray icon.
 
 ### Fixed
 - **One copy on the shared computer could reach the viewer two or three times.** Windows sometimes announces a single Ctrl+C more than once; the same files are now sent only once.

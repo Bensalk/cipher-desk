@@ -40,6 +40,7 @@ Secure, open-source Remote Desktop (RDP) viewer by Bensal for Windows, Linux and
 - Passwords only in the OS vault (Credential Manager / Secret Service / Android Keystore), never in app files, exports, logs or command lines.
 - `sspi`/`picky` logging always off (SF-2: sspi logs the password at debug level; Devolutions classed it as hardening, public PR welcome).
 - Third-party actions pinned to full commit SHAs.
+- Never name other remote-desktop products (e.g. competitor apps) anywhere in the repo, release notes, commit messages or code comments. Say "other remote-access apps" instead.
 
 ## App facts
 

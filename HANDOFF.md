@@ -11,7 +11,7 @@ _Last updated: 16 Nov 2026._
   All releases now dispatch from `main`.
 - **v0.3.27 (16 Nov 2026) — waiting for Bensal's test.** Fix for host→viewer
   file copy + tray icon:
-  - Clean v0.3.26 retest (AnyDesk disconnected) confirmed the cause: host copy
+  - Clean v0.3.26 retest (other remote-access app closed) confirmed the cause: host copy
     logs `ole_formats=[none]`; viewer→host still works.
   - New `tray` command (`rust/host-service/src/tray.rs`), started by the service
     **as the signed-in user** (`launch::spawn_tray`, WTSQueryUserToken). Icon:
@@ -33,7 +33,7 @@ _Last updated: 16 Nov 2026._
   - CI: Rust jobs pass. Flutter jobs fail on a **pre-existing** check
     ("frb_generated.rs is out of date", failing since before v0.3.24; releases
     still build). Worth fixing separately.
-  - Bensal's test: install on both PCs, AnyDesk closed. Tray icon on host?
+  - Bensal's test: install on both PCs, other remote-access apps closed. Tray icon on host?
     Copy a file in Explorer on the host → paste on viewer. Viewer → host still
     works? Try Disconnect viewer / Go offline / Go online. Send worker.log
     (+ tray.log if present).
@@ -44,8 +44,8 @@ _Last updated: 16 Nov 2026._
   - **Host→viewer still does NOT work in Cipher Desk.** Every host copy logs
     `owner=explorer.exe; formats=[49161 "DataObject"]; ole_formats=[none]` and
     the host never offers files. Bensal's successful host→viewer pastes were
-    almost certainly **AnyDesk's** clipboard sync (AnyDesk was open; log shows
-    `owner=AnyDesk.exe`). Test with AnyDesk closed.
+    almost certainly **another remote-access app's** clipboard sync (it was open;
+    the log showed that app as the clipboard owner). Test with it closed.
   - **Root cause (host→viewer):** the worker runs as SYSTEM (launch.rs dups the
     service's own token into the user's session). "DataObject" is OLE's own
     marker; Explorer's real formats live in its COM object, which the SYSTEM
@@ -92,7 +92,7 @@ _Last updated: 16 Nov 2026._
   `EnumClipboardFormats`) structurally cannot see text placed that way, at any
   speed — this was never a timing race. Fixed by also reading through OLE's
   `IDataObject` (`OleGetClipboard` → `QueryGetData`/`GetData` for
-  CF_UNICODETEXT), which is how AnyDesk/TeamViewer-style tools read clipboards
+  CF_UNICODETEXT), which is how other remote-desktop tools read clipboards
   reliably. See `winclip::ole_has_text` / `winclip::ole_read_text` in
   `rust/host/src/clipboard.rs`. `winclip::describe()` now also logs
   `ole_has_text=yes/no` so the next log confirms whether this was the real fix.

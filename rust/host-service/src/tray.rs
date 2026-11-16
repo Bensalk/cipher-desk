@@ -259,7 +259,7 @@ fn ask_worker(tray: &mut Tray) -> Status {
 }
 
 /// Adds, updates or removes the icon. Returns whether Windows accepted it.
-/// `popup`: (title, text) to also pop up above the icon, like AnyDesk does
+/// `popup`: (title, text) to also pop up above the icon
 /// when someone connects — Windows shows this even while the Action Center
 /// is closed and the tray icon is just sitting in the overflow tray.
 fn notify(tray: &Tray, message: NOTIFY_ICON_MESSAGE, popup: Option<(&str, &str)>) -> bool {
