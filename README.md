@@ -5,7 +5,7 @@
   <br>
 </h1>
 
-<h4 align="center">A secure, open-source remote desktop app for Windows, Linux and Android: Remote Desktop (RDP), screen sharing and VNC.</h4>
+<h4 align="center">A secure, open-source remote desktop app for Windows, Linux and Android: screen sharing, Remote Desktop (RDP) and VNC.</h4>
 
 <p align="center">
   <a href="https://github.com/Bensalk/cipher-desk/releases"><img src="https://img.shields.io/badge/release-v1.0.0-00796B?style=flat-square" alt="Release v1.0.0"></a>
