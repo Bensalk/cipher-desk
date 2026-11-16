@@ -140,9 +140,12 @@ fn copy_program(target: &std::path::Path) -> anyhow::Result<()> {
     ))
 }
 
-/// Only administrators and Windows itself may start, stop or send commands
-/// to the service; everyone may see whether it runs.
-const SERVICE_SDDL: &str = "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWLORC;;;IU)(A;;CCLCSWLORC;;;SU)(A;;CCLCSWLORC;;;AU)";
+/// Only administrators and Windows itself may stop, change or remove the
+/// service; everyone may see whether it runs.
+/// The person signed in at the computer may also start it and send it "Go
+/// online" (CR), so opening the app turns sharing back on after "Exit" with
+/// no prompt. Stopping, changing or removing it needs an administrator.
+const SERVICE_SDDL: &str = "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWRPLOCRRC;;;IU)(A;;CCLCSWLORC;;;SU)(A;;CCLCSWLORC;;;AU)";
 
 fn restrict_service() {
     let Some(windir) = std::env::var_os("SystemRoot") else {
@@ -328,7 +331,12 @@ pub fn go_online() -> anyhow::Result<()> {
     ) {
         Ok(s) => s,
         Err(e) => {
-            if std::env::args().any(|a| a == "--elevated") {
+            let quiet = std::env::args().any(|a| a == "--quiet");
+            if quiet && e.to_string().contains("1060") {
+                // Not installed (opening the app on any PC): nothing to do.
+                return Ok(());
+            }
+            if quiet || std::env::args().any(|a| a == "--elevated") {
                 return Err(anyhow::anyhow!("open the service: {e}"));
             }
             // Not an administrator yet: ask Windows for the prompt.
@@ -387,7 +395,11 @@ pub fn set(change: Option<String>) -> anyhow::Result<()> {
     let mut settings = crate::config::load_settings();
     match change.as_str() {
         "ask=on" => settings.ask = true,
-        "ask=off" => settings.ask = false,
+        "ask=off" => {
+            settings.ask = false;
+            // Turning it off also forgets devices that were always allowed.
+            crate::config::forget_allowed_devices()?;
+        }
         "networks=tailscale" => settings.tailnet_only = true,
         "networks=any" => settings.tailnet_only = false,
         other => anyhow::bail!("unknown setting: {other}"),

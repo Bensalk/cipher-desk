@@ -50,6 +50,12 @@ class ShareController extends ChangeNotifier {
 
   ShareStatus status = ShareStatus.off;
   String? message;
+
+  /// Address of the device asking to connect (while [approvalPending]).
+  String? askingAddress;
+
+  /// Tick "Always allow this device" on the allow prompt.
+  bool alwaysAllow = false;
   String? fingerprint;
   bool hasPassword = false;
 
@@ -115,7 +121,11 @@ class ShareController extends ChangeNotifier {
     if (username != null && username.trim().isNotEmpty) this.username = username.trim();
     if (port != null && port > 0 && port < 65536) this.port = port;
     if (startWhenAppOpens != null) this.startWhenAppOpens = startWhenAppOpens;
-    if (askBeforeConnecting != null) this.askBeforeConnecting = askBeforeConnecting;
+    if (askBeforeConnecting != null) {
+      this.askBeforeConnecting = askBeforeConnecting;
+      // Turning asking off forgets the always-allowed devices.
+      if (!askBeforeConnecting) forgetAllowedDevices();
+    }
     await _save();
     notifyListeners();
   }
@@ -163,6 +173,11 @@ class ShareController extends ChangeNotifier {
   void approve(bool allow) {
     if (status != ShareStatus.approvalPending) return;
     _host?.approve(allow: allow);
+    final address = askingAddress;
+    if (allow && alwaysAllow && address != null && canAlwaysAllow(address)) {
+      _remember(address);
+    }
+    alwaysAllow = false;
     if (!allow) {
       status = ShareStatus.waiting;
       notifyListeners();
@@ -201,6 +216,51 @@ class ShareController extends ChangeNotifier {
     });
   }
 
+  /// Only Tailscale addresses (100.64.0.0/10, fd7a:115c:a1e0::/48) belong
+  /// to one device for sure, so only they can be always allowed.
+  static bool canAlwaysAllow(String address) {
+    final a = address.toLowerCase();
+    if (a.startsWith('fd7a:115c:a1e0:')) return true;
+    final parts = a.split('.');
+    if (parts.length != 4 || parts[0] != '100') return false;
+    final second = int.tryParse(parts[1]) ?? -1;
+    return second >= 64 && second <= 127;
+  }
+
+  Future<File> _allowedFile() async =>
+      File('${(await _paths()).dir}${Platform.pathSeparator}allowed-devices.txt');
+
+  Future<bool> _isRemembered(String address) async {
+    try {
+      final f = await _allowedFile();
+      if (!await f.exists()) return false;
+      return (await f.readAsLines()).any((l) => l.trim() == address);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _remember(String address) async {
+    try {
+      if (await _isRemembered(address)) return;
+      final f = await _allowedFile();
+      await f.writeAsString('$address\n', mode: FileMode.append, flush: true);
+    } catch (_) {}
+  }
+
+  void setAlwaysAllow(bool on) {
+    alwaysAllow = on;
+    notifyListeners();
+  }
+
+  /// Forgets every always-allowed device.
+  Future<void> forgetAllowedDevices() async {
+    try {
+      final f = await _allowedFile();
+      if (await f.exists()) await f.delete();
+    } catch (_) {}
+  }
+
   static Future<bool> _serviceRunning() async {
     if (!HostService.supported) return false;
     try {
@@ -220,6 +280,16 @@ class ShareController extends ChangeNotifier {
         status = ShareStatus.waiting;
         message = null;
       case HostUpdateKind.approvalRequested:
+        askingAddress = u.message;
+        alwaysAllow = false;
+        final address = u.message;
+        if (address != null && canAlwaysAllow(address)) {
+          _isRemembered(address).then((yes) {
+            if (yes && status == ShareStatus.approvalPending && askingAddress == address) {
+              approve(true);
+            }
+          });
+        }
         status = ShareStatus.approvalPending;
         message = null;
       case HostUpdateKind.viewerConnected:

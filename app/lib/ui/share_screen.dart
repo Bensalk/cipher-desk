@@ -800,8 +800,21 @@ class _StatusCard extends StatelessWidget {
             ],
             const SizedBox(height: 12),
             if (share.status == ShareStatus.approvalPending) ...[
+              Text('Device asking: ${share.askingAddress ?? 'unknown'}',
+                  key: const Key('share-asking')),
+              const SizedBox(height: 4),
               const Text('Allow this connection? If you do nothing, it is '
                   'refused in a few seconds.'),
+              if (share.askingAddress != null &&
+                  ShareController.canAlwaysAllow(share.askingAddress!))
+                CheckboxListTile(
+                  key: const Key('share-always-allow'),
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: const Text('Always allow this device'),
+                  value: share.alwaysAllow,
+                  onChanged: (v) => share.setAlwaysAllow(v ?? false),
+                ),
               const SizedBox(height: 12),
               Row(
                 children: [

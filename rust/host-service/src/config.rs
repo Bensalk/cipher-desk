@@ -168,6 +168,41 @@ pub fn twostep_devices_file() -> anyhow::Result<PathBuf> {
     secret_file("twostep-devices.txt")
 }
 
+/// Devices (Tailscale addresses) allowed through "ask to connect" without
+/// asking, one per line.
+fn allowed_devices_file() -> anyhow::Result<PathBuf> {
+    secret_file("allowed-devices.txt")
+}
+
+/// Whether `address` was set to "always allow" for ask-to-connect.
+pub fn is_allowed_device(address: &str) -> bool {
+    allowed_devices_file()
+        .ok()
+        .and_then(|f| std::fs::read_to_string(f).ok())
+        .is_some_and(|t| t.lines().any(|l| l.trim() == address))
+}
+
+/// Remembers `address` as "always allow" for ask-to-connect.
+pub fn allow_device(address: &str) -> anyhow::Result<()> {
+    use std::io::Write as _;
+    if is_allowed_device(address) {
+        return Ok(());
+    }
+    let mut f = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(allowed_devices_file()?)
+        .context("save the allowed device")?;
+    writeln!(f, "{address}").context("save the allowed device")?;
+    Ok(())
+}
+
+/// Forgets every "always allow" device.
+pub fn forget_allowed_devices() -> anyhow::Result<()> {
+    let _ = std::fs::remove_file(allowed_devices_file()?);
+    Ok(())
+}
+
 /// Records in the (readable) settings whether two-step is on, so the app can
 /// show it without opening the secrets.
 fn set_twostep_flag(on: bool) -> anyhow::Result<()> {

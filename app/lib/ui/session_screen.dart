@@ -175,6 +175,11 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   int? _fileSeq;
   int? _ownFileSeq;
   String _receiveDir = '';
+
+  /// Files arriving from the remote: fraction done (null when nothing is
+  /// arriving) and "12.0 MB of 1.2 GB".
+  double? _transferProgress;
+  String _transferText = '';
   final List<String> _receivedBatch = [];
   DateTime? _lastReceived;
   Timer? _receivedBatchTimer;
@@ -486,12 +491,24 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
         ));
       case UpdateKind.filesIncoming:
         if (!mounted) return;
+        if (u.label == 'progress') {
+          setState(() {
+            _transferProgress = u.x >= 100 ? null : u.x / 100;
+            _transferText = u.text ?? '';
+          });
+          return;
+        }
+        setState(() {
+          _transferProgress = 0;
+          _transferText = u.text ?? '';
+        });
         _notice(SnackBar(
           content: Text('Receiving ${u.text ?? 'files'} from the remote computer…'),
           duration: const Duration(seconds: 6),
         ));
       case UpdateKind.fileReceived:
         if (!mounted) return;
+        if (_transferProgress != null) setState(() => _transferProgress = null);
         final name = u.text ?? 'a file';
         final path = u.label;
         if (path != null && path.isNotEmpty) _putReceivedOnClipboard(path);
@@ -590,7 +607,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     if (!mounted) return;
     // TODO(next-bump): update this when pubspec version changes.
     // Adding package_info_plus would let us read it at runtime.
-    const version = '0.3.30';
+    const version = '0.3.31';
     final content = rust_log.sessionLogExport(appVersion: version);
     final fileName = 'cipher-desk-log-${DateTime.now().millisecondsSinceEpoch}.txt';
 
@@ -1189,6 +1206,33 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
                     : FilterQuality.medium,
               ),
             ),
+            if (_transferProgress != null)
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                child: IgnorePointer(
+                  child: Material(
+                    key: const Key('transfer-progress'),
+                    color: Theme.of(context).colorScheme.surface.withAlpha(217),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Receiving files… ${(_transferProgress! * 100).round()}%'
+                            '${_transferText.isEmpty ? '' : ' ($_transferText)'}',
+                          ),
+                          const SizedBox(height: 4),
+                          LinearProgressIndicator(value: _transferProgress),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             if (_trackpad)
               Positioned(
                 left: o.dx + _cursor.dx * sx - 2,

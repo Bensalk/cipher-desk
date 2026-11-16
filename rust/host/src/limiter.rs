@@ -97,7 +97,7 @@ fn show_ip(addr: SocketAddr) -> String {
 
 /// True for addresses on a Tailscale network (100.64.0.0/10 and
 /// fd7a:115c:a1e0::/48) and for this computer itself.
-pub(crate) fn is_tailnet_or_local(ip: std::net::IpAddr) -> bool {
+pub fn is_tailnet_or_local(ip: std::net::IpAddr) -> bool {
     use std::net::IpAddr;
     let ip = match ip {
         IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(IpAddr::V6(v6), IpAddr::V4),

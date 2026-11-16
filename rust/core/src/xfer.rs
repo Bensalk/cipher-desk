@@ -182,6 +182,30 @@ fn stays_inside(dir: &Path, path: &Path) -> bool {
 
 /// A path under `dir` for `name` that does not clash with an existing file:
 /// `report.pdf`, then `report (1).pdf`, and so on.
+/// Empties a Received folder before new files arrive: the clipboard now
+/// points at the new files, so earlier ones are no longer needed, and the new
+/// ones keep their own names instead of "name (2)". Links inside are removed
+/// as links, never followed. Returns how many entries were removed.
+pub fn clear_received(dir: &Path) -> usize {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return 0;
+    };
+    let mut removed = 0;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let is_dir = entry.file_type().is_ok_and(|t| t.is_dir());
+        let ok = if is_dir {
+            std::fs::remove_dir_all(&path).is_ok()
+        } else {
+            std::fs::remove_file(&path).is_ok()
+        };
+        if ok {
+            removed += 1;
+        }
+    }
+    removed
+}
+
 pub fn unique_path(dir: &Path, name: &str) -> PathBuf {
     let candidate = dir.join(name);
     if !candidate.exists() {
@@ -266,6 +290,10 @@ pub struct Receiver {
     data_id: Option<u32>,
     /// Total bytes announced (for "receiving …" messages).
     pub total_bytes: u64,
+    /// Bytes written so far, over all files.
+    received: u64,
+    /// Last progress reported ([`Receiver::progress`]), in percent.
+    reported: u8,
 }
 
 impl Receiver {
@@ -321,6 +349,8 @@ impl Receiver {
             current: None,
             data_id,
             total_bytes,
+            received: 0,
+            reported: 0,
         };
         let step = r.advance();
         (r, step)
@@ -347,6 +377,7 @@ impl Receiver {
             return Some(self.advance());
         }
         cur.done += bytes.len() as u64;
+        self.received += bytes.len() as u64;
         let finished = match cur.size {
             Some(size) => cur.done >= size || bytes.is_empty(),
             None => (bytes.len() as u64) < u64::from(cur.asked),
@@ -370,6 +401,21 @@ impl Receiver {
             return Some(self.advance());
         }
         Some(Step::Request(self.request()))
+    }
+
+    /// Progress to show, when it moved by at least 2 % since last time:
+    /// `(percent, bytes received, total bytes)`.
+    pub fn progress(&mut self) -> Option<(u8, u64, u64)> {
+        if self.total_bytes == 0 {
+            return None;
+        }
+        let pct = (u128::from(self.received) * 100 / u128::from(self.total_bytes)).min(100);
+        let pct = u8::try_from(pct).unwrap_or(100);
+        if pct >= self.reported.saturating_add(2) || (pct == 100 && self.reported < 100) {
+            self.reported = pct;
+            return Some((pct, self.received, self.total_bytes));
+        }
+        None
     }
 
     /// Drops the file being received.
@@ -751,6 +797,18 @@ mod tests {
         assert!(stays_inside(dir, &dir.join("a").join("b.txt")));
         assert!(!stays_inside(dir, &dir.join("..").join("b.txt")));
         assert!(!stays_inside(dir, Path::new("elsewhere/b.txt")));
+    }
+
+    #[test]
+    fn clear_received_empties_the_folder() {
+        let dir = std::env::temp_dir().join(format!("rdpv-clear-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("sub")).unwrap_or_else(|e| panic!("{e}"));
+        std::fs::write(dir.join("a.txt"), b"x").unwrap_or_else(|e| panic!("{e}"));
+        std::fs::write(dir.join("sub").join("b.txt"), b"y").unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(clear_received(&dir), 2);
+        assert_eq!(std::fs::read_dir(&dir).map(|e| e.count()).unwrap_or(9), 0);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

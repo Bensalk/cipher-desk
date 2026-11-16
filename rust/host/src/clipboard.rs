@@ -112,7 +112,7 @@ impl HostClipboard {
                 hdrop_pending: AtomicBool::new(false),
                 last_text: Mutex::new(None),
                 text_cached_ms: AtomicU64::new(0),
-                last_offered: Mutex::new((Vec::new(), 0)),
+                last_offered: Mutex::new((load_last_sent(&receive_dir), 0)),
             }),
         }
     }
@@ -301,6 +301,35 @@ fn now_ms() -> u64 {
         .as_millis() as u64
 }
 
+/// Where the last files sent to the viewer are remembered, so that a
+/// restarted host (go offline/online, a service update) does not send the
+/// same copied files again on the next connection. Beside the Received folder.
+fn last_sent_file(receive_dir: &std::path::Path) -> Option<PathBuf> {
+    receive_dir.parent().map(|d| d.join("last-sent.txt"))
+}
+
+fn load_last_sent(receive_dir: &std::path::Path) -> Vec<PathBuf> {
+    last_sent_file(receive_dir)
+        .and_then(|f| std::fs::read_to_string(f).ok())
+        .map(|t| {
+            t.lines()
+                .filter(|l| !l.is_empty())
+                .map(PathBuf::from)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn save_last_sent(receive_dir: &std::path::Path, paths: &[PathBuf]) {
+    if let Some(f) = last_sent_file(receive_dir) {
+        let text: Vec<String> = paths
+            .iter()
+            .map(|p| p.to_string_lossy().into_owned())
+            .collect();
+        let _ = std::fs::write(f, text.join("\n"));
+    }
+}
+
 /// Sends the files copied here (Explorer) to the viewer, if the clipboard
 /// holds files. Returns whether it did (or skipped them on purpose).
 ///
@@ -356,6 +385,7 @@ fn offer_copied_files(inner: &Inner, refresh: bool) -> bool {
         }
         last.0 = paths.clone();
         last.1 = now;
+        save_last_sent(&inner.receive_dir, &paths);
     }
     let files = with_file_rights(|| xfer::offer(&paths)).unwrap_or_default();
     if files.is_empty() {
@@ -704,8 +734,13 @@ impl CliprdrBackend for Backend {
                 tracing::error!("host clip: receiving mutex poisoned");
                 return;
             };
-            // A new copy replaces one still arriving.
+            // A new copy replaces one still arriving, and the files of
+            // earlier copies (so names stay plain, no "(2)").
             *r = None;
+            let removed = xfer::clear_received(&self.inner.receive_dir);
+            if removed > 0 {
+                tracing::info!(removed, "host clip: cleared earlier received files");
+            }
             let (rx, step) = xfer::Receiver::start(items, clip_data_id, &self.inner.receive_dir);
             tracing::info!(
                 file_count = rx.file_count(),

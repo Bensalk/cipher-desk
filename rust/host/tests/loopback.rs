@@ -451,7 +451,7 @@ fn ask_and_answer(allow: bool) -> Result<usize, Option<ConnectionError>> {
     // The person at the computer answers once asked.
     let answered = std::thread::spawn(move || loop {
         match events.recv_timeout(Duration::from_secs(20)) {
-            Ok(HostEvent::ApprovalRequested) => {
+            Ok(HostEvent::ApprovalRequested { .. }) => {
                 approver.approve(allow);
                 return true;
             }

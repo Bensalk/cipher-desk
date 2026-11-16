@@ -132,6 +132,9 @@ pub enum SessionEvent {
     RemoteClipboardTooLarge,
     /// Files or a folder copied on the remote started arriving.
     FilesIncoming { files: usize, bytes: u64 },
+    /// Files from the remote are arriving: `percent` done, `done` of `total`
+    /// bytes (sent every couple of percent).
+    FileProgress { percent: u8, done: u64, total: u64 },
     /// A file or folder copied on the remote finished arriving in the
     /// receive folder (one event per top-level item). `path` is where it was
     /// saved (the name may have " (1)" added).
@@ -701,8 +704,13 @@ impl Session {
                     );
                     if policy.host_to_local {
                         if let Some(dir) = clip.receive_dir.clone() {
-                            // A new copy replaces one still arriving.
+                            // A new copy replaces one still arriving, and
+                            // the files of earlier copies.
                             clip.receiving = None;
+                            let removed = crate::xfer::clear_received(&dir);
+                            if removed > 0 {
+                                tracing::info!(removed, "clip: cleared earlier received files");
+                            }
                             let (rx, step) =
                                 crate::xfer::Receiver::start(files, clip_data_id, &dir);
                             let count = rx.file_count();
@@ -757,10 +765,19 @@ impl Session {
                     self.send_svc(msgs)?;
                 }
                 ClipAction::FileData { stream_id, bytes } => {
-                    let step = clip
-                        .receiving
-                        .as_mut()
-                        .and_then(|rx| rx.on_data(stream_id, bytes.as_deref()));
+                    let mut progress = None;
+                    let step = clip.receiving.as_mut().and_then(|rx| {
+                        let step = rx.on_data(stream_id, bytes.as_deref());
+                        progress = rx.progress();
+                        step
+                    });
+                    if let Some((percent, done, total)) = progress {
+                        events.push(SessionEvent::FileProgress {
+                            percent,
+                            done,
+                            total,
+                        });
+                    }
                     if let Some(step) = step {
                         self.receive_step(step, events)?;
                     }

@@ -22,6 +22,7 @@ pub mod frames;
 pub mod identity;
 pub mod input;
 mod limiter;
+pub use limiter::is_tailnet_or_local;
 pub mod totp;
 #[cfg(windows)]
 pub mod win;
@@ -72,7 +73,8 @@ pub enum HostEvent {
     /// A viewer has signed in and is waiting for the person at this computer to
     /// allow or refuse it (only when "ask before each connection" is on).
     /// Answer with [`HostHandle::approve`].
-    ApprovalRequested,
+    /// `address`: the device asking (IP).
+    ApprovalRequested { address: String },
     /// A file sent by the viewer finished arriving in the Received folder.
     FileReceived { name: String },
     /// The Host could not start or stopped with an error.
@@ -393,7 +395,9 @@ impl<S: FrameSource + Send + 'static> RdpServerDisplay for ScreenDisplay<S> {
                 let mut rx = self.approvals.lock().await;
                 while rx.try_recv().is_ok() {}
             }
-            let _ = self.events.send(HostEvent::ApprovalRequested);
+            let _ = self.events.send(HostEvent::ApprovalRequested {
+                address: self.peer.ip(),
+            });
             let allowed = {
                 let mut rx = self.approvals.lock().await;
                 matches!(

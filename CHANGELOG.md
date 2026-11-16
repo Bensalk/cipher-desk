@@ -2,6 +2,19 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.31 (16 Nov 2026)
+
+### Added
+- **Opening Cipher Desk turns sharing back on** after "Exit" or "Go offline" in the tray icon, with no prompt. "Go online" from the tray no longer asks for an administrator either. (Press **Update** on the Share screen page once after installing, so the background service gets this.)
+- **Progress bar for files arriving on the viewer**, with percent and size.
+- **"Ask to connect" shows who is asking** (device name and address), on the background service's question and on the Share screen page.
+- **Always allow this device:** after allowing a device on your Tailscale network, you can choose to always allow it without asking. Turning "Ask to connect" off forgets these devices.
+- **Clearer message when the sharing port is taken by the always-on background sharing.**
+
+### Fixed
+- **Copied files could still arrive again** after sharing was turned off and on, or after an update. Files already sent are remembered until something new is copied.
+- **Received files piled up as "name (2)", "name (3)"…** A new copy now clears the files from earlier copies in the Received folder, so names stay plain.
+
 ## v0.3.30 (16 Nov 2026)
 
 ### Security

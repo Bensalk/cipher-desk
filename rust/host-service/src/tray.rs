@@ -34,7 +34,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreateIconIndirect, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu,
     DispatchMessageW, GetCursorPos, GetMessageW, GetSystemMetrics, PostMessageW, RegisterClassW,
     RegisterWindowMessageW, SetForegroundWindow, SetTimer, TrackPopupMenu, TranslateMessage, HICON,
-    ICONINFO, MF_GRAYED, MF_SEPARATOR, MF_STRING, MSG, SM_CXSMICON, SW_HIDE, TPM_BOTTOMALIGN,
+    ICONINFO, MF_GRAYED, MF_SEPARATOR, MF_STRING, MSG, SM_CXSMICON, TPM_BOTTOMALIGN,
     TPM_RIGHTBUTTON, WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_COMMAND, WM_LBUTTONUP, WM_NULL,
     WM_RBUTTONUP, WM_TIMER, WNDCLASSW,
 };
@@ -546,27 +546,19 @@ fn open_history() {
 
 /// Starts `<this program> go-online` with the Windows administrator prompt.
 fn go_online() {
+    use std::os::windows::process::CommandExt as _;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     let Ok(exe) = std::env::current_exe() else {
         return;
     };
-    let exe: Vec<u16> = {
-        use std::os::windows::ffi::OsStrExt as _;
-        exe.as_os_str().encode_wide().chain([0]).collect()
-    };
-    // SAFETY: all strings are NUL-terminated and outlive the call.
-    let result = unsafe {
-        ShellExecuteW(
-            None,
-            w!("runas"),
-            PCWSTR(exe.as_ptr()),
-            w!("go-online"),
-            PCWSTR::null(),
-            SW_HIDE,
-        )
-    };
-    // Values above 32 mean it started; otherwise refused or cancelled.
-    if (result.0 as isize) <= 32 {
-        tracing::info!("tray: go online was cancelled or refused");
+    // Works without a prompt for the person signed in here; asks for an
+    // administrator only if needed (see `manage::go_online`).
+    if let Err(e) = std::process::Command::new(exe)
+        .arg("go-online")
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+    {
+        tracing::info!(error = %e, "tray: could not start go online");
     }
 }
 

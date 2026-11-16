@@ -158,18 +158,38 @@ pub fn run() -> anyhow::Result<()> {
                     crate::history::record(&time, "WRONG PASSWORD", &who, door.label());
                 });
             }
-            Ok((Door::Password, HostEvent::ApprovalRequested)) => {
+            Ok((Door::Password, HostEvent::ApprovalRequested { .. })) => {
                 // The password door never asks; allow so nobody waits forever.
                 password_host.approve(true);
             }
-            Ok((Door::Ask, HostEvent::ApprovalRequested)) => {
+            Ok((Door::Ask, HostEvent::ApprovalRequested { address })) => {
                 if let Some(host) = &ask_host {
                     let approver = host.approver();
                     // The popup blocks until answered or timed out.
                     std::thread::spawn(move || {
-                        let allow = ask_person_at_computer();
+                        if crate::config::is_allowed_device(&address) {
+                            tracing::info!(%address, "ask-to-connect: always-allowed device");
+                            approver.approve(true);
+                            return;
+                        }
+                        let who = who_is(&address);
+                        let allow = ask_person_at_computer(&who);
                         tracing::info!(allow, "ask-to-connect answered");
                         approver.approve(allow);
+                        // Only Tailscale addresses belong to one device for
+                        // sure; offer to remember those.
+                        let ip = address.parse::<std::net::IpAddr>().ok();
+                        let tailnet = ip.is_some_and(|ip| {
+                            !ip.is_loopback() && rdpv_host::is_tailnet_or_local(ip)
+                        });
+                        if allow && tailnet && ask_always_allow(&who) {
+                            match crate::config::allow_device(&address) {
+                                Ok(()) => tracing::info!(%address, "device will always be allowed"),
+                                Err(e) => {
+                                    tracing::warn!(error = %format!("{e:#}"), "could not remember the device")
+                                }
+                            }
+                        }
                     });
                 }
             }
@@ -228,7 +248,35 @@ fn start(
 /// session. `true` only for Yes; No, closing it, or no answer within
 /// [`rdpv_host::APPROVAL_TIMEOUT`] refuse.
 #[allow(unsafe_code)]
-fn ask_person_at_computer() -> bool {
+fn ask_person_at_computer(who: &str) -> bool {
+    let seconds = rdpv_host::APPROVAL_TIMEOUT.as_secs();
+    show_question(
+        &format!(
+            "Someone is asking to see and control this computer.\n\n\
+             Device: {who}\n\n\
+             Allow the connection?\n\n\
+             If nobody answers, it is refused in {seconds} seconds."
+        ),
+        seconds,
+    )
+}
+
+/// After allowing: offer to skip the question for this device from now on.
+fn ask_always_allow(who: &str) -> bool {
+    show_question(
+        &format!(
+            "Always allow this device without asking?\n\n\
+             Device: {who}\n\n\
+             Choose No to be asked every time. Turning \"Ask to connect\" off in \
+             Cipher Desk forgets all always-allowed devices."
+        ),
+        30,
+    )
+}
+
+/// A Yes/No question on the signed-in person's screen (No is the default and
+/// the answer when nobody responds within `seconds`).
+fn show_question(text: &str, seconds: u64) -> bool {
     use windows::core::PCWSTR;
     use windows::Win32::System::RemoteDesktop::{WTSSendMessageW, WTS_CURRENT_SERVER_HANDLE};
     use windows::Win32::UI::WindowsAndMessaging::{
@@ -239,15 +287,8 @@ fn ask_person_at_computer() -> bool {
     /// "This session" for WTSSendMessage.
     const WTS_CURRENT_SESSION: u32 = u32::MAX;
 
-    let seconds = rdpv_host::APPROVAL_TIMEOUT.as_secs();
     let title: Vec<u16> = "Cipher Desk".encode_utf16().collect();
-    let message: Vec<u16> = format!(
-        "Someone is asking to see and control this computer.\n\n\
-         Allow the connection?\n\n\
-         If nobody answers, it is refused in {seconds} seconds."
-    )
-    .encode_utf16()
-    .collect();
+    let message: Vec<u16> = text.encode_utf16().collect();
     let mut response = MESSAGEBOX_RESULT(0);
     let timeout = u32::try_from(seconds).unwrap_or(30);
     // SAFETY: the title and message buffers outlive the call; their lengths
@@ -268,7 +309,7 @@ fn ask_person_at_computer() -> bool {
         )
     };
     if let Err(e) = sent {
-        tracing::warn!(error = %e, "ask-to-connect popup could not be shown");
+        tracing::warn!(error = %e, "question popup could not be shown");
         return false;
     }
     response == IDYES

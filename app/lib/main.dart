@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'platform/secure_window.dart';
 import 'src/rust/api/log.dart' as rust_log;
 import 'src/rust/frb_generated.dart';
+import 'state/host_service.dart';
 import 'state/persistence.dart';
 import 'state/profiles.dart';
 import 'state/settings.dart';
@@ -37,6 +38,9 @@ Future<void> main(List<String> args) async {
   final notice = ProfilePersistence(paths, store, onSaveFailed: saveFailed).start();
   await SecureWindow.setEnabled(settings.blockScreenshots);
   runApp(CipherDeskApp(store: store, settings: settings, paths: paths, startupNotice: notice));
+  // Opening the app turns screen sharing back on after "Exit" in the tray
+  // icon (if the background service is installed). No prompt, no waiting.
+  HostService.goOnlineQuietly();
 }
 
 class CipherDeskApp extends StatelessWidget {

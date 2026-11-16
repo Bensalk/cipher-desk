@@ -172,6 +172,16 @@ class HostService {
     return (_statusFrom(m), m['PASSWORD']);
   }
 
+  /// Turns sharing back on if it was turned off with "Exit" or "Go offline"
+  /// in the tray icon. Quiet: no prompt, nothing shown, errors ignored.
+  static Future<void> goOnlineQuietly() async {
+    final exe = exePath();
+    if (exe == null) return;
+    try {
+      await Process.run(exe, ['go-online', '--quiet']);
+    } catch (_) {}
+  }
+
   /// Updates the installed service to this app's version (same admin
   /// prompt as installing). Returns the new state.
   static Future<HostServiceStatus> update() async {
