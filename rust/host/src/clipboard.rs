@@ -78,6 +78,11 @@ struct Inner {
     /// another program replaces the clipboard a fraction of a second after a
     /// copy; this lets `on_format_data_request` still serve the copied text.
     last_text: Mutex<Option<String>>,
+    /// The file list last offered to the viewer, and when — so a copy of the
+    /// same files announced again moments later (Explorer can raise the
+    /// clipboard-changed notification more than once for a single Ctrl+C) is
+    /// not sent to the viewer a second time.
+    last_offered: Mutex<(Vec<PathBuf>, u64)>,
     /// When `last_text` was captured (ms since the UNIX epoch; 0 = never).
     /// While recent, the poller keeps telling the viewer text is available
     /// even if the clipboard itself no longer holds it.
@@ -107,6 +112,7 @@ impl HostClipboard {
                 hdrop_pending: AtomicBool::new(false),
                 last_text: Mutex::new(None),
                 text_cached_ms: AtomicU64::new(0),
+                last_offered: Mutex::new((Vec::new(), 0)),
             }),
         }
     }
@@ -286,6 +292,15 @@ fn with_file_rights<T>(f: impl FnOnce() -> T) -> Option<T> {
     Some(f())
 }
 
+/// Milliseconds since the UNIX epoch, for comparing timestamps; never used
+/// as a real calendar time.
+fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
+
 /// Sends the files copied here (Explorer) to the viewer, if the clipboard
 /// holds files. Returns whether it did.
 fn offer_copied_files(inner: &Inner) -> bool {
@@ -313,6 +328,22 @@ fn offer_copied_files(inner: &Inner) -> bool {
     if paths.iter().all(|p| p.starts_with(&inner.receive_dir)) {
         tracing::info!("host clip: all clipboard files are own-received, skipping echo");
         return true;
+    }
+    // Same files as the last thing we offered, seconds ago: Explorer
+    // re-announcing one copy, not a fresh one. Skip it so the viewer does
+    // not get it twice for a single Ctrl+C.
+    const REOFFER_WINDOW_MS: u64 = 5_000;
+    if let Ok(mut last) = inner.last_offered.lock() {
+        let now = now_ms();
+        if last.0 == paths && now.saturating_sub(last.1) < REOFFER_WINDOW_MS {
+            tracing::info!(
+                count = paths.len(),
+                "host clip: same files offered moments ago, not sending again"
+            );
+            return true;
+        }
+        last.0 = paths.clone();
+        last.1 = now;
     }
     let files = with_file_rights(|| xfer::offer(&paths)).unwrap_or_default();
     if files.is_empty() {

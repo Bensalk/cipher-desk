@@ -16,6 +16,9 @@ Download any version from the [Releases page](https://github.com/Bensalk/cipher-
 - **Host logs keep working if a log file is deleted or moved** while the service runs. A new file is started within a few seconds.
 - **A Windows pop-up (above the tray icon) when someone connects or disconnects**, the same way AnyDesk notifies you — so you don't have to glance at the icon to know.
 
+### Fixed
+- **Copying the same file twice in quick succession on the host sent it to the viewer twice.** Windows can announce one Ctrl+C as two separate clipboard changes; the host now recognises that and sends it once.
+
 ## v0.3.26 (15 Nov 2026)
 
 ### Changed
