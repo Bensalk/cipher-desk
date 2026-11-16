@@ -247,6 +247,7 @@ fn start(
 /// Shows the Windows popup "allow this connection?" on the screen of this
 /// session. `true` only for Yes; No, closing it, or no answer within
 /// [`rdpv_host::APPROVAL_TIMEOUT`] refuse.
+fn ask_person_at_computer(who: &str) -> bool {
     let seconds = rdpv_host::APPROVAL_TIMEOUT.as_secs();
     show_question(
         &format!(
