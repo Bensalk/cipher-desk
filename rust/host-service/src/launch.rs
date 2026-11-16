@@ -187,6 +187,16 @@ unsafe fn start_as(
         ..Default::default()
     };
     let mut pi = PROCESS_INFORMATION::default();
+    // Start in the service's own data folder, never the system folder the
+    // service itself runs in, so nothing relative can land in System32.
+    let cwd: Vec<u16> = crate::config::data_dir()
+        .map(|d| d.as_os_str().encode_wide().chain([0]).collect())
+        .unwrap_or_default();
+    let cwd_ptr = if cwd.is_empty() {
+        PCWSTR::null()
+    } else {
+        PCWSTR(cwd.as_ptr())
+    };
     // SAFETY: the caller guarantees `token` and `env`; the string buffers
     // and `si` outlive the call.
     unsafe {
@@ -199,12 +209,12 @@ unsafe fn start_as(
             false,
             CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT,
             env,
-            PCWSTR::null(),
+            cwd_ptr,
             &si,
             &mut pi,
         )?;
     }
-    let _ = (&app, &cmd, &desktop, &si);
+    let _ = (&app, &cmd, &desktop, &si, &cwd);
     Ok(Worker {
         process: pi.hProcess,
         thread: pi.hThread,

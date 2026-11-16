@@ -51,9 +51,10 @@ pub fn local_time() -> String {
 
 /// The connecting device's name as the network knows it (reverse DNS:
 /// the Tailscale device name, or the name your router gave it), or `None`.
-/// This name comes from the network, not from the connecting computer, so a
-/// stranger cannot simply type in one of your device names; outside your own
-/// networks there is usually no name at all. Gives up after 3 seconds.
+/// Inside your own Tailscale network the names are the ones your account
+/// gives your devices. From the internet the name is set by whoever owns
+/// that address, so it can be anything: treat it as a hint, not proof.
+/// Gives up after 3 seconds.
 pub fn device_name(ip: &str) -> Option<String> {
     let ip: std::net::IpAddr = ip.parse().ok()?;
     let (tx, rx) = std::sync::mpsc::channel();

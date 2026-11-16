@@ -146,14 +146,23 @@ pub fn read_range(path: &Path, position: u64, len: u64) -> Option<Vec<u8>> {
 
 /// Turns a name received from the other side into a safe base file name, or
 /// `None` if it is unusable. Strips any directory part (both `/` and `\`),
-/// rejects `.`/`..`, empty names, Windows device names, and control characters.
+/// rejects `.`/`..`, empty names, Windows device names, control characters,
+/// characters Windows does not allow in names (a `:` would make `C:name` a
+/// path on drive C:, outside the folder the file belongs in), names ending in
+/// a dot or space, and names longer than 255 characters.
 pub fn safe_file_name(raw: &str) -> Option<String> {
     // Keep only the last path component, however it was separated.
     let base = raw.rsplit(['/', '\\']).next().unwrap_or(raw).trim();
     if base.is_empty() || base == "." || base == ".." {
         return None;
     }
-    if base.chars().any(|c| c.is_control()) {
+    if base
+        .chars()
+        .any(|c| c.is_control() || matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*'))
+    {
+        return None;
+    }
+    if base.ends_with(['.', ' ']) || base.chars().count() > 255 {
         return None;
     }
     // Reserved Windows device names (CON, NUL, COM1, …) are unsafe to create.
@@ -161,6 +170,14 @@ pub fn safe_file_name(raw: &str) -> Option<String> {
         return None;
     }
     Some(base.to_owned())
+}
+
+/// True when `path` is `dir` followed only by plain names (no drive, root,
+/// `..` or `.` parts).
+fn stays_inside(dir: &Path, path: &Path) -> bool {
+    use std::path::Component;
+    path.strip_prefix(dir)
+        .is_ok_and(|rest| rest.components().all(|c| matches!(c, Component::Normal(_))))
 }
 
 /// A path under `dir` for `name` that does not clash with an existing file:
@@ -283,6 +300,12 @@ impl Receiver {
             for c in &safe[1..] {
                 dest.push(c);
             }
+            // Belt and braces: whatever the names were, the result must be a
+            // plain path inside `dir`.
+            if !stays_inside(dir, &dest) {
+                dests.push(None);
+                continue;
+            }
             if item.is_dir {
                 let _ = std::fs::create_dir_all(&dest);
             } else {
@@ -331,7 +354,16 @@ impl Receiver {
         if finished {
             if let Some(cur) = self.current.take() {
                 drop(cur.file);
-                if std::fs::rename(&cur.part, &cur.dest).is_err() {
+                // Never replace a file that is already there.
+                let dest = if cur.dest.exists() {
+                    match (cur.dest.parent(), cur.dest.file_name()) {
+                        (Some(parent), Some(name)) => unique_path(parent, &name.to_string_lossy()),
+                        _ => cur.dest.clone(),
+                    }
+                } else {
+                    cur.dest.clone()
+                };
+                if dest.exists() || std::fs::rename(&cur.part, &dest).is_err() {
                     let _ = std::fs::remove_file(&cur.part);
                 }
             }
@@ -703,6 +735,22 @@ mod tests {
         assert_eq!(safe_file_name("   "), None);
         assert_eq!(safe_file_name("CON"), None);
         assert_eq!(safe_file_name("a\u{0007}b"), None);
+        // A drive letter without a slash would point outside the folder.
+        assert_eq!(safe_file_name("C:evil.dll"), None);
+        assert_eq!(safe_file_name(r"x\C:evil.dll"), None);
+        assert_eq!(safe_file_name("file.txt:stream"), None);
+        assert_eq!(safe_file_name("a?b"), None);
+        assert_eq!(safe_file_name("trailing."), None);
+        assert_eq!(safe_file_name(&"a".repeat(256)), None);
+        assert_eq!(safe_file_name(&"a".repeat(255)).map(|n| n.len()), Some(255));
+    }
+
+    #[test]
+    fn received_paths_stay_inside_the_folder() {
+        let dir = Path::new("received");
+        assert!(stays_inside(dir, &dir.join("a").join("b.txt")));
+        assert!(!stays_inside(dir, &dir.join("..").join("b.txt")));
+        assert!(!stays_inside(dir, Path::new("elsewhere/b.txt")));
     }
 
     #[test]

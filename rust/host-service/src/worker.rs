@@ -49,6 +49,8 @@ pub fn run() -> anyhow::Result<()> {
     // Real screen pixels at any Windows display scale (picture and clicks).
     rdpv_host::win::make_dpi_aware();
     let data_dir = crate::config::data_dir()?;
+    // Never work relative to the system folder the service started in.
+    std::env::set_current_dir(&data_dir).context("enter the service folder")?;
     let password =
         crate::config::load_password()?.context("no sharing password is set for the service")?;
     let (username, port) = crate::config::load_settings();
