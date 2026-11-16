@@ -27,11 +27,15 @@ Only the latest release receives security fixes.
   approves them on first connection. A changed certificate blocks the
   connection before any credentials are sent. The IronRDP option that accepts
   any certificate is never used (checked in CI by `scripts/check-policy.sh`).
-- **Passwords are stored only in the operating system's vault**
-  (Windows Credential Manager, Linux Secret Service, Android Keystore),
-  never in files, logs or error messages. If no vault exists, the password is
-  not saved. Using a saved password needs Windows Hello on Windows, the
-  fingerprint/face/screen-lock prompt on Android, and an unlocked keyring on Linux.
+- **Saved connection passwords are stored only in the operating system's
+  vault** (Windows Credential Manager, Linux Secret Service, Android
+  Keystore), never in files, logs or error messages. If no vault exists, the
+  password is not saved. Using a saved password needs Windows Hello on
+  Windows, the fingerprint/face/screen-lock prompt on Android, and an
+  unlocked keyring on Linux. Setting up or changing Share screen's own
+  sharing password is a separate, short handoff (see R-11 in
+  `docs/THREAT_MODEL.md`): the password briefly sits in a locked-down,
+  short-lived file in your own app folder, not the OS vault.
 - **Logging is capped at `info` in release builds** and the authentication
   library's (`sspi`) logs are always disabled, because at debug level it
   records credential buffers.

@@ -5,7 +5,7 @@
   <br>
 </h1>
 
-<h4 align="center">A secure, open-source remote desktop app for Windows, Linux and Android: screen sharing, Remote Desktop (RDP) and VNC.</h4>
+<h4 align="center">A security-focused, open-source remote desktop app for Windows, Linux and Android: screen sharing, Remote Desktop (RDP) and VNC.</h4>
 
 <p align="center">
   <a href="https://github.com/Bensalk/cipher-desk/releases"><img src="https://img.shields.io/badge/release-v1.0.0-00796B?style=flat-square" alt="Release v1.0.0"></a>
@@ -14,6 +14,7 @@
   <img src="https://img.shields.io/badge/Flutter-stable-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-004D40?style=flat-square" alt="Apache-2.0"></a>
   <a href="https://github.com/Bensalk/cipher-desk/actions"><img src="https://img.shields.io/badge/build-GitHub%20Actions-2D6BFF?style=flat-square" alt="Built on GitHub Actions"></a>
+  <a href="docs/SECURITY_REVIEW.md"><img src="https://img.shields.io/badge/security%20review-self--reviewed%2C%20not%20yet%20independent-E65100?style=flat-square" alt="Self-reviewed, not yet independently reviewed"></a>
 </p>
 
 <p align="center">
@@ -159,7 +160,7 @@ $ flutter run -d linux                       # or: -d windows, or an Android dev
 ## Privacy & Security
 
 - **No accounts, no tracking.** Cipher Desk has no analytics, telemetry or ads, and there is no Cipher Desk server: it talks to your computers directly.
-- **Passwords stay on your device.** Saved passwords live only in the operating system's secure storage. They are never written to the app's files, never exported, and never logged.
+- **Passwords stay on your device.** Saved connection passwords live only in the operating system's secure storage. They are never written to the app's files, never exported, and never logged. Setting up or changing Share screen's own sharing password briefly uses a short-lived handoff file in your own app folder instead, locked to your account and deleted right after use (see `docs/THREAT_MODEL.md`).
 - **Identity checked every time.** Each computer's certificate is pinned after you approve it; a changed certificate blocks the connection.
 - **Clipboard off by default**, and screenshots of the app blocked on Android and Windows by default. While sharing its screen, the Cipher Desk window is always hidden from the viewer.
 - **VNC only where it is safe.** VNC isn't encrypted, so it is used only with addresses on your own network or Tailscale.
