@@ -9,17 +9,38 @@ _Last updated: 16 Nov 2026._
 
 - **Work is now on `main`** — the `connection-methods` branch was merged.
   All releases now dispatch from `main`.
-- **v0.3.29 (16 Nov 2026) — waiting for Bensal's test.** Tray shows who is
-  connected (reverse-DNS name + IP), warns on wrong passwords, Connection
-  history (`connections.log`). Security fix C1 below. v0.3.27/28 confirmed:
-  file copy both ways works, no duplicates.
-- **Hardening to-do before v1.0 (from the 16 Nov 2026 review; keep details
-  out of this public repo):** received-file names (done in v0.3.29); install the
-  service program in an admin-only folder; lock down the service data folder
-  and how its secrets are stored; ask-to-connect off by default and listen only
-  on the Tailscale network; pre-login timeout and per-address lockout; verify
-  both ends of the tray link; restrict who may control the service; stop the
-  service reading the clipboard itself; size cap for received files.
+- **v0.3.30 (16 Nov 2026) — waiting for Bensal's test.** Security
+  hardening + tray changes. Key facts for the next chat:
+  - Service exe is copied to `%ProgramFiles%\Cipher Desk Host\` by
+    `install` (re-runnable = update). `status` reports `NEEDS_UPDATE` (version
+    or location); the Share page shows an **Update** button. Release builds
+    the service with `+crt-static` in `target/service`.
+  - `secure.rs`: protected DACLs — `ProgramData\Cipher Desk` and
+    `host-service` (SY/BA full, BU read), `secrets\` (SY/BA only; password,
+    two-step files), private key locked. Run at service start and before every
+    admin command; migrates old secrets; deletes old `last-result.txt`.
+  - Admin results go to `--result <LOCALAPPDATA>\Cipher Desk\service-result.txt`
+    (validated name/folder); pending password also there.
+  - config.txt keys: `ask` (default off), `networks` (default `tailscale`),
+    `twostep` flag (readable). `set ask=on|off`, `set networks=tailscale|any`.
+  - Limiter: per-IP block (5/10 min → 15 min) + global 20; Tailscale filter in
+    `on_accept`; vendored server: 30 s timeouts on pre-session steps.
+  - Tray: green online, Exit (tray exit code 77 → service hides icon and goes
+    offline until Go online/reboot; Start menu "Cipher Desk - Go online"),
+    wrong-password line in menu + note in next Connected pop-up. Tray log
+    moved to `%LOCALAPPDATA%\Cipher Desk\tray.log`.
+  - Logs: `logfiles.rs` — 1 MB / rotate when first line > 10 days, delete
+    `.old` after 11 days (history too).
+  - Clipboard: on (re)connect, files already sent are not re-sent.
+  - Wrong-password warning: verified working in loopback test (5 SignInFailed
+    events); Bensal's missing pop-up was because he was remote.
+- **Still to do before v1.0 (keep details out of this public repo):** verify
+  both ends of the tray link; stop the service reading the clipboard itself;
+  size cap for received files (Bensal: no cap wanted for now); then the 1.0
+  feature list (always allow this device, 2FA for manual sharing, transfer
+  progress bar, port-in-use message, frb_generated CI check).
+- **v0.3.29 (16 Nov 2026) — tested by Bensal:** who-connected pop-up, amber
+  icon, history, file copy OK.
 - **v0.3.27 (16 Nov 2026) — waiting for Bensal's test.** Fix for host→viewer
   file copy + tray icon:
   - Clean v0.3.26 retest (other remote-access app closed) confirmed the cause: host copy
