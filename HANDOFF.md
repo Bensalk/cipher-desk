@@ -283,6 +283,22 @@ API returns 403 from the cloud session. Use Chrome automation
 4. File transfer progress bar; resume broken copy.
 5. Backlog: auto-adapt host resolution to viewer window.
 
+## UI polish ideas — after v1.0, not urgent
+
+Bensal said "note it down, do it after v1.0 later." No code written yet.
+
+- Share screen: group the flat list of switches/buttons under small headers
+  (Connection / Security / Advanced); add a colored status dot/chip next to
+  port, username, wrong-password count instead of plain text.
+- Viewer: a small persistent "Received files" panel/badge (not just the
+  snackbar, which disappears in seconds) — also where the Android share-sheet
+  button for received files (see "Next features" list) would live. Add a
+  cancel button next to the transfer progress bar.
+- Tray icon: badge/number overlay on the icon itself showing wrong-password
+  count, visible without opening the menu.
+- Connection history: in-app scrollable log viewer (newest first, failed
+  attempts in red) instead of opening the Notepad file.
+
 ## Known issue: version string in Report Problem
 
 `app/lib/ui/session_screen.dart` has `const version = '...'` hardcoded.
