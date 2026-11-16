@@ -17,7 +17,7 @@ with the reporter.
 
 ## Supported versions
 
-Only the latest release receives security fixes until version 1.0.
+Only the latest release receives security fixes.
 
 ## Security design summary
 
@@ -50,6 +50,12 @@ Only the latest release receives security fixes until version 1.0.
   notifications only.
 - Outside access is intended **only through a VPN** (e.g. WireGuard or
   Tailscale). Never expose RDP port 3389 to the internet.
+- **File transfer** (Share screen's copy-paste, Private Remote Desktop's
+  "Send file") reads the file names and data sent by whoever is on the other
+  end of the connection. That data is treated as untrusted: file names are
+  checked against path traversal and reserved names before anything is
+  written to disk, and the binary file list the remote side sends is
+  bounds-checked before it is parsed.
 
 See also `docs/THREAT_MODEL.md` (threats and accepted risks),
 `docs/SECURITY_REVIEW.md` (verification of each requirement) and
