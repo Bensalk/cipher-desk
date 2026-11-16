@@ -14,6 +14,7 @@ should I use?** in the form and answer two questions.
 | **Encryption** | Yes (TLS) | Yes (TLS) | No, so only on your own network or Tailscale |
 | **Identity check** | Certificate fingerprint | Identity code | None (use Tailscale) |
 | **Clipboard** | Yes (if you allow it) | No | No |
+| **File transfer** | One-way, to the remote only; 256 MB, one at a time; Windows hosts only | Both ways, by copy-paste; no size limit | None |
 | **Default port** | 3389 | 3395 | 5900 |
 | **Best for** | Working on your PC privately from anywhere | Helping someone, or when the screen must stay visible | Computers where you can't install Cipher Desk |
 

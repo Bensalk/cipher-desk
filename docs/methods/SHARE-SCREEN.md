@@ -62,6 +62,37 @@ and Cipher Desk on the device you connect from.
 While someone is connected, the computer shows **"Your screen is being shared"**
 with a **Stop** button at the top of Cipher Desk.
 
+## Copying files (both directions)
+
+Copy a file or a whole folder with **Ctrl+C** on either computer, then **Ctrl+V**
+into a folder on the other one. This works in both directions, even with the
+Cipher Desk window minimised, and there is no size limit.
+
+While a file is arriving, a progress bar appears over the session with the file
+name and how much is left; tap the **×** on it to cancel — the part already
+received is deleted, and anything you'd already copied in full before that stays.
+Everything that arrives is also saved automatically to a **Received** folder (open
+it from the session's menu).
+
+## Two-step verification (Google Authenticator)
+
+Adds a second check on top of the Share screen password: even with the right
+password, a new device also needs a 6-digit code from an authenticator app.
+
+**Turning it on (on the computer):** Share screen page → **Two-step verification
+(Google Authenticator)** → approve the one-time Windows administrator prompt →
+scan the QR code with Google Authenticator (or tap **Enter a setup key** and type
+the key shown) → type the 6-digit code the app now shows, to confirm it's working.
+
+**Using it (on the device connecting):** connect as usual with the username and
+password. If the device hasn't entered a correct code in the last 30 days, Cipher
+Desk asks for the 6-digit code from Google Authenticator before letting it in.
+Once entered correctly, that device is remembered for 30 days and isn't asked
+again until then.
+
+Keep the setup key private — anyone who has it, plus the password, can sign in
+without needing the authenticator app at all.
+
 ## Good to know
 
 - **Security:** the connection is encrypted (TLS) and needs the password. After 5
