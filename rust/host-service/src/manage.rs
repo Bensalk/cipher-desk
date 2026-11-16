@@ -10,6 +10,7 @@ use windows_service::service::{
 };
 use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
 
+use crate::result_path::{validate_result_path, RESULT_NAME};
 use crate::service::{DISPLAY_NAME, SERVICE_NAME};
 
 /// Collects `KEY=value` lines, prints them (for a person) and writes them to
@@ -22,23 +23,20 @@ struct Report {
     lines: Vec<String>,
 }
 
-/// File name the app asks results to be written to.
-const RESULT_NAME: &str = "service-result.txt";
-
 /// The `--result` file, if given and safe: named [`RESULT_NAME`], in an
 /// existing folder named "Cipher Desk", neither of them a link.
 fn result_path() -> Option<std::path::PathBuf> {
     let mut args = std::env::args_os().skip_while(|a| a != "--result");
     args.next()?;
     let path = std::path::PathBuf::from(args.next()?);
-    let parent = path.parent()?;
-    let named = path.file_name().is_some_and(|n| n == RESULT_NAME)
-        && parent.file_name().is_some_and(|n| n == "Cipher Desk");
-    if !named || !parent.is_dir() || crate::secure::is_link(parent) || crate::secure::is_link(&path)
-    {
-        return None;
-    }
-    Some(path)
+    let parent = path.parent()?.to_owned();
+    let ok = validate_result_path(
+        &path,
+        parent.is_dir(),
+        || crate::secure::is_link(&path),
+        || crate::secure::is_link(&parent),
+    );
+    ok.then_some(path)
 }
 
 impl Report {
