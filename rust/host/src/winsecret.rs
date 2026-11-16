@@ -87,9 +87,47 @@ pub fn write_pending(path: &std::path::Path, password: &str) -> anyhow::Result<(
 
 /// Reads and decrypts a pending password written by [`write_pending`], then
 /// deletes the file. Returns the plain password for immediate re-storage.
+/// The file is removed whether this succeeds or not — it held a password
+/// (or an attempt at one), so it should never outlive this one read, not
+/// even when decryption itself fails.
 pub fn read_pending(path: &std::path::Path) -> anyhow::Result<String> {
-    let sealed = std::fs::read(path).context("read pending password")?;
-    let plain = machine_unprotect(&sealed)?;
+    let result = (|| -> anyhow::Result<String> {
+        let sealed = std::fs::read(path).context("read pending password")?;
+        let plain = machine_unprotect(&sealed)?;
+        String::from_utf8(plain).context("pending password is not valid text")
+    })();
     let _ = std::fs::remove_file(path);
-    String::from_utf8(plain).context("pending password is not valid text")
+    result
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn round_trips_and_removes_the_file() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("pending-password.bin");
+        write_pending(&path, "a password, not a real one").expect("write");
+        assert!(path.exists());
+
+        let plain = read_pending(&path).expect("read");
+        assert_eq!(plain, "a password, not a real one");
+        assert!(!path.exists(), "the pending file must not outlive a successful read");
+    }
+
+    #[test]
+    fn a_failed_read_still_removes_the_file() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("pending-password.bin");
+        // Not a real sealed blob, so decryption fails — the leftover-cleanup
+        // bug this guards against left exactly this kind of file on disk.
+        std::fs::write(&path, b"not a real sealed blob").expect("write");
+
+        let err = read_pending(&path).expect_err("garbage must not decrypt");
+        assert!(!path.exists(), "a failed read must not leave the file behind");
+        // The error must not echo the file's content back.
+        assert!(!err.to_string().contains("not a real sealed blob"));
+    }
 }
