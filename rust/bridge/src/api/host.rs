@@ -72,7 +72,12 @@ pub fn host_supported() -> bool {
 pub fn host_fingerprint(data_dir: String) -> Option<String> {
     #[cfg(windows)]
     {
-        rdpv_host::fingerprint(std::path::Path::new(&data_dir)).ok()
+        let dir = std::path::Path::new(&data_dir);
+        // The certificate alone is enough (the service keeps its private key
+        // where only administrators can read it); make one only if missing.
+        rdpv_host::cert_fingerprint(dir)
+            .or_else(|_| rdpv_host::fingerprint(dir))
+            .ok()
     }
     #[cfg(not(windows))]
     {
@@ -252,6 +257,8 @@ impl ShareHost {
             require_approval,
             // Two-step verification is set up for always-on sharing only.
             second_factor: None,
+            // Manual sharing: the person chose to start it, on any network.
+            tailnet_only: false,
         };
         match rdpv_host::start(
             config,
@@ -287,7 +294,7 @@ impl ShareHost {
                         E::ViewerDisconnected => HostUpdate::of(HostUpdateKind::ViewerDisconnected),
                         // Already shown as a disconnect; the app page needs no more.
                         E::SignInFailed { .. } => continue,
-                        E::LockedOut { minutes } => HostUpdate {
+                        E::LockedOut { minutes, .. } => HostUpdate {
                             minutes,
                             ..HostUpdate::of(HostUpdateKind::LockedOut)
                         },

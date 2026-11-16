@@ -154,10 +154,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build the Host service (sign-in screen sharing) and add it to the bundle
         run: |
-          $env:RUSTFLAGS = "--remap-path-prefix=$env:USERPROFILE=C:\home --remap-path-prefix=$env:GITHUB_WORKSPACE=C:\src"
+          # Static C runtime: the service is copied on its own to Program Files,
+          # with no runtime DLLs beside it. Own target folder, so the other
+          # builds' cache is not invalidated by the different flags.
+          $env:RUSTFLAGS = "--remap-path-prefix=$env:USERPROFILE=C:\home --remap-path-prefix=$env:GITHUB_WORKSPACE=C:\src -C target-feature=+crt-static"
+          $env:CARGO_TARGET_DIR = "target/service"
           & "$env:ProgramFiles\Git\bin\bash.exe" scripts/ci-run.sh "Host service build" cargo build --release -p cipher-desk-host-service
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Copy-Item target/release/cipher-desk-host-service.exe app/build/windows/x64/runner/Release/ -Force
+          Copy-Item target/service/release/cipher-desk-host-service.exe app/build/windows/x64/runner/Release/ -Force
       - name: No local paths in the binaries
         shell: bash
         run: bash scripts/ci-run.sh "Local paths in Windows files" bash scripts/check-binaries.sh app/build/windows/x64/runner/Release

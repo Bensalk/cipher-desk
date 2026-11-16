@@ -302,8 +302,13 @@ fn now_ms() -> u64 {
 }
 
 /// Sends the files copied here (Explorer) to the viewer, if the clipboard
-/// holds files. Returns whether it did.
-fn offer_copied_files(inner: &Inner) -> bool {
+/// holds files. Returns whether it did (or skipped them on purpose).
+///
+/// `refresh`: called because a viewer (re)connected or asked for the
+/// clipboard, not because something was copied. Files already sent once are
+/// then not sent again: the clipboard simply still holds the last copy, and
+/// sending it would make the viewer receive the same file again.
+fn offer_copied_files(inner: &Inner, refresh: bool) -> bool {
     let from_helper = || {
         let files = COPIED_FILES_SOURCE.get().and_then(|source| source());
         if let Some(f) = &files {
@@ -335,6 +340,13 @@ fn offer_copied_files(inner: &Inner) -> bool {
     const REOFFER_WINDOW_MS: u64 = 5_000;
     if let Ok(mut last) = inner.last_offered.lock() {
         let now = now_ms();
+        if refresh && last.0 == paths {
+            tracing::info!(
+                count = paths.len(),
+                "host clip: same files as already sent; not sending again on reconnect"
+            );
+            return true;
+        }
         if last.0 == paths && now.saturating_sub(last.1) < REOFFER_WINDOW_MS {
             tracing::info!(
                 count = paths.len(),
@@ -456,7 +468,7 @@ fn spawn_poller(inner: Arc<Inner>) -> Poller {
                     // Files copied here go to the viewer; otherwise text (or
                     // nothing). Files already on the clipboard when the viewer
                     // connected are not sent: only a new copy is.
-                    if offer_copied_files(&inner) {
+                    if offer_copied_files(&inner, false) {
                         // User copied files: clear the text cache (new clipboard content).
                         if let Ok(mut cache) = inner.last_text.lock() {
                             *cache = None;
@@ -635,14 +647,14 @@ impl CliprdrBackend for Backend {
         // advertise text. Without this, files copied before the viewer
         // connects are invisible to the viewer (the poller only detects
         // changes, so a pre-existing CF_HDROP is never sent).
-        if !offer_copied_files(&self.inner) {
+        if !offer_copied_files(&self.inner, true) {
             advertise(&self.inner);
         }
     }
 
     fn on_request_format_list(&mut self) {
         // Same logic as on_ready: offer files if present, else advertise text.
-        if !offer_copied_files(&self.inner) {
+        if !offer_copied_files(&self.inner, true) {
             advertise(&self.inner);
         }
     }

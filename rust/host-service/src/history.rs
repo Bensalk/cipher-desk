@@ -1,5 +1,6 @@
 //! A short, readable record of who connected to this computer and when:
-//! `connections.log` beside the service logs. One line per event, local
+//! `connections.log` beside the service logs (entries older than about
+//! three weeks are dropped). One line per event, local
 //! time, the connecting computer's IP address, and which way it came in.
 //! Opened from the tray icon ("Connection history"). Holds no passwords or
 //! user names: only times, addresses and what happened.
@@ -8,23 +9,28 @@
 use std::io::Write as _;
 use std::path::PathBuf;
 
-/// Above this size the file is renamed to `connections.old.log` (replacing
-/// an older one) and a new file is started, so it never grows without end.
-const MAX_BYTES: u64 = 512 * 1024;
-
 pub const FILE_NAME: &str = "connections.log";
 
 pub fn path() -> Option<PathBuf> {
     crate::config::data_dir().ok().map(|d| d.join(FILE_NAME))
 }
 
+/// Makes sure the file exists (the tray opens it as the signed-in person,
+/// who may read but not create it), and drops entries older than about
+/// three weeks (see [`crate::logfiles`]).
+pub fn ensure_exists() {
+    let Some(path) = path() else { return };
+    crate::logfiles::tidy(&path);
+    if !path.exists() {
+        record(&local_time(), "History started", "-", "-");
+    }
+}
+
 /// Appends one line: `<local time>  <what>  <who>  (<door>)`. `time` from
 /// [`local_time`], taken when it happened.
 pub fn record(time: &str, what: &str, who: &str, door: &str) {
     let Some(path) = path() else { return };
-    if std::fs::metadata(&path).is_ok_and(|m| m.len() > MAX_BYTES) {
-        let _ = std::fs::rename(&path, path.with_file_name("connections.old.log"));
-    }
+    crate::logfiles::tidy(&path);
     let line = format!("{time}  {what:<22} {who}  ({door})\r\n");
     let file = std::fs::OpenOptions::new()
         .create(true)

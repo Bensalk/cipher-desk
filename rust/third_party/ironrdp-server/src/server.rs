@@ -30,6 +30,11 @@ use rdpsnd::server::{RdpsndServer, RdpsndServerMessage};
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt as _};
 use tokio::net::TcpSocket;
 use tokio::sync::{Mutex, mpsc, oneshot};
+
+/// Cipher Desk: longest a connection may take for each step before the
+/// session starts (TLS, sign-in, setup). The server takes one connection at a
+/// time, so a silent one must not block everyone else.
+const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(30);
 use tokio::task;
 use tokio_rustls::TlsAcceptor;
 use tracing::{debug, error, trace, warn};
@@ -839,8 +844,11 @@ impl RdpServer {
 
         self.attach_channels(&mut acceptor);
 
-        let res = ironrdp_acceptor::accept_begin(framed, &mut acceptor)
+        // Cipher Desk: a connection that stops talking before signing in must
+        // not hold the (single) listener: every pre-session step has a time limit.
+        let res = tokio::time::timeout(HANDSHAKE_TIMEOUT, ironrdp_acceptor::accept_begin(framed, &mut acceptor))
             .await
+            .context("handshake timed out")?
             .context("accept_begin failed")?;
 
         match res {
@@ -853,7 +861,10 @@ impl RdpServer {
                         RdpServerSecurity::Hybrid((acceptor, _)) => acceptor,
                         RdpServerSecurity::None => unreachable!(),
                     };
-                    let accept = match tls_acceptor.accept(stream).await {
+                    let accept = match tokio::time::timeout(HANDSHAKE_TIMEOUT, tls_acceptor.accept(stream))
+                        .await
+                        .context("TLS handshake timed out")?
+                    {
                         Ok(accept) => accept,
                         Err(e) => {
                             warn!("Failed to TLS accept: {}", e);
@@ -902,15 +913,19 @@ impl RdpServer {
             // uses this value in practice.
             let client_name = "rdp-client".to_owned();
 
-            ironrdp_acceptor::accept_credssp(
-                &mut framed,
-                &mut acceptor,
-                &mut NoNetwork,
-                client_name.into(),
-                pub_key.clone(),
-                None,
+            tokio::time::timeout(
+                HANDSHAKE_TIMEOUT,
+                ironrdp_acceptor::accept_credssp(
+                    &mut framed,
+                    &mut acceptor,
+                    &mut NoNetwork,
+                    client_name.into(),
+                    pub_key.clone(),
+                    None,
+                ),
             )
-            .await?;
+            .await
+            .context("sign-in timed out")??;
         }
 
         let framed = self.accept_finalize(framed, acceptor).await?;
@@ -999,7 +1014,9 @@ impl RdpServer {
                         let duration = started.elapsed();
 
                         if let Err(ref error) = result {
-                            error!(?error, "Connection error");
+                            // Cipher Desk: one line; probes and dropped
+                            // connections are common and not errors of ours.
+                            warn!(error = %format!("{error:#}"), "Connection ended");
                         }
 
                         self.static_channels = StaticChannelSet::new();
@@ -1800,9 +1817,13 @@ impl RdpServer {
         S: AsyncRead + AsyncWrite + Sync + Send + Unpin,
     {
         loop {
-            let (new_framed, result) = ironrdp_acceptor::accept_finalize(framed, &mut acceptor)
-                .await
-                .context("failed to accept client during finalize")?;
+            let (new_framed, result) = tokio::time::timeout(
+                HANDSHAKE_TIMEOUT,
+                ironrdp_acceptor::accept_finalize(framed, &mut acceptor),
+            )
+            .await
+            .context("connection setup timed out")?
+            .context("failed to accept client during finalize")?;
 
             let (mut reader, mut writer) = split_tokio_framed(new_framed);
 

@@ -2,6 +2,28 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.30 (16 Nov 2026)
+
+### Security
+- **The background service is better protected on the shared computer.** Its program now runs from the Program Files folder, which only administrators can change. Its folder can be read but not changed by other people on that computer, and the sharing password, the two-step key and the certificate's private key are kept where only Windows and administrators can open them. The sharing password is no longer left in a result file. After installing this version, open Cipher Desk on the shared computer, go to **Share screen** and press **Update** once (administrator approval).
+- **Only connections over Tailscale are accepted by default** (and from the computer itself). Turn "Only over Tailscale" off on the Share screen page to allow other networks.
+- **"Ask to connect" is now off by default**, because it lets anyone who reaches the computer ask without a password. Turn it on from the Share screen page when you need it.
+- **A connection that stops responding before signing in is closed after 30 seconds**, so it cannot keep others from connecting.
+- **Only administrators can start, stop or send commands to the service.**
+
+### Changed
+- **Wrong passwords now block only the device that typed them.** After 5 wrong passwords in 10 minutes that device waits 15 minutes; your other devices can still connect, and a successful sign-in forgets earlier typos. If wrong passwords come from many devices at once (20 in 10 minutes), everyone waits 15 minutes.
+- **The tray icon is green when online** (amber when someone is connected, grey when offline).
+- **Logs stay small:** each log is limited to about 1 MB, and entries older than about three weeks are removed, including in the connection history. The tray icon's own log is now in your user folder (`%LOCALAPPDATA%\Cipher Desk\tray.log`).
+
+### Added
+- **Exit in the tray menu:** turns sharing off and removes the icon. Turn it back on with **Cipher Desk - Go online** in the Start menu, or restart the computer.
+- **Missed wrong passwords are shown:** the tray menu lists wrong password attempts, and the next "Connected" pop-up mentions any made while you were away.
+- **Ask to connect** and **Only over Tailscale** switches on the Share screen page.
+
+### Fixed
+- **A file copied before reconnecting arrived again on the viewer.** After reconnecting, files already sent are not sent again; copy them again if you want another copy.
+
 ## v0.3.29 (16 Nov 2026)
 
 ### Security

@@ -12,6 +12,9 @@ class HostServiceStatus {
     this.port,
     this.fingerprint,
     this.twoStep = false,
+    this.ask = false,
+    this.tailscaleOnly = true,
+    this.needsUpdate = false,
   });
 
   final bool installed;
@@ -22,6 +25,16 @@ class HostServiceStatus {
 
   /// Two-step verification (authenticator app) is on.
   final bool twoStep;
+
+  /// "Ask to connect" (no password; the person at this PC allows it) is on.
+  final bool ask;
+
+  /// Connections are accepted only over Tailscale.
+  final bool tailscaleOnly;
+
+  /// The installed service is older than this app (or in an unsafe place):
+  /// offer to update it.
+  final bool needsUpdate;
 
   static const none = HostServiceStatus(installed: false, running: false);
 }
@@ -35,8 +48,8 @@ class ElevationCancelled implements Exception {}
 ///
 /// The service runs as the system account and needs a one-time Windows admin
 /// prompt to install or remove. Its install/remove output is read from a small
-/// result file, because a program started through the admin prompt can't hand
-/// its output back directly.
+/// result file in this person's own app folder, because a program started
+/// through the admin prompt can't hand its output back directly.
 class HostService {
   static bool get supported => Platform.isWindows;
 
@@ -54,6 +67,18 @@ class HostService {
     return '$base\\Cipher Desk\\host-service';
   }
 
+  /// This person's own Cipher Desk folder (results and the pending password
+  /// go here, never to the shared service folder).
+  static String get _ownDir {
+    final base = Platform.environment['LOCALAPPDATA'] ??
+        '${Platform.environment['USERPROFILE'] ?? r'C:\Users\Public'}\\AppData\\Local';
+    final dir = Directory('$base\\Cipher Desk');
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+    return dir.path;
+  }
+
+  static String get _resultPath => '$_ownDir\\service-result.txt';
+
   static Map<String, String> _parse(String text) {
     final map = <String, String>{};
     for (final line in const LineSplitter().convert(text)) {
@@ -65,7 +90,7 @@ class HostService {
 
   /// Reads (and then deletes) the result file written by the last command.
   static Future<Map<String, String>> _readResult() async {
-    final file = File('$dataDir\\last-result.txt');
+    final file = File(_resultPath);
     if (!await file.exists()) return {};
     try {
       final map = _parse(await file.readAsString());
@@ -85,6 +110,9 @@ class HostService {
       port: int.tryParse(m['PORT'] ?? ''),
       fingerprint: m['FINGERPRINT'],
       twoStep: m['TWOSTEP'] == '1',
+      ask: m['ASK'] == '1',
+      tailscaleOnly: m['TAILSCALE_ONLY'] != '0',
+      needsUpdate: m['NEEDS_UPDATE'] == '1',
     );
   }
 
@@ -118,13 +146,16 @@ class HostService {
     if (exe == null) throw ElevationCancelled();
     // Clear any leftover result so we only read this run's output.
     try {
-      final old = File('$dataDir\\last-result.txt');
+      final old = File(_resultPath);
       if (await old.exists()) await old.delete();
     } on FileSystemException {
       // ignore
     }
+    // Single quotes inside a PowerShell '...' string are doubled.
+    String q(String v) => v.replaceAll("'", "''");
+    final args = '$command --result "$_resultPath"';
     final ps =
-        "Start-Process -FilePath '$exe' -ArgumentList '$command' -Verb RunAs -Wait -WindowStyle Hidden";
+        "Start-Process -FilePath '${q(exe)}' -ArgumentList '${q(args)}' -Verb RunAs -Wait -WindowStyle Hidden";
     try {
       final r = await Process.run('powershell', ['-NoProfile', '-Command', ps]);
       if (r.exitCode != 0) throw ElevationCancelled();
@@ -139,6 +170,26 @@ class HostService {
     await _elevated('install');
     final m = await _readResult();
     return (_statusFrom(m), m['PASSWORD']);
+  }
+
+  /// Updates the installed service to this app's version (same admin
+  /// prompt as installing). Returns the new state.
+  static Future<HostServiceStatus> update() async {
+    await _elevated('install');
+    return _statusFrom(await _readResult());
+  }
+
+  /// Turns "Ask to connect" on or off (restarts sharing).
+  static Future<void> setAsk(bool on) async {
+    await _elevated('set ask=${on ? 'on' : 'off'}');
+    await _readResult();
+  }
+
+  /// Accept connections only over Tailscale, or from any network
+  /// (restarts sharing).
+  static Future<void> setTailscaleOnly(bool on) async {
+    await _elevated('set networks=${on ? 'tailscale' : 'any'}');
+    await _readResult();
   }
 
   /// Stops and removes the service.
@@ -190,7 +241,7 @@ class HostService {
   /// imports and stores it. Returns true on success.
   static Future<bool> setOwnPassword(String password) async {
     if (!supported) return false;
-    final pending = '$dataDir\\pending-password.bin';
+    final pending = '$_ownDir\\pending-password.bin';
     if (!hostServiceStashPassword(pendingPath: pending, password: password)) {
       return false;
     }

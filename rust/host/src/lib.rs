@@ -67,7 +67,8 @@ pub enum HostEvent {
     /// The viewer left (or the connection ended).
     ViewerDisconnected,
     /// Too many wrong passwords: new connections are refused for a while.
-    LockedOut { minutes: u64 },
+    /// `address`: the device that is refused, or "all devices".
+    LockedOut { minutes: u64, address: String },
     /// A viewer has signed in and is waiting for the person at this computer to
     /// allow or refuse it (only when "ask before each connection" is on).
     /// Answer with [`HostHandle::approve`].
@@ -92,6 +93,9 @@ pub struct HostConfig {
     /// Two-step verification: when set, a viewer that passed the password
     /// also needs a remembered device or a correct authenticator code.
     pub second_factor: Option<Arc<totp::Gate>>,
+    /// Accept connections only from the Tailscale network (and this computer
+    /// itself); anything else is closed before sign-in.
+    pub tailnet_only: bool,
 }
 
 /// How long to wait for the person at the computer to allow a viewer before
@@ -208,6 +212,13 @@ pub fn fingerprint(data_dir: &std::path::Path) -> anyhow::Result<String> {
     Ok(identity::load_or_create(data_dir)?.fingerprint())
 }
 
+/// The Host certificate's fingerprint without reading the private key (for
+/// someone who may read the certificate but not the key). Errors if the
+/// certificate has not been made yet.
+pub fn cert_fingerprint(data_dir: &std::path::Path) -> anyhow::Result<String> {
+    identity::cert_fingerprint(data_dir)
+}
+
 /// Starts sharing: listens on all network interfaces (the firewall decides who
 /// can reach it; the app tells users to use it on their own network or a VPN).
 pub fn start<S, I>(
@@ -268,7 +279,7 @@ where
     let username = config.username.trim().to_owned();
     let password = config.password;
     let second_factor = config.second_factor;
-    let limiter = limiter::Limiter::new(events.clone(), peer);
+    let limiter = limiter::Limiter::new(events.clone(), peer, config.tailnet_only);
 
     // Text + file clipboard bridge (Windows only). Files the viewer sends land
     // in a "Received" folder beside the app's data; `clip` lets the app offer

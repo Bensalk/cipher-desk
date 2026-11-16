@@ -14,7 +14,7 @@ use windows_service::service_control_handler::{self, ServiceControlHandlerResult
 use windows_service::{define_windows_service, service_dispatcher};
 
 use crate::launch::{active_session, spawn_tray, spawn_worker, Worker};
-use crate::link::{EXIT_OFFLINE, EXIT_RESTART};
+use crate::link::{EXIT_OFFLINE, EXIT_QUIT, EXIT_RESTART};
 
 pub const SERVICE_NAME: &str = "CipherDeskHost";
 pub const DISPLAY_NAME: &str = "Cipher Desk Host (screen sharing)";
@@ -38,12 +38,25 @@ fn service_main(_args: Vec<OsString>) {
 }
 
 fn run_service() -> anyhow::Result<()> {
+    // Lock the service folder (and move secrets from older versions into
+    // the locked part) before anything reads them.
+    match crate::config::data_dir().and_then(|d| crate::secure::lock_down(&d)) {
+        Ok(()) => {
+            if let Ok(d) = crate::config::data_dir() {
+                let _ = std::fs::write(d.join("version.txt"), env!("CARGO_PKG_VERSION"));
+            }
+        }
+        Err(e) => tracing::error!(error = %format!("{e:#}"), "could not lock the service folder"),
+    }
     let running = Arc::new(AtomicBool::new(true));
     let stop_flag = Arc::clone(&running);
     // "Go offline" from the tray: kept only in memory, so a restart of the
     // computer (or the service) brings sharing back on.
     let offline = Arc::new(AtomicBool::new(false));
     let online_flag = Arc::clone(&offline);
+    // "Exit" from the tray: also no icon. Same rules as "Go offline".
+    let hidden = Arc::new(AtomicBool::new(false));
+    let shown_flag = Arc::clone(&hidden);
 
     let handler = move |control| match control {
         ServiceControl::Stop | ServiceControl::Shutdown => {
@@ -53,6 +66,7 @@ fn run_service() -> anyhow::Result<()> {
         ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
         ServiceControl::UserEvent(code) if code.to_raw() == GO_ONLINE_CONTROL => {
             online_flag.store(false, Ordering::SeqCst);
+            shown_flag.store(false, Ordering::SeqCst);
             tracing::info!("sharing turned back on (Go online)");
             ServiceControlHandlerResult::NoError
         }
@@ -77,14 +91,15 @@ fn run_service() -> anyhow::Result<()> {
         ServiceState::Running,
         ServiceControlAccept::STOP | ServiceControlAccept::SHUTDOWN,
     );
-    supervise(&running, &offline);
+    supervise(&running, &offline, &hidden);
     set_state(ServiceState::Stopped, ServiceControlAccept::empty());
     Ok(())
 }
 
 /// Keeps a worker (sharing) and a tray icon running in the session on the
-/// monitor until asked to stop. While `offline`, there is no worker.
-fn supervise(running: &AtomicBool, offline: &AtomicBool) {
+/// monitor until asked to stop. While `offline`, there is no worker; while
+/// `hidden`, no tray icon either.
+fn supervise(running: &AtomicBool, offline: &AtomicBool, hidden: &AtomicBool) {
     let exe = match std::env::current_exe() {
         Ok(p) => p,
         Err(e) => {
@@ -109,6 +124,13 @@ fn supervise(running: &AtomicBool, offline: &AtomicBool) {
                 code => tracing::warn!(?code, "the sharing worker ended"),
             }
         }
+        if tray.ended() == Some(Some(EXIT_QUIT)) {
+            offline.store(true, Ordering::SeqCst);
+            hidden.store(true, Ordering::SeqCst);
+            tracing::info!(
+                "Exit chosen from the tray icon: sharing and icon off until Go online or a restart"
+            );
+        }
         let active = active_session();
         let sharing = if offline.load(Ordering::SeqCst) {
             None
@@ -116,7 +138,12 @@ fn supervise(running: &AtomicBool, offline: &AtomicBool) {
             active
         };
         worker.keep(sharing, |s| spawn_worker(&exe, s));
-        tray.keep(active, |s| spawn_tray(&exe, s));
+        let icon = if hidden.load(Ordering::SeqCst) {
+            None
+        } else {
+            active
+        };
+        tray.keep(icon, |s| spawn_tray(&exe, s));
 
         std::thread::sleep(Duration::from_secs(1));
     }

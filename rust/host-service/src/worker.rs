@@ -5,9 +5,12 @@
 //!
 //! - on the sharing port with the sharing password: the viewer gets straight
 //!   in (unattended access to your own computers);
-//! - on the next port ([`rdpv_host::request_port`]) with the public
-//!   "ask to connect" sign-in: a popup asks the person at this computer to
-//!   allow or refuse, refused after 30 seconds without an answer.
+//! - only if turned on (off by default): on the next port
+//!   ([`rdpv_host::request_port`]) with the public "ask to connect" sign-in:
+//!   a popup asks the person at this computer to allow or refuse, refused
+//!   after 30 seconds without an answer.
+//!
+//! Unless turned off, both accept connections only over Tailscale.
 //!
 //! Started by the service with [`crate::launch::spawn_worker`]; it runs until
 //! the service ends it (on stop or when the session changes).
@@ -53,7 +56,9 @@ pub fn run() -> anyhow::Result<()> {
     std::env::set_current_dir(&data_dir).context("enter the service folder")?;
     let password =
         crate::config::load_password()?.context("no sharing password is set for the service")?;
-    let (username, port) = crate::config::load_settings();
+    let settings = crate::config::load_settings();
+    let (username, port) = (settings.username.clone(), settings.port);
+    crate::history::ensure_exists();
 
     // The tray icon (running as the signed-in person) reads the files copied
     // here for us, and copied files are opened with that person's rights.
@@ -80,30 +85,41 @@ pub fn run() -> anyhow::Result<()> {
                 Box::new(crate::config::load_twostep),
                 crate::config::twostep_devices_file()?,
             ))),
+            tailnet_only: settings.tailnet_only,
         },
         &tx,
     )
     .context("start sharing")?;
-    // If the "ask" port can't be used, password access still works.
-    let ask_host = match start(
-        Door::Ask,
-        HostConfig {
-            port: rdpv_host::request_port(port),
-            username: rdpv_host::REQUEST_USERNAME.to_owned(),
-            password: SecretString::new(rdpv_host::REQUEST_PASSWORD.to_owned()),
-            data_dir,
-            require_approval: true,
-            // The person at the computer decides; no code is asked here.
-            second_factor: None,
-        },
-        &tx,
-    ) {
-        Ok(h) => Some(h),
-        Err(e) => {
-            tracing::warn!(error = %format!("{e:#}"), "ask-to-connect is off");
-            None
+    // Only when turned on. If the "ask" port can't be used, password access
+    // still works.
+    let ask_host = if !settings.ask {
+        tracing::info!("ask-to-connect is off (turn it on in Cipher Desk's Share screen page)");
+        None
+    } else {
+        match start(
+            Door::Ask,
+            HostConfig {
+                port: rdpv_host::request_port(port),
+                username: rdpv_host::REQUEST_USERNAME.to_owned(),
+                password: SecretString::new(rdpv_host::REQUEST_PASSWORD.to_owned()),
+                data_dir,
+                require_approval: true,
+                // The person at the computer decides; no code is asked here.
+                second_factor: None,
+                tailnet_only: settings.tailnet_only,
+            },
+            &tx,
+        ) {
+            Ok(h) => Some(h),
+            Err(e) => {
+                tracing::warn!(error = %format!("{e:#}"), "ask-to-connect is off");
+                None
+            }
         }
     };
+    if !settings.tailnet_only {
+        tracing::warn!("accepting connections from any network (Tailscale only is off)");
+    }
 
     // Stay alive, logging what happens, until the service ends this process.
     loop {
@@ -160,11 +176,12 @@ pub fn run() -> anyhow::Result<()> {
             Ok((door, HostEvent::FileReceived { .. })) => {
                 tracing::info!(?door, "file received from viewer");
             }
-            Ok((door, HostEvent::LockedOut { minutes })) => {
-                tracing::warn!(?door, minutes, "locked out");
+            Ok((door, HostEvent::LockedOut { minutes, address })) => {
+                tracing::warn!(?door, minutes, %address, "blocked after too many wrong passwords");
                 let time = crate::history::local_time();
                 let what = format!("BLOCKED {minutes} MIN");
-                crate::history::record(&time, &what, "too many wrong passwords", door.label());
+                let who = format!("{address} (too many wrong passwords)");
+                crate::history::record(&time, &what, &who, door.label());
             }
             Ok((Door::Password, HostEvent::Failed { message })) => {
                 tracing::error!(%message, "service host failed");

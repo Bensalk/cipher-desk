@@ -99,6 +99,7 @@ fn start_gated<S: rdpv_host::FrameSource + Send + 'static>(
             data_dir: dir.path().to_path_buf(),
             require_approval,
             second_factor,
+            tailnet_only: false,
         },
         "127.0.0.1".parse().expect("ip"),
         source,
@@ -235,15 +236,23 @@ fn wrong_passwords_lock_the_host_for_a_while() {
         }
     }
     let deadline = Instant::now() + Duration::from_secs(5);
+    let mut warned = 0;
     loop {
         match r.events.recv_timeout(Duration::from_millis(200)) {
-            Ok(HostEvent::LockedOut { minutes }) => {
+            Ok(HostEvent::SignInFailed { address }) => {
+                // The person at the Host is told who tried.
+                assert_eq!(address, "127.0.0.1");
+                warned += 1;
+            }
+            Ok(HostEvent::LockedOut { minutes, address }) => {
                 assert_eq!(minutes, 15);
+                assert_eq!(address, "127.0.0.1");
                 break;
             }
             _ => assert!(Instant::now() < deadline, "no lockout event"),
         }
     }
+    assert_eq!(warned, 5, "each wrong password is reported");
     // Even the right password is refused while locked.
     assert!(connect(params(r.port, &r.password, pin)).is_err());
 }

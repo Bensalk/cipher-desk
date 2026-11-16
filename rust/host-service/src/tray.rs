@@ -1,11 +1,13 @@
 //! The Cipher Desk icon next to the clock on this computer (the one being
 //! shared). It runs as the person signed in, started by the service.
 //!
-//! - Teal: online, waiting for a connection. Amber: someone is connected.
+//! - Green: online, waiting for a connection. Amber: someone is connected.
 //!   Grey: offline (sharing is off, or starting).
-//! - Right-click (or click) menu: "Disconnect viewer", "Go offline", and
+//! - Right-click (or click) menu: "Disconnect viewer", "Go offline",
 //!   "Go online…" (asks for an administrator's OK, since it opens this
-//!   computer to connections again).
+//!   computer to connections again), "Exit" (sharing off and the icon
+//!   gone until "Go online" from the Start menu, or a restart), and wrong
+//!   passwords tried since sharing started.
 //!
 //! Its second job: because it runs as the signed-in person, it can read the
 //! files that person copies in Explorer, which Windows hides from the
@@ -51,13 +53,17 @@ const CMD_DISCONNECT: usize = 10;
 const CMD_OFFLINE: usize = 11;
 const CMD_ONLINE: usize = 12;
 const CMD_HISTORY: usize = 13;
+const CMD_EXIT: usize = 14;
+
+/// "Exit" was chosen: end with [`crate::link::EXIT_QUIT`].
+static EXITING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Announce a new connection once its device name is known, or after this
 /// long without one.
 const NAME_WAIT: Duration = Duration::from_secs(4);
 
-/// Teal, amber and grey (the app's colours).
-const TEAL: (u8, u8, u8) = (0x00, 0x89, 0x7B);
+/// Green (easy to spot), amber and grey.
+const GREEN: (u8, u8, u8) = (0x2E, 0x7D, 0x32);
 const AMBER: (u8, u8, u8) = (0xFF, 0xB3, 0x00);
 const GREY: (u8, u8, u8) = (0x9E, 0x9E, 0x9E);
 
@@ -82,6 +88,11 @@ struct Tray {
     /// Wrong sign-ins already shown (`None` until the first report from the
     /// worker, so old ones are not shown again after the tray restarts).
     failures_seen: Option<u64>,
+    /// Wrong sign-ins since sharing started, and who made the last one.
+    failures: u64,
+    last_failure: Option<String>,
+    /// Wrong sign-ins already mentioned in a "Connected" pop-up.
+    failures_told: u64,
 }
 
 /// A message popped up above the icon.
@@ -148,7 +159,7 @@ pub fn run() -> anyhow::Result<()> {
         let size = GetSystemMetrics(SM_CXSMICON).max(16);
         let icons = [
             make_icon(size, GREY),
-            make_icon(size, TEAL),
+            make_icon(size, GREEN),
             make_icon(size, AMBER),
         ];
         TRAY.with(|t| {
@@ -163,6 +174,9 @@ pub fn run() -> anyhow::Result<()> {
                 connected_at: None,
                 announced: false,
                 failures_seen: None,
+                failures: 0,
+                last_failure: None,
+                failures_told: 0,
             });
         });
         poll();
@@ -181,6 +195,10 @@ pub fn run() -> anyhow::Result<()> {
                 }
             }
         });
+    }
+    if EXITING.load(Ordering::SeqCst) {
+        // Tells the service "Exit was chosen": no icon until Go online.
+        std::process::exit(i32::try_from(crate::link::EXIT_QUIT).unwrap_or(77));
     }
     Ok(())
 }
@@ -247,6 +265,8 @@ fn poll() {
                 _ => {}
             }
             tray.failures_seen = Some(r.failures);
+            tray.failures = r.failures;
+            tray.last_failure.clone_from(&r.last_failure);
         }
 
         let previous = tray.status;
@@ -264,9 +284,21 @@ fn poll() {
             if named || waited {
                 tray.announced = true;
                 let who = tray.who.as_deref().unwrap_or("an unknown device");
+                // Wrong passwords tried while nobody was watching (for
+                // example while you were away and could not see this PC).
+                let missed = tray.failures.saturating_sub(tray.failures_told);
+                tray.failures_told = tray.failures;
+                let text = if missed > 0 {
+                    let last = tray.last_failure.as_deref().unwrap_or("an unknown device");
+                    format!(
+                        "Connected to this computer: {who}\nNote: {missed} wrong password attempt(s) before this. Last from: {last}"
+                    )
+                } else {
+                    format!("Connected to this computer: {who}")
+                };
                 popup = popup.or(Some(Popup {
-                    text: format!("Connected to this computer: {who}"),
-                    warning: false,
+                    text,
+                    warning: missed > 0,
                 }));
             }
         }
@@ -299,6 +331,7 @@ fn ask_worker(tray: &mut Tray) -> Option<Report> {
                 tray.link = Some(c);
                 // A new worker counts wrong passwords from zero.
                 tray.failures_seen = None;
+                tray.failures_told = 0;
             }
             Err(_) => {
                 tray.retry_at = Instant::now() + RECONNECT;
@@ -374,7 +407,15 @@ fn notify(tray: &Tray, message: NOTIFY_ICON_MESSAGE, popup: Option<Popup>) -> bo
 }
 
 fn show_menu(hwnd: HWND) {
-    let (status, who) = with_tray(|t| (t.status, t.who.clone())).unwrap_or((Status::Offline, None));
+    let (status, who, failures) = with_tray(|t| {
+        let failures = (t.failures > 0).then(|| {
+            let last = t.last_failure.clone().unwrap_or_else(|| "unknown".into());
+            format!("Wrong passwords: {} (last from {last})", t.failures)
+        });
+        (t.status, t.who.clone(), failures)
+    })
+    .unwrap_or((Status::Offline, None, None));
+    let failures_line: Option<Vec<u16>> = failures.map(|f| f.encode_utf16().chain([0]).collect());
     let title: Vec<u16> = status_text(status).encode_utf16().chain([0]).collect();
     let who_line: Option<Vec<u16>> = who.filter(|_| status == Status::Connected).map(|w| {
         format!("Connected: {w}")
@@ -390,6 +431,9 @@ fn show_menu(hwnd: HWND) {
         if let Some(line) = &who_line {
             let _ = AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, PCWSTR(line.as_ptr()));
         }
+        if let Some(line) = &failures_line {
+            let _ = AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, PCWSTR(line.as_ptr()));
+        }
         let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
         match status {
             Status::Connected => {
@@ -403,6 +447,7 @@ fn show_menu(hwnd: HWND) {
                 let _ = AppendMenuW(menu, MF_STRING, CMD_ONLINE, w!("Go online…"));
             }
         }
+        let _ = AppendMenuW(menu, MF_STRING, CMD_EXIT, w!("Exit (sharing off)"));
         let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
         let _ = AppendMenuW(menu, MF_STRING, CMD_HISTORY, w!("Connection history"));
         let mut pt = POINT::default();
@@ -446,6 +491,20 @@ fn command(id: usize) {
             });
         }
         CMD_ONLINE => go_online(),
+        CMD_EXIT => {
+            with_tray(|tray| {
+                if let Some(link) = tray.link.as_mut() {
+                    let _ = link.go_offline();
+                }
+                tray.link = None;
+                notify(tray, NIM_DELETE, None);
+                tray.shown = false;
+            });
+            tracing::info!("tray: exit (sharing off)");
+            EXITING.store(true, Ordering::SeqCst);
+            // SAFETY: ends this thread's message loop.
+            unsafe { windows::Win32::UI::WindowsAndMessaging::PostQuitMessage(0) };
+        }
         CMD_HISTORY => open_history(),
         _ => {}
     }
@@ -457,8 +516,8 @@ fn open_history() {
         return;
     };
     if !path.exists() {
-        let time = crate::history::local_time();
-        crate::history::record(&time, "History started", "-", "-");
+        // The service makes it when sharing starts.
+        return;
     }
     let Some(windir) = std::env::var_os("SystemRoot") else {
         return;

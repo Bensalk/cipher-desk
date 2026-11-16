@@ -51,6 +51,9 @@ use windows::Win32::System::Threading::GetCurrentProcessId;
 pub const EXIT_OFFLINE: u32 = 75;
 /// Worker exit code: "drop the viewer" (the service starts a fresh worker).
 pub const EXIT_RESTART: u32 = 76;
+/// Tray exit code: "Exit" was chosen (the service keeps sharing off and the
+/// icon away until "Go online" or the next restart).
+pub const EXIT_QUIT: u32 = 77;
 
 /// Longest line either side accepts (a guard against garbage).
 const MAX_LINE: u64 = 4 * 1024 * 1024;

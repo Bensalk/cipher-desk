@@ -383,6 +383,32 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
       ));
     } else {
       children.addAll([
+        if (_service.needsUpdate) ...[
+          const SizedBox(height: 8),
+          Card(
+            color: scheme.tertiaryContainer,
+            child: ListTile(
+              leading: const Icon(Icons.system_update_alt),
+              title: const Text('Update the background service'),
+              subtitle: const Text(
+                'This app was updated. Update the background part too, so it gets '
+                'the same fixes. Asks for administrator approval once.',
+              ),
+              trailing: FilledButton(
+                key: const Key('service-update'),
+                onPressed: () => _runService(() async {
+                  final status = await HostService.update();
+                  if (!status.installed) {
+                    _snack('The update did not finish. Please try again.');
+                  } else {
+                    _snack('The background service is up to date.');
+                  }
+                }, 'Not updated (the admin prompt was declined).'),
+                child: const Text('Update'),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
         ListTile(
           contentPadding: EdgeInsets.zero,
@@ -444,6 +470,32 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
               : 'Off — the password is enough.'),
           value: _service.twoStep,
           onChanged: (on) => on ? _setUpTwoStep() : _turnOffTwoStep(),
+        ),
+        SwitchListTile(
+          key: const Key('service-ask'),
+          contentPadding: EdgeInsets.zero,
+          secondary: const Icon(Icons.front_hand_outlined),
+          title: const Text('Ask to connect'),
+          subtitle: Text(_service.ask
+              ? 'On — anyone who reaches this PC can ask without a password; '
+                  'someone here must click Allow.'
+              : 'Off — only the password works. Turn on when someone here will '
+                  'allow you in.'),
+          value: _service.ask,
+          onChanged: (on) => _runService(() => HostService.setAsk(on),
+              'Not changed (the admin prompt was declined).'),
+        ),
+        SwitchListTile(
+          key: const Key('service-tailscale-only'),
+          contentPadding: EdgeInsets.zero,
+          secondary: const Icon(Icons.vpn_lock_outlined),
+          title: const Text('Only over Tailscale (recommended)'),
+          subtitle: Text(_service.tailscaleOnly
+              ? 'On — devices on your own network or the internet are refused.'
+              : 'Off — any network that can reach this PC may try to sign in.'),
+          value: _service.tailscaleOnly,
+          onChanged: (on) => _runService(() => HostService.setTailscaleOnly(on),
+              'Not changed (the admin prompt was declined).'),
         ),
         if (_serviceFingerprint != null)
           ListTile(

@@ -60,6 +60,15 @@ pub fn load_or_create(dir: &Path) -> anyhow::Result<Identity> {
     load(&cert_path, &key_path)
 }
 
+/// The fingerprint of the certificate saved in `dir`, reading only the
+/// certificate (not the private key, which may be locked away from the
+/// person asking). Errors if there is none yet.
+pub fn cert_fingerprint(dir: &Path) -> anyhow::Result<String> {
+    let cert =
+        CertificateDer::from_pem_file(dir.join(CERT_FILE)).context("reading the certificate")?;
+    Ok(rdpv_core::pins::fingerprint(&cert))
+}
+
 /// Makes a new certificate (the fingerprint changes; viewers must check it again).
 pub fn recreate(dir: &Path) -> anyhow::Result<Identity> {
     let (cert_path, key_path) = paths(dir);
