@@ -9,7 +9,22 @@ _Last updated: 16 Nov 2026._
 
 - **Work is now on `main`** — the `connection-methods` branch was merged.
   All releases now dispatch from `main`.
-- **v0.3.30 (16 Nov 2026) — waiting for Bensal's test.** Security
+- **v0.3.31 (16 Nov 2026) — waiting for Bensal's test.** v0.3.30 tested OK
+  (file copy both ways, Exit, 2FA, Update to Program Files). New: app start
+  runs `go-online --quiet` (service DACL lets IU start + send control 130;
+  needs the Update button once); tray Go online without runas; viewer
+  progress bar (FilesIncoming with label "progress", x = percent); approval
+  events carry the address; service ask door shows device and offers
+  "always allow" for Tailscale IPs (`secrets\allowed-devices.txt`, cleared by
+  `set ask=off`); in-app share: "Always allow this device" checkbox
+  (`allowed-devices.txt` in app data); `last-sent.txt` beside Received keeps
+  already-sent files across worker restarts; `xfer::clear_received` empties
+  Received before each new copy (both sides).
+  - Open: Bensal saw no wrong-password pop-up although worker.log shows the
+    failures were detected (14:19). Ask for `%LOCALAPPDATA%\Cipher Desk\tray.log`.
+  - Note: loopback `a_resolution_change_resizes_the_viewer` is flaky on
+    Windows CI (passes on re-run).
+- **v0.3.30 (16 Nov 2026) — tested by Bensal.** Security
   hardening + tray changes. Key facts for the next chat:
   - Service exe is copied to `%ProgramFiles%\Cipher Desk Host\` by
     `install` (re-runnable = update). `status` reports `NEEDS_UPDATE` (version
