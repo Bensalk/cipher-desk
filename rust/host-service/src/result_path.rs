@@ -99,11 +99,12 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn a_real_symlink_in_place_of_the_folder_is_refused_on_linux() {
-        let base = tempfile::tempdir().expect("temp dir");
+        let base = tempfile::tempdir().unwrap_or_else(|e| panic!("temp dir: {e}"));
         let real_other_dir = base.path().join("somewhere else entirely");
-        std::fs::create_dir(&real_other_dir).expect("create real dir");
+        std::fs::create_dir(&real_other_dir).unwrap_or_else(|e| panic!("create real dir: {e}"));
         let link_dir = base.path().join("Cipher Desk");
-        std::os::unix::fs::symlink(&real_other_dir, &link_dir).expect("create symlink");
+        std::os::unix::fs::symlink(&real_other_dir, &link_dir)
+            .unwrap_or_else(|e| panic!("create symlink: {e}"));
         let path = result_file(&link_dir);
 
         assert!(link_dir.is_symlink());
@@ -118,13 +119,15 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn a_real_symlink_in_place_of_the_file_is_refused_on_linux() {
-        let base = tempfile::tempdir().expect("temp dir");
+        let base = tempfile::tempdir().unwrap_or_else(|e| panic!("temp dir: {e}"));
         let dir = base.path().join("Cipher Desk");
-        std::fs::create_dir(&dir).expect("create dir");
+        std::fs::create_dir(&dir).unwrap_or_else(|e| panic!("create dir: {e}"));
         let real_other_file = base.path().join("somewhere-else.txt");
-        std::fs::write(&real_other_file, b"not the result file").expect("write real file");
+        std::fs::write(&real_other_file, b"not the result file")
+            .unwrap_or_else(|e| panic!("write real file: {e}"));
         let path = result_file(&dir);
-        std::os::unix::fs::symlink(&real_other_file, &path).expect("create symlink");
+        std::os::unix::fs::symlink(&real_other_file, &path)
+            .unwrap_or_else(|e| panic!("create symlink: {e}"));
 
         assert!(path.is_symlink());
         assert!(!validate_result_path(
@@ -146,12 +149,12 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn a_real_symlink_in_place_of_the_folder_is_refused_on_windows() {
-        let base = tempfile::tempdir().expect("temp dir");
+        let base = tempfile::tempdir().unwrap_or_else(|e| panic!("temp dir: {e}"));
         let real_other_dir = base.path().join("somewhere else entirely");
-        std::fs::create_dir(&real_other_dir).expect("create real dir");
+        std::fs::create_dir(&real_other_dir).unwrap_or_else(|e| panic!("create real dir: {e}"));
         let link_dir = base.path().join("Cipher Desk");
         std::os::windows::fs::symlink_dir(&real_other_dir, &link_dir)
-            .expect("create symlink (needs admin or Developer Mode)");
+            .unwrap_or_else(|e| panic!("create symlink (needs admin or Developer Mode): {e}"));
         let path = result_file(&link_dir);
 
         assert!(crate::secure::is_link(&link_dir));
