@@ -130,59 +130,69 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
   Future<String?> _askCustomPassword() async {
     final controller = TextEditingController();
     var obscure = true;
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setLocal) {
-          final pw = controller.text;
-          final weak = pw.length < 10;
-          return AlertDialog(
-            title: const Text('Set your own password'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  key: const Key('custom-password-field'),
-                  controller: controller,
-                  autofocus: true,
-                  obscureText: obscure,
-                  onChanged: (_) => setLocal(() {}),
-                  decoration: InputDecoration(
-                    labelText: 'New sharing password',
-                    border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: Icon(obscure ? Icons.visibility : Icons.visibility_off),
-                      onPressed: () => setLocal(() => obscure = !obscure),
+    try {
+      final result = await showDialog<String>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setLocal) {
+            final pw = controller.text;
+            final weak = pw.length < 10;
+            return AlertDialog(
+              title: const Text('Set your own password'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    key: const Key('custom-password-field'),
+                    controller: controller,
+                    autofocus: true,
+                    obscureText: obscure,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    enableIMEPersonalizedLearning: false,
+                    keyboardType: TextInputType.visiblePassword,
+                    onChanged: (_) => setLocal(() {}),
+                    decoration: InputDecoration(
+                      labelText: 'New sharing password',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: Icon(obscure ? Icons.visibility : Icons.visibility_off),
+                        onPressed: () => setLocal(() => obscure = !obscure),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  pw.isEmpty
-                      ? 'Anyone connecting will type this. Use at least 10 characters.'
-                      : weak
-                          ? '⚠ That is short. A longer password is much safer over a network.'
-                          : '✓ Looks reasonable.',
-                  style: TextStyle(
-                    color: weak && pw.isNotEmpty ? Theme.of(context).colorScheme.error : null,
+                  const SizedBox(height: 8),
+                  Text(
+                    pw.isEmpty
+                        ? 'Anyone connecting will type this. Use at least 10 characters.'
+                        : weak
+                            ? '⚠ That is short. A longer password is much safer over a network.'
+                            : '✓ Looks reasonable.',
+                    style: TextStyle(
+                      color: weak && pw.isNotEmpty ? Theme.of(context).colorScheme.error : null,
+                    ),
                   ),
+                ],
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                FilledButton(
+                  key: const Key('custom-password-save'),
+                  onPressed: pw.isEmpty ? null : () => Navigator.pop(context, pw),
+                  child: const Text('Save'),
                 ),
               ],
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-              FilledButton(
-                key: const Key('custom-password-save'),
-                onPressed: pw.isEmpty ? null : () => Navigator.pop(context, pw),
-                child: const Text('Save'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-    return (result != null && result.isNotEmpty) ? result : null;
+            );
+          },
+        ),
+      );
+      return (result != null && result.isNotEmpty) ? result : null;
+    } finally {
+      // Runs whichever way the dialog closes: Save, Cancel, back button, or
+      // tapping outside it.
+      controller.dispose();
+    }
   }
 
   Future<void> _setOwnInSessionPassword() async {
