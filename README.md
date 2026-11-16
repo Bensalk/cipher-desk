@@ -37,7 +37,7 @@ Cipher Desk connects to your own computers from a PC, a Linux machine or an Andr
 
 ## Key Features
 
-- **Three connection methods** – [Private Remote Desktop](docs/methods/PRIVATE-REMOTE-DESKTOP.md) (the computer's screen locks), [Share screen](docs/methods/SHARE-SCREEN.md) (the screen stays on and usable at the computer; any Windows edition) and [VNC](docs/methods/VNC.md) (own network or Tailscale only). A two-question helper picks the right one. See [which one to use](docs/CONNECTION-METHODS.md).
+- **Three connection methods** – [Share screen](docs/methods/SHARE-SCREEN.md) (the screen stays on and usable at the computer; any Windows edition), [Private Remote Desktop](docs/methods/PRIVATE-REMOTE-DESKTOP.md) (the computer's screen locks) and [VNC](docs/methods/VNC.md) (own network or Tailscale only). A two-question helper picks the right one. See [which one to use](docs/CONNECTION-METHODS.md).
 - **Secure connections only** – Network Level Authentication (NLA) and TLS 1.2 / 1.3. Older, unprotected connections are refused, not downgraded.
 - **Certificate check and pinning** – the first time, you compare the computer's fingerprint before anything is sent. If it ever changes, the connection is blocked before your password leaves the device.
 - **Saved passwords, safely** – optional, and only in Windows Credential Manager, the Linux keyring or the Android Keystore, confirmed with Windows Hello or your screen lock. Never in the app's files, exports or logs.
@@ -92,7 +92,7 @@ Cipher Desk connects to your own computers from a PC, a Linux machine or an Andr
 
 **Quick start**
 
-1. Choose a [connection method](docs/CONNECTION-METHODS.md) and set up the computer you want to reach with its tutorial: [Private Remote Desktop](docs/methods/PRIVATE-REMOTE-DESKTOP.md), [Share screen](docs/methods/SHARE-SCREEN.md) or [VNC](docs/methods/VNC.md).
+1. Choose a [connection method](docs/CONNECTION-METHODS.md) and set up the computer you want to reach with its tutorial: [Share screen](docs/methods/SHARE-SCREEN.md), [Private Remote Desktop](docs/methods/PRIVATE-REMOTE-DESKTOP.md) or [VNC](docs/methods/VNC.md).
 2. Install Cipher Desk and tap **New connection**. Choose the method, then enter the computer's name or IP address and your username.
 3. Tap the connection and type your password (or tick **Save password** to keep it in this device's secure storage).
 4. The first time, **compare the certificate fingerprint** with the one on the computer. Only trust it if they match.
