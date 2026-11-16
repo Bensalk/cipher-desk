@@ -114,7 +114,10 @@ mod tests {
 
         let plain = read_pending(&path).expect("read");
         assert_eq!(plain, "a password, not a real one");
-        assert!(!path.exists(), "the pending file must not outlive a successful read");
+        assert!(
+            !path.exists(),
+            "the pending file must not outlive a successful read"
+        );
     }
 
     #[test]
@@ -126,7 +129,10 @@ mod tests {
         std::fs::write(&path, b"not a real sealed blob").expect("write");
 
         let err = read_pending(&path).expect_err("garbage must not decrypt");
-        assert!(!path.exists(), "a failed read must not leave the file behind");
+        assert!(
+            !path.exists(),
+            "a failed read must not leave the file behind"
+        );
         // The error must not echo the file's content back.
         assert!(!err.to_string().contains("not a real sealed blob"));
     }

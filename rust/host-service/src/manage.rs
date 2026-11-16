@@ -76,9 +76,7 @@ impl Report {
                         // nothing.
                         drop(f);
                         let _ = std::fs::remove_file(&path);
-                        tracing::warn!(
-                            "refused to write the result file: it became a link"
-                        );
+                        tracing::warn!("refused to write the result file: it became a link");
                     } else {
                         let _ = f.write_all(self.lines.join("\n").as_bytes());
                         drop(f);
