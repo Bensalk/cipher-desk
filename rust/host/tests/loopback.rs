@@ -557,3 +557,83 @@ fn two_step_verification_asks_once_per_device() {
     );
     assert!(!ConnectionError::CodeNeeded.auto_reconnect_allowed());
 }
+
+/// Many short connect-and-disconnect cycles against one Host in a row — the
+/// kind of load a flaky phone connection or someone repeatedly reopening the
+/// app would produce. Nothing should leak, hang, or start failing partway
+/// through; each cycle should behave exactly like the first.
+#[test]
+fn many_connect_disconnect_cycles_in_a_row_all_behave_the_same() {
+    let r = start();
+    let pin = Some(r.fingerprint.clone());
+    for round in 0..20 {
+        let mut s = connect(params(r.port, &r.password, pin.clone()))
+            .unwrap_or_else(|f| panic!("round {round}: connect failed: {f:?}"));
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut updates = 0;
+        while updates < 1 && Instant::now() < deadline {
+            for e in s.poll().0 {
+                match e {
+                    SessionEvent::Updated(_) => updates += 1,
+                    SessionEvent::Ended(err) => panic!("round {round}: session ended: {err:?}"),
+                    _ => {}
+                }
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(updates >= 1, "round {round}: no picture update");
+        s.disconnect();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            match r.events.recv_timeout(Duration::from_millis(200)) {
+                Ok(HostEvent::ViewerDisconnected) => break,
+                Ok(_) => {}
+                Err(_) => assert!(
+                    Instant::now() < deadline,
+                    "round {round}: no disconnect event"
+                ),
+            }
+        }
+    }
+}
+
+/// Several "devices" try to connect to the same Host at the same moment.
+/// Cipher Desk allows one viewer at a time, so exactly one of these must
+/// get in; the rest must be refused cleanly (no panic, no hang, no two
+/// viewers both thinking they are connected).
+#[test]
+fn several_devices_connecting_at_once_only_one_gets_in() {
+    let r = start();
+    let (port, password, pin) = (r.port, r.password.clone(), Some(r.fingerprint.clone()));
+    let mut handles = Vec::new();
+    for _ in 0..6 {
+        let password = password.clone();
+        let pin = pin.clone();
+        handles.push(std::thread::spawn(move || {
+            connect(params(port, &password, pin))
+        }));
+    }
+    let results: Vec<_> = handles
+        .into_iter()
+        .map(|h| h.join().expect("thread"))
+        .collect();
+    let mut sessions: Vec<_> = results.into_iter().filter_map(Result::ok).collect();
+    assert_eq!(
+        sessions.len(),
+        1,
+        "exactly one viewer should get in at once"
+    );
+    // The one that got in must still work normally.
+    let s = &mut sessions[0];
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let mut updates = 0;
+    while updates < 1 && Instant::now() < deadline {
+        for e in s.poll().0 {
+            if let SessionEvent::Updated(_) = e {
+                updates += 1;
+            }
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(updates >= 1, "the one viewer that connected got no picture");
+}

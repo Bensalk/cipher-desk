@@ -2,6 +2,11 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.32 (16 Nov 2026)
+
+### Fixed
+- **The "everyone blocked" safety net could trip from one device's own repeated wrong passwords**, even with successful sign-ins in between, instead of only from a flood of different addresses guessing together as intended. It now counts how many *different* devices tried a wrong password, not how many attempts happened — so retrying from the same PC never locks out both PCs for 15 minutes on its own.
+
 ## v0.3.31 (16 Nov 2026)
 
 ### Added

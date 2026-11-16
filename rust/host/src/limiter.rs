@@ -63,6 +63,45 @@ impl Counter {
     }
 }
 
+/// Wrong passwords tried by different devices together, within the window.
+/// Counts *distinct devices*, not raw attempts — its job is to catch many
+/// addresses guessing together (a flood), not to duplicate the per-device
+/// block above, so one device retrying (even many times, even with
+/// successful sign-ins mixed in) never by itself locks out everyone.
+#[derive(Default)]
+struct AllCounter {
+    recent: Vec<(IpAddr, Instant)>,
+    locked_until: Option<Instant>,
+}
+
+impl AllCounter {
+    fn locked(&mut self, now: Instant) -> bool {
+        match self.locked_until {
+            Some(t) if now < t => true,
+            Some(_) => {
+                self.locked_until = None;
+                self.recent.clear();
+                false
+            }
+            None => false,
+        }
+    }
+
+    /// Records a failure from `ip`; returns true if this starts a lockout.
+    fn fail(&mut self, ip: IpAddr, now: Instant, max: usize) -> bool {
+        self.recent.retain(|(_, t)| now.duration_since(*t) < WINDOW);
+        match self.recent.iter_mut().find(|(a, _)| *a == ip) {
+            Some(entry) => entry.1 = now,
+            None => self.recent.push((ip, now)),
+        }
+        if self.recent.len() >= max && self.locked_until.is_none() {
+            self.locked_until = Some(now + LOCKOUT);
+            return true;
+        }
+        false
+    }
+}
+
 /// The address of the connection being served. The server takes one
 /// connection at a time, so the last accepted address is the current one.
 #[derive(Clone, Default)]
@@ -117,7 +156,7 @@ pub fn is_tailnet_or_local(ip: std::net::IpAddr) -> bool {
 
 pub(crate) struct Limiter {
     devices: HashMap<IpAddr, Counter>,
-    all: Counter,
+    all: AllCounter,
     events: mpsc::Sender<HostEvent>,
     peer: Peer,
     tailnet_only: bool,
@@ -137,7 +176,7 @@ impl Limiter {
     pub(crate) fn new(events: mpsc::Sender<HostEvent>, peer: Peer, tailnet_only: bool) -> Self {
         Self {
             devices: HashMap::new(),
-            all: Counter::default(),
+            all: AllCounter::default(),
             events,
             peer,
             tailnet_only,
@@ -172,7 +211,7 @@ impl Limiter {
             }
         }
         let device = self.devices.entry(ip).or_default().fail(now, MAX_FAILURES);
-        let all = self.all.fail(now, MAX_FAILURES_ALL);
+        let all = self.all.fail(ip, now, MAX_FAILURES_ALL);
         if all {
             Lock::All
         } else if device {
@@ -358,5 +397,53 @@ mod tests {
             false,
         );
         assert!(!l.devices.contains_key(&a));
+    }
+
+    /// Thousands of different devices hammering the limiter over a short
+    /// time: memory must stay bounded (eviction kicks in) and nothing
+    /// should panic or loop forever. This is the kind of flood a scanner
+    /// or a botnet would produce, not a real user.
+    #[test]
+    fn a_flood_of_devices_does_not_grow_without_bound_or_panic() {
+        let (tx, _rx) = mpsc::channel();
+        let mut l = Limiter::new(tx, Peer::default(), false);
+        let t0 = Instant::now();
+        let s1 = Duration::from_secs(1);
+        for i in 0..20_000u32 {
+            let device = ip(&format!(
+                "{}.{}.{}.{}",
+                (i >> 24) as u8 | 1,
+                (i >> 16) as u8,
+                (i >> 8) as u8,
+                i as u8
+            ));
+            // Spread the clock out so the global 20-in-10-min safety net
+            // doesn't dominate the test; each device gets one failure.
+            let now = t0 + Duration::from_millis(u64::from(i) * 50);
+            l.record(device, now, s1, true);
+            assert!(l.devices.len() <= MAX_DEVICES, "device map grew unbounded");
+        }
+    }
+
+    /// One device that alternates between a quick wrong password and a
+    /// real (successful, longer) session many times in a row: the lockout
+    /// state must not leak or get stuck across that back-and-forth.
+    #[test]
+    fn repeated_reconnect_cycles_do_not_leave_a_stuck_lock() {
+        let (tx, _rx) = mpsc::channel();
+        let mut l = Limiter::new(tx, Peer::default(), false);
+        let a = ip("100.64.5.5");
+        let mut t = Instant::now();
+        let s1 = Duration::from_secs(1);
+        for _ in 0..500 {
+            // One wrong password, then immediately a real, successful
+            // session: the device should never end up locked out just
+            // from this pattern.
+            l.record(a, t, s1, true);
+            t += Duration::from_secs(1);
+            l.record(a, t, Duration::from_secs(30), false);
+            t += Duration::from_secs(1);
+            assert!(!l.locked(a, t), "device got stuck locked after cycle");
+        }
     }
 }
