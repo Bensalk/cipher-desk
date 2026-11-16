@@ -91,6 +91,15 @@ pub fn lock_down(dir: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Locks a single file the same way as a secret: only Windows itself and
+/// administrators may open it. Used for the `--result` file an elevated
+/// admin command writes for the app to read — it can hold the sharing
+/// password, so it gets the same protection as the files in `secrets`,
+/// not whatever the containing folder's permissions happen to allow.
+pub fn lock_result_file(path: &Path) -> anyhow::Result<()> {
+    apply(path, SECRET_SDDL)
+}
+
 /// `<dir>\secrets`, created locked if missing ([`lock_down`] checks the
 /// permissions of an existing one).
 pub fn secrets_dir(dir: &Path) -> anyhow::Result<std::path::PathBuf> {

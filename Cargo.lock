@@ -558,6 +558,7 @@ dependencies = [
  "anyhow",
  "rdpv-core",
  "rdpv-host",
+ "tempfile",
  "tracing",
  "tracing-subscriber",
  "windows",

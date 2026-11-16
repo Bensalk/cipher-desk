@@ -47,16 +47,56 @@ impl Report {
     }
 
     /// Writes the result file and prints the lines, then any closing note.
+    ///
+    /// `result_path()` already refused a link at the time it checked; this
+    /// narrows the window between that check and actually writing by
+    /// re-checking right before creating the file, and again right after —
+    /// a normal user controls this folder, so a link that appears between
+    /// the two checks, or even between `create_new` succeeding and the
+    /// attributes check below, is refused rather than written to. This does
+    /// not close the window entirely (that needs verifying the open
+    /// handle's own final path, not just re-reading attributes by name),
+    /// but it is a meaningful narrowing with only safe, already-used code.
     fn finish(self, note: &str) {
         if let Some(path) = result_path() {
             use std::io::Write as _;
             let _ = std::fs::remove_file(&path);
-            if let Ok(mut f) = std::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&path)
+            if !crate::secure::is_link(&path)
+                && path.parent().is_some_and(|p| !crate::secure::is_link(p))
             {
-                let _ = f.write_all(self.lines.join("\n").as_bytes());
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(&path)
+                {
+                    if crate::secure::is_link(&path) {
+                        // Something replaced it with a link in the instant
+                        // between create_new succeeding and this check.
+                        // Refuse it: remove whatever is there now and write
+                        // nothing.
+                        drop(f);
+                        let _ = std::fs::remove_file(&path);
+                        tracing::warn!(
+                            "refused to write the result file: it became a link"
+                        );
+                    } else {
+                        let _ = f.write_all(self.lines.join("\n").as_bytes());
+                        drop(f);
+                        // The file may hold the sharing password: lock it to
+                        // Windows itself and administrators, the same as a
+                        // secret, rather than relying only on the containing
+                        // folder's permissions (which this command did not
+                        // create).
+                        if let Err(e) = crate::secure::lock_result_file(&path) {
+                            tracing::warn!(
+                                error = %e,
+                                "could not restrict who may read the result file"
+                            );
+                        }
+                    }
+                }
+            } else {
+                tracing::warn!("refused to write the result file: a link appeared");
             }
         }
         for line in &self.lines {
