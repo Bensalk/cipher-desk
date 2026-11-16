@@ -79,17 +79,21 @@ impl Report {
                     } else {
                         let _ = f.write_all(self.lines.join("\n").as_bytes());
                         drop(f);
-                        // The file may hold the sharing password: lock it to
-                        // Windows itself and administrators, the same as a
-                        // secret, rather than relying only on the containing
-                        // folder's permissions (which this command did not
-                        // create).
-                        if let Err(e) = crate::secure::lock_result_file(&path) {
-                            tracing::warn!(
-                                error = %e,
-                                "could not restrict who may read the result file"
-                            );
-                        }
+                        // Deliberately not locked down like a secret in
+                        // `secrets`: this is written by the elevated admin
+                        // command, but read and deleted by the app's own,
+                        // non-elevated process. Locking it to Windows itself
+                        // and administrators only (as an earlier version of
+                        // this code did) left the signed-in user's own,
+                        // non-elevated process without read access to its
+                        // own file, which broke reading the result back
+                        // after every admin command. It relies instead on
+                        // the containing folder's own permissions:
+                        // `%LOCALAPPDATA%\Cipher Desk` is already private to
+                        // the signed-in user (plus Windows itself and
+                        // administrators) by Windows' own default ACL
+                        // inheritance, since it sits under the user's own
+                        // profile.
                     }
                 }
             } else {
