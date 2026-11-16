@@ -247,8 +247,6 @@ fn start(
 /// Shows the Windows popup "allow this connection?" on the screen of this
 /// session. `true` only for Yes; No, closing it, or no answer within
 /// [`rdpv_host::APPROVAL_TIMEOUT`] refuse.
-#[allow(unsafe_code)]
-fn ask_person_at_computer(who: &str) -> bool {
     let seconds = rdpv_host::APPROVAL_TIMEOUT.as_secs();
     show_question(
         &format!(
@@ -276,6 +274,7 @@ fn ask_always_allow(who: &str) -> bool {
 
 /// A Yes/No question on the signed-in person's screen (No is the default and
 /// the answer when nobody responds within `seconds`).
+#[allow(unsafe_code)]
 fn show_question(text: &str, seconds: u64) -> bool {
     use windows::core::PCWSTR;
     use windows::Win32::System::RemoteDesktop::{WTSSendMessageW, WTS_CURRENT_SERVER_HANDLE};
