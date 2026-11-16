@@ -285,6 +285,8 @@ impl ShareHost {
                             HostUpdate::of(HostUpdateKind::ViewerConnected)
                         }
                         E::ViewerDisconnected => HostUpdate::of(HostUpdateKind::ViewerDisconnected),
+                        // Already shown as a disconnect; the app page needs no more.
+                        E::SignInFailed { .. } => continue,
                         E::LockedOut { minutes } => HostUpdate {
                             minutes,
                             ..HostUpdate::of(HostUpdateKind::LockedOut)

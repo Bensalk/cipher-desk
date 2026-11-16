@@ -27,6 +27,24 @@ enum Door {
     Ask,
 }
 
+impl Door {
+    /// For the connection history.
+    fn label(self) -> &'static str {
+        match self {
+            Door::Password => "with the sharing password",
+            Door::Ask => "ask to connect",
+        }
+    }
+}
+
+/// "device-name (address)", or "address (no device name)".
+fn who_is(address: &str) -> String {
+    match crate::history::device_name(address) {
+        Some(name) => format!("{name} ({address})"),
+        None => format!("{address} (no device name)"),
+    }
+}
+
 pub fn run() -> anyhow::Result<()> {
     // Real screen pixels at any Windows display scale (picture and clicks).
     rdpv_host::win::make_dpi_aware();
@@ -91,13 +109,36 @@ pub fn run() -> anyhow::Result<()> {
             Ok((door, HostEvent::Listening { port })) => {
                 tracing::info!(?door, port, "service host listening");
             }
-            Ok((door, HostEvent::ViewerConnected { .. })) => {
-                tracing::info!(?door, "viewer connected");
-                link.viewer_connected(door as u32);
+            Ok((door, HostEvent::ViewerConnected { address })) => {
+                tracing::info!(?door, %address, "viewer connected");
+                let time = crate::history::local_time();
+                link.viewer_connected(door as u32, address.clone());
+                let link = std::sync::Arc::clone(&link);
+                // The name lookup can take a few seconds; do not hold up events.
+                std::thread::spawn(move || {
+                    let who = who_is(&address);
+                    link.viewer_named(door as u32, &address, who.clone());
+                    crate::history::record(&time, "Connected", &who, door.label());
+                });
             }
             Ok((door, HostEvent::ViewerDisconnected)) => {
-                tracing::info!(?door, "viewer disconnected");
-                link.viewer_disconnected(door as u32);
+                // Also sent for refused attempts: only real sessions go in
+                // the history.
+                if let Some(who) = link.viewer_disconnected(door as u32) {
+                    tracing::info!(?door, "viewer disconnected");
+                    let time = crate::history::local_time();
+                    crate::history::record(&time, "Disconnected", &who, door.label());
+                }
+            }
+            Ok((door, HostEvent::SignInFailed { address })) => {
+                tracing::warn!(?door, %address, "wrong user name or password");
+                let time = crate::history::local_time();
+                let link = std::sync::Arc::clone(&link);
+                std::thread::spawn(move || {
+                    let who = who_is(&address);
+                    link.sign_in_failed(who.clone());
+                    crate::history::record(&time, "WRONG PASSWORD", &who, door.label());
+                });
             }
             Ok((Door::Password, HostEvent::ApprovalRequested)) => {
                 // The password door never asks; allow so nobody waits forever.
@@ -119,6 +160,9 @@ pub fn run() -> anyhow::Result<()> {
             }
             Ok((door, HostEvent::LockedOut { minutes })) => {
                 tracing::warn!(?door, minutes, "locked out");
+                let time = crate::history::local_time();
+                let what = format!("BLOCKED {minutes} MIN");
+                crate::history::record(&time, &what, "too many wrong passwords", door.label());
             }
             Ok((Door::Password, HostEvent::Failed { message })) => {
                 tracing::error!(%message, "service host failed");

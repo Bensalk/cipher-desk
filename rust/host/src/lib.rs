@@ -59,8 +59,11 @@ const SEND_WAIT_STEP: Duration = Duration::from_millis(2);
 pub enum HostEvent {
     /// Listening for viewers on this port.
     Listening { port: u16 },
-    /// A viewer signed in and is now seeing the screen.
+    /// A viewer signed in and is now seeing the screen. `address`: the
+    /// connecting computer's IP address as this computer sees it.
     ViewerConnected { address: String },
+    /// Someone tried to sign in with a wrong user name or password.
+    SignInFailed { address: String },
     /// The viewer left (or the connection ended).
     ViewerDisconnected,
     /// Too many wrong passwords: new connections are refused for a while.
@@ -254,16 +257,18 @@ where
 
     // Approval channel: the UI answers ApprovalRequested through HostHandle.
     let (approve_tx, approve_rx) = tokio::sync::mpsc::unbounded_channel::<bool>();
+    let peer = limiter::Peer::default();
     let display = ScreenDisplay {
         source: Arc::new(Mutex::new(source)),
         events: events.clone(),
         require_approval: config.require_approval,
         approvals: Arc::new(tokio::sync::Mutex::new(approve_rx)),
+        peer: peer.clone(),
     };
     let username = config.username.trim().to_owned();
     let password = config.password;
     let second_factor = config.second_factor;
-    let limiter = limiter::Limiter::new(events.clone());
+    let limiter = limiter::Limiter::new(events.clone(), peer);
 
     // Text + file clipboard bridge (Windows only). Files the viewer sends land
     // in a "Received" folder beside the app's data; `clip` lets the app offer
@@ -351,6 +356,8 @@ struct ScreenDisplay<S: FrameSource> {
     events: mpsc::Sender<HostEvent>,
     require_approval: bool,
     approvals: Arc<tokio::sync::Mutex<tokio::sync::mpsc::UnboundedReceiver<bool>>>,
+    /// Address of the connection being served (set when it is accepted).
+    peer: limiter::Peer,
 }
 
 #[async_trait]
@@ -389,7 +396,7 @@ impl<S: FrameSource + Send + 'static> RdpServerDisplay for ScreenDisplay<S> {
             }
         }
         let _ = self.events.send(HostEvent::ViewerConnected {
-            address: String::new(),
+            address: self.peer.ip(),
         });
         let (tx, rx) = tokio::sync::mpsc::channel::<DisplayUpdate>(16);
         let source = Arc::clone(&self.source);

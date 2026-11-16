@@ -10,8 +10,10 @@
 //! The tray always starts the conversation, one line per request, one line
 //! per answer:
 //!
-//! - `POLL` → `online <n>` or `connected <n>`; `n` > 0 means "please send the
-//!   files copied right now, as answer number `n`".
+//! - `POLL` → five fields separated by tabs: `online` or `connected`; `n`
+//!   (> 0 means "please send the files copied right now, as answer number
+//!   `n`"); who is connected (device name and address, or `-`); how many
+//!   wrong sign-ins so far; and who made the last one (or `-`).
 //! - `FILES <n>` then the paths, each after a tab → `ok`. (Tabs cannot appear
 //!   in Windows file names.)
 //! - `OFFLINE` → `ok`, then the worker ends and the service keeps sharing off
@@ -84,6 +86,10 @@ fn epoch_ms() -> u64 {
 #[derive(Default)]
 pub struct Link {
     viewers: AtomicU32,
+    /// Who is connected on each listener (device name and address).
+    who: Mutex<[Option<String>; 2]>,
+    /// Wrong sign-ins seen by this worker, and who made the last one.
+    failures: Mutex<(u64, String)>,
     tray_seen_ms: AtomicU64,
     ask: Mutex<Ask>,
     answered: Condvar,
@@ -99,14 +105,45 @@ struct Ask {
 
 impl Link {
     /// `door`: which listener (0 or 1); each serves one viewer at a time.
-    pub fn viewer_connected(&self, door: u32) {
+    /// `who`: the device name and address, for the tray icon.
+    pub fn viewer_connected(&self, door: u32, who: String) {
+        if let Ok(mut w) = self.who.lock() {
+            if let Some(slot) = w.get_mut(door as usize) {
+                *slot = Some(who);
+            }
+        }
         self.viewers.fetch_or(1 << door, Ordering::SeqCst);
     }
 
-    pub fn viewer_disconnected(&self, door: u32) {
+    /// Fills in the device name once it is known, if the same viewer is
+    /// still connected (`old` is what [`Self::viewer_connected`] was given).
+    pub fn viewer_named(&self, door: u32, old: &str, who: String) {
+        if let Ok(mut w) = self.who.lock() {
+            if let Some(slot) = w.get_mut(door as usize) {
+                if slot.as_deref() == Some(old) {
+                    *slot = Some(who);
+                }
+            }
+        }
+    }
+
+    /// Returns who was connected on that listener, if anyone.
+    pub fn viewer_disconnected(&self, door: u32) -> Option<String> {
         // Also sent for refused or failed attempts; a listener serves one
         // connection at a time, so any disconnect means nobody is on it.
         self.viewers.fetch_and(!(1 << door), Ordering::SeqCst);
+        self.who
+            .lock()
+            .ok()
+            .and_then(|mut w| w.get_mut(door as usize).and_then(Option::take))
+    }
+
+    /// A wrong user name or password was tried (`who`: name and address).
+    pub fn sign_in_failed(&self, who: String) {
+        if let Ok(mut f) = self.failures.lock() {
+            f.0 += 1;
+            f.1 = who;
+        }
     }
 
     /// The files the signed-in person has copied right now, asked from the
@@ -154,7 +191,34 @@ impl Link {
                 "online"
             };
             let want = self.ask.lock().map(|a| a.want).unwrap_or(0);
-            return (format!("{state} {want}"), None);
+            let who = self
+                .who
+                .lock()
+                .ok()
+                .and_then(|w| w.iter().flatten().next().cloned())
+                .unwrap_or_else(|| "-".into());
+            let (count, last) = self
+                .failures
+                .lock()
+                .map(|f| {
+                    (
+                        f.0,
+                        if f.1.is_empty() {
+                            "-".into()
+                        } else {
+                            f.1.clone()
+                        },
+                    )
+                })
+                .unwrap_or((0, "-".into()));
+            return (
+                format!(
+                    "{state}\t{want}\t{}\t{count}\t{}",
+                    clean(&who),
+                    clean(&last)
+                ),
+                None,
+            );
         }
         if let Some(rest) = line.strip_prefix("FILES ") {
             let mut parts = rest.split('\t');
@@ -185,6 +249,13 @@ impl Link {
             _ => ("?".into(), None),
         }
     }
+}
+
+/// No tabs or line breaks inside a field.
+fn clean(s: &str) -> String {
+    s.chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect()
 }
 
 /// Starts the pipe the tray connects to; runs for the worker's lifetime.
@@ -308,6 +379,19 @@ pub struct Client {
     writer: File,
 }
 
+/// One answer to `POLL`.
+pub struct Report {
+    pub status: Status,
+    /// A pending request for the copied files (0 = none).
+    pub want: u64,
+    /// Who is connected: device name and address.
+    pub who: Option<String>,
+    /// Wrong sign-ins seen since the worker started.
+    pub failures: u64,
+    /// Who made the last wrong sign-in.
+    pub last_failure: Option<String>,
+}
+
 /// What the worker says about sharing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
@@ -353,17 +437,26 @@ impl Client {
         Ok(answer.trim_end().to_owned())
     }
 
-    /// The status, and the number of a pending request for the copied files
-    /// (0 = none).
-    pub fn poll(&mut self) -> std::io::Result<(Status, u64)> {
+    /// What the worker reports (see the module docs).
+    pub fn poll(&mut self) -> std::io::Result<Report> {
         let answer = self.request("POLL")?;
-        let mut parts = answer.split(' ');
+        let mut parts = answer.split('\t');
         let status = match parts.next() {
             Some("connected") => Status::Connected,
             _ => Status::Online,
         };
         let want = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
-        Ok((status, want))
+        let field = |s: Option<&str>| s.filter(|v| *v != "-" && !v.is_empty()).map(str::to_owned);
+        let who = field(parts.next());
+        let failures = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
+        let last_failure = field(parts.next());
+        Ok(Report {
+            status,
+            want,
+            who,
+            failures,
+            last_failure,
+        })
     }
 
     /// Answers request `id` with the copied files (empty: none).

@@ -14,6 +14,8 @@
 #[cfg(windows)]
 mod config;
 #[cfg(windows)]
+mod history;
+#[cfg(windows)]
 mod launch;
 #[cfg(windows)]
 mod link;

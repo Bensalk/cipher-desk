@@ -6,7 +6,7 @@
 //! A real session that later drops on a bad network lasts longer and does not.
 
 use std::net::SocketAddr;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use ironrdp_server::{ConnectionHandler, PostConnectionAction};
@@ -18,18 +18,52 @@ pub(crate) const WINDOW: Duration = Duration::from_secs(10 * 60);
 pub(crate) const LOCKOUT: Duration = Duration::from_secs(15 * 60);
 const SHORT: Duration = Duration::from_secs(20);
 
+/// The address of the connection being served. The server takes one
+/// connection at a time, so the last accepted address is the current one.
+#[derive(Clone, Default)]
+pub(crate) struct Peer(Arc<Mutex<Option<SocketAddr>>>);
+
+impl Peer {
+    fn set(&self, addr: SocketAddr) {
+        if let Ok(mut p) = self.0.lock() {
+            *p = Some(addr);
+        }
+    }
+
+    /// The IP address alone (no port), or "unknown".
+    pub(crate) fn ip(&self) -> String {
+        self.0
+            .lock()
+            .ok()
+            .and_then(|p| *p)
+            .map_or_else(|| "unknown".to_owned(), show_ip)
+    }
+}
+
+/// An IP address for people: IPv4-mapped IPv6 shown as plain IPv4.
+fn show_ip(addr: SocketAddr) -> String {
+    match addr.ip() {
+        std::net::IpAddr::V6(v6) => v6
+            .to_ipv4_mapped()
+            .map_or_else(|| v6.to_string(), |v4| v4.to_string()),
+        ip => ip.to_string(),
+    }
+}
+
 pub(crate) struct Limiter {
     failures: Vec<Instant>,
     locked_until: Option<Instant>,
     events: mpsc::Sender<HostEvent>,
+    peer: Peer,
 }
 
 impl Limiter {
-    pub(crate) fn new(events: mpsc::Sender<HostEvent>) -> Self {
+    pub(crate) fn new(events: mpsc::Sender<HostEvent>, peer: Peer) -> Self {
         Self {
             failures: Vec::new(),
             locked_until: None,
             events,
+            peer,
         }
     }
 
@@ -67,13 +101,17 @@ impl Limiter {
 }
 
 impl ConnectionHandler for Limiter {
-    fn on_accept(&mut self, _peer: SocketAddr) -> bool {
-        !self.locked(Instant::now())
+    fn on_accept(&mut self, peer: SocketAddr) -> bool {
+        let allowed = !self.locked(Instant::now());
+        if allowed {
+            self.peer.set(peer);
+        }
+        allowed
     }
 
     fn on_disconnected(
         &mut self,
-        _peer: SocketAddr,
+        peer: SocketAddr,
         duration: Duration,
         error: Option<&anyhow::Error>,
     ) -> PostConnectionAction {
@@ -81,7 +119,13 @@ impl ConnectionHandler for Limiter {
         // Only credential failures count toward lockout. TLS noise from relay
         // networks (accept_begin failed, UnknownCA) and post-auth network drops
         // must not trigger the 15-minute lockout: they are not password guesses.
-        if self.record(Instant::now(), duration, is_credential_failure(error)) {
+        let failed = is_credential_failure(error);
+        if failed {
+            let _ = self.events.send(HostEvent::SignInFailed {
+                address: show_ip(peer),
+            });
+        }
+        if self.record(Instant::now(), duration, failed) {
             let _ = self.events.send(HostEvent::LockedOut {
                 minutes: LOCKOUT.as_secs() / 60,
             });
@@ -107,7 +151,7 @@ mod tests {
     #[test]
     fn five_quick_failures_lock_and_the_lock_expires() {
         let (tx, _rx) = mpsc::channel();
-        let mut l = Limiter::new(tx);
+        let mut l = Limiter::new(tx, Peer::default());
         let t0 = Instant::now();
         for i in 0..4 {
             assert!(!l.record(t0 + Duration::from_secs(i), Duration::from_secs(1), true));
@@ -121,7 +165,7 @@ mod tests {
     #[test]
     fn old_failures_and_long_sessions_do_not_count() {
         let (tx, _rx) = mpsc::channel();
-        let mut l = Limiter::new(tx);
+        let mut l = Limiter::new(tx, Peer::default());
         let t0 = Instant::now();
         for i in 0..4 {
             l.record(t0 + Duration::from_secs(i), Duration::from_secs(1), true);

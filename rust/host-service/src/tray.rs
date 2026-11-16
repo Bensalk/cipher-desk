@@ -25,8 +25,8 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Shell::{
-    ShellExecuteW, Shell_NotifyIconW, NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_TIP, NIIF_INFO, NIM_ADD,
-    NIM_DELETE, NIM_MODIFY, NOTIFYICONDATAW, NOTIFY_ICON_MESSAGE,
+    ShellExecuteW, Shell_NotifyIconW, NIF_ICON, NIF_INFO, NIF_MESSAGE, NIF_TIP, NIIF_INFO,
+    NIIF_WARNING, NIM_ADD, NIM_DELETE, NIM_MODIFY, NOTIFYICONDATAW, NOTIFY_ICON_MESSAGE,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreateIconIndirect, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu,
@@ -37,7 +37,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_RBUTTONUP, WM_TIMER, WNDCLASSW,
 };
 
-use crate::link::{Client, Status};
+use crate::link::{Client, Report, Status};
 
 /// Messages from the tray icon (clicks).
 const WM_TRAY: u32 = WM_APP + 1;
@@ -50,6 +50,11 @@ const RECONNECT: Duration = Duration::from_secs(1);
 const CMD_DISCONNECT: usize = 10;
 const CMD_OFFLINE: usize = 11;
 const CMD_ONLINE: usize = 12;
+const CMD_HISTORY: usize = 13;
+
+/// Announce a new connection once its device name is known, or after this
+/// long without one.
+const NAME_WAIT: Duration = Duration::from_secs(4);
 
 /// Teal, amber and grey (the app's colours).
 const TEAL: (u8, u8, u8) = (0x00, 0x89, 0x7B);
@@ -68,6 +73,21 @@ struct Tray {
     shown: bool,
     link: Option<Client>,
     retry_at: Instant,
+    /// Who is connected (device name and address), from the worker.
+    who: Option<String>,
+    /// When the current connection started, and whether the pop-up for it
+    /// has been shown.
+    connected_at: Option<Instant>,
+    announced: bool,
+    /// Wrong sign-ins already shown (`None` until the first report from the
+    /// worker, so old ones are not shown again after the tray restarts).
+    failures_seen: Option<u64>,
+}
+
+/// A message popped up above the icon.
+struct Popup {
+    text: String,
+    warning: bool,
 }
 
 thread_local! {
@@ -139,6 +159,10 @@ pub fn run() -> anyhow::Result<()> {
                 shown: false,
                 link: None,
                 retry_at: Instant::now(),
+                who: None,
+                connected_at: None,
+                announced: false,
+                failures_seen: None,
             });
         });
         poll();
@@ -197,64 +221,116 @@ fn with_tray<T>(f: impl FnOnce(&mut Tray) -> T) -> Option<T> {
     })
 }
 
-/// Asks the worker for the status; answers its request for copied files.
+/// Asks the worker for the status; answers its request for copied files;
+/// pops up who connected, who left, and wrong-password attempts.
 fn poll() {
     with_tray(|tray| {
-        let status = ask_worker(tray);
+        let report = ask_worker(tray);
+        let status = report.as_ref().map_or(Status::Offline, |r| r.status);
+        let mut popup = None;
+
+        // Wrong passwords: always worth a warning.
+        if let Some(r) = &report {
+            match tray.failures_seen {
+                Some(seen) if r.failures > seen => {
+                    let who = r.last_failure.as_deref().unwrap_or("an unknown device");
+                    let more = r.failures - seen;
+                    popup = Some(Popup {
+                        text: if more > 1 {
+                            format!("{more} wrong password attempts. Last from: {who}")
+                        } else {
+                            format!("Wrong password attempt from: {who}")
+                        },
+                        warning: true,
+                    });
+                }
+                _ => {}
+            }
+            tray.failures_seen = Some(r.failures);
+        }
+
+        let previous = tray.status;
+        let was_who = tray.who.take();
+        tray.who = report.and_then(|r| r.who);
+        if status == Status::Connected && previous != Status::Connected {
+            tray.connected_at = Some(Instant::now());
+            tray.announced = false;
+        }
+        // Announce once the device name lookup is done (the worker then adds
+        // "(...)"), or after a short wait.
+        if status == Status::Connected && !tray.announced {
+            let named = tray.who.as_deref().is_some_and(|w| w.contains('('));
+            let waited = tray.connected_at.is_some_and(|t| t.elapsed() >= NAME_WAIT);
+            if named || waited {
+                tray.announced = true;
+                let who = tray.who.as_deref().unwrap_or("an unknown device");
+                popup = popup.or(Some(Popup {
+                    text: format!("Connected to this computer: {who}"),
+                    warning: false,
+                }));
+            }
+        }
+        if previous == Status::Connected && status != Status::Connected {
+            let who = was_who.as_deref().unwrap_or("the viewer");
+            popup = popup.or(Some(Popup {
+                text: format!("Disconnected: {who}"),
+                warning: false,
+            }));
+            tray.connected_at = None;
+        }
+
+        tray.status = status;
         if !tray.shown {
-            tray.status = status;
             tray.shown = notify(tray, NIM_ADD, None);
-        } else if status != tray.status {
-            let previous = tray.status;
-            tray.status = status;
-            notify(tray, NIM_MODIFY, popup_for(previous, status));
+        } else if status != previous || popup.is_some() || tray.who != was_who {
+            notify(tray, NIM_MODIFY, popup);
         }
     });
 }
 
-/// The pop-up text for a status change a person should be told about right
-/// away (a viewer connecting or leaving), or `None` for a change that should
-/// stay quiet (for example going offline, which the person just asked for).
-fn popup_for(previous: Status, status: Status) -> Option<(&'static str, &'static str)> {
-    match (previous, status) {
-        (_, Status::Connected) => Some(("Cipher Desk", "Someone connected to this computer.")),
-        (Status::Connected, Status::Online) => Some(("Cipher Desk", "The viewer disconnected.")),
-        _ => None,
-    }
-}
-
-fn ask_worker(tray: &mut Tray) -> Status {
+/// One report from the worker (`None` when it is not running: offline).
+fn ask_worker(tray: &mut Tray) -> Option<Report> {
     if tray.link.is_none() {
         if Instant::now() < tray.retry_at {
-            return Status::Offline;
+            return None;
         }
         match Client::connect() {
-            Ok(c) => tray.link = Some(c),
+            Ok(c) => {
+                tray.link = Some(c);
+                // A new worker counts wrong passwords from zero.
+                tray.failures_seen = None;
+            }
             Err(_) => {
                 tray.retry_at = Instant::now() + RECONNECT;
-                return Status::Offline;
+                return None;
             }
         }
     }
-    let Some(link) = tray.link.as_mut() else {
-        return Status::Offline;
-    };
-    let result = link.poll().and_then(|(status, want)| {
-        if want > 0 {
+    let link = tray.link.as_mut()?;
+    let result = link.poll().and_then(|report| {
+        if report.want > 0 {
             // A viewer is connected and something was just copied here.
             let files = rdpv_host::clipboard::copied_files().unwrap_or_default();
             tracing::info!(count = files.len(), "tray: sent the copied files");
-            link.send_files(want, &files)?;
+            link.send_files(report.want, &files)?;
         }
-        Ok(status)
+        Ok(report)
     });
     match result {
-        Ok(status) => status,
+        Ok(report) => Some(report),
         Err(_) => {
             tray.link = None;
             tray.retry_at = Instant::now() + RECONNECT;
-            Status::Offline
+            None
         }
+    }
+}
+
+/// The hover text: the status, and who is connected.
+fn tip_text(tray: &Tray) -> String {
+    match (&tray.who, tray.status) {
+        (Some(who), Status::Connected) => format!("Cipher Desk: connected - {who}"),
+        _ => status_text(tray.status).to_owned(),
     }
 }
 
@@ -262,7 +338,7 @@ fn ask_worker(tray: &mut Tray) -> Status {
 /// `popup`: (title, text) to also pop up above the icon
 /// when someone connects — Windows shows this even while the Action Center
 /// is closed and the tray icon is just sitting in the overflow tray.
-fn notify(tray: &Tray, message: NOTIFY_ICON_MESSAGE, popup: Option<(&str, &str)>) -> bool {
+fn notify(tray: &Tray, message: NOTIFY_ICON_MESSAGE, popup: Option<Popup>) -> bool {
     let mut nid = NOTIFYICONDATAW {
         cbSize: u32::try_from(core::mem::size_of::<NOTIFYICONDATAW>()).unwrap_or(0),
         hWnd: tray.hwnd,
@@ -272,14 +348,19 @@ fn notify(tray: &Tray, message: NOTIFY_ICON_MESSAGE, popup: Option<(&str, &str)>
         hIcon: tray.icons[icon_index(tray.status)],
         ..Default::default()
     };
-    let tip: Vec<u16> = status_text(tray.status)
+    let tip: Vec<u16> = tip_text(tray)
         .encode_utf16()
         .take(nid.szTip.len() - 1)
         .collect();
     nid.szTip[..tip.len()].copy_from_slice(&tip);
-    if let Some((title, text)) = popup {
+    if let Some(Popup { text, warning }) = popup {
         nid.uFlags |= NIF_INFO;
-        nid.dwInfoFlags = NIIF_INFO;
+        nid.dwInfoFlags = if warning { NIIF_WARNING } else { NIIF_INFO };
+        let title = if warning {
+            "Cipher Desk: warning"
+        } else {
+            "Cipher Desk"
+        };
         let t: Vec<u16> = title
             .encode_utf16()
             .take(nid.szInfoTitle.len() - 1)
@@ -293,13 +374,22 @@ fn notify(tray: &Tray, message: NOTIFY_ICON_MESSAGE, popup: Option<(&str, &str)>
 }
 
 fn show_menu(hwnd: HWND) {
-    let status = with_tray(|t| t.status).unwrap_or(Status::Offline);
+    let (status, who) = with_tray(|t| (t.status, t.who.clone())).unwrap_or((Status::Offline, None));
     let title: Vec<u16> = status_text(status).encode_utf16().chain([0]).collect();
+    let who_line: Option<Vec<u16>> = who.filter(|_| status == Status::Connected).map(|w| {
+        format!("Connected: {w}")
+            .encode_utf16()
+            .chain([0])
+            .collect()
+    });
     // SAFETY: the menu is created, shown and destroyed here; the title buffer
     // outlives the AppendMenuW call that copies it.
     unsafe {
         let Ok(menu) = CreatePopupMenu() else { return };
         let _ = AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, PCWSTR(title.as_ptr()));
+        if let Some(line) = &who_line {
+            let _ = AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, PCWSTR(line.as_ptr()));
+        }
         let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
         match status {
             Status::Connected => {
@@ -313,6 +403,8 @@ fn show_menu(hwnd: HWND) {
                 let _ = AppendMenuW(menu, MF_STRING, CMD_ONLINE, w!("Go online…"));
             }
         }
+        let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
+        let _ = AppendMenuW(menu, MF_STRING, CMD_HISTORY, w!("Connection history"));
         let mut pt = POINT::default();
         let _ = GetCursorPos(&mut pt);
         // Needed so the menu closes when you click elsewhere.
@@ -354,7 +446,42 @@ fn command(id: usize) {
             });
         }
         CMD_ONLINE => go_online(),
+        CMD_HISTORY => open_history(),
         _ => {}
+    }
+}
+
+/// Opens the connection history in Notepad (the Windows one, by full path).
+fn open_history() {
+    let Some(path) = crate::history::path() else {
+        return;
+    };
+    if !path.exists() {
+        let time = crate::history::local_time();
+        crate::history::record(&time, "History started", "-", "-");
+    }
+    let Some(windir) = std::env::var_os("SystemRoot") else {
+        return;
+    };
+    let notepad = std::path::Path::new(&windir)
+        .join("System32")
+        .join("notepad.exe");
+    let wide = |s: &std::ffi::OsStr| -> Vec<u16> {
+        use std::os::windows::ffi::OsStrExt as _;
+        s.encode_wide().chain([0]).collect()
+    };
+    let exe = wide(notepad.as_os_str());
+    let arg = wide(format!("\"{}\"", path.display()).as_ref());
+    // SAFETY: all strings are NUL-terminated and outlive the call.
+    unsafe {
+        let _ = ShellExecuteW(
+            None,
+            w!("open"),
+            PCWSTR(exe.as_ptr()),
+            PCWSTR(arg.as_ptr()),
+            PCWSTR::null(),
+            windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL,
+        );
     }
 }
 

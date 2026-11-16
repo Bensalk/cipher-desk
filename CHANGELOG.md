@@ -2,6 +2,13 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.29 (16 Nov 2026)
+
+### Added
+- **See who connects to the shared computer.** The pop-up and the tray icon show the connecting device's name and address, for example "Office-PC.your-network.ts.net (100.64.0.2)". The name comes from your network (your Tailscale device names, or the name your router gives a device), not from the connecting computer, so it is hard to fake. A device outside your own networks usually has no name, which is worth noticing.
+- **Warning when someone tries a wrong password.** A warning pop-up shows the device and address that tried. After 5 wrong attempts in 10 minutes, new connections are blocked for 15 minutes (as before), and that is recorded too.
+- **Connection history.** Right-click the tray icon and choose "Connection history" to see every connection, disconnection, wrong password and block, with date and time. It is kept in `connections.log` beside the service logs and holds no passwords.
+
 ## v0.3.28 (16 Nov 2026)
 
 ### Added

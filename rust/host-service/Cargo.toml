@@ -39,6 +39,8 @@ windows = { version = "0.62", features = [
     "Win32_System_IO",
     "Win32_Storage_FileSystem",
     "Win32_Security_Authorization",
+    "Win32_Networking_WinSock",
+    "Win32_System_SystemInformation",
 ] }
 
 # Its own lints: unsafe is needed for the Win32 session/token calls.
