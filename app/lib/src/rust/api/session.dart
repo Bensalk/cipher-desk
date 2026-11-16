@@ -22,6 +22,12 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
  void  approveCertificate({required bool approve });
 
 
+/// Stops a copy of files arriving from the remote computer right now.
+/// The file still being written is deleted; anything from the same copy
+/// that already finished is kept. Does nothing if nothing is arriving.
+ void  cancelIncomingFiles();
+
+
 /// Creates a handle (no connection yet).
 static RdpSession  create()=>RustLib.instance.api.crateApiSessionRdpSessionCreate();
 
@@ -191,6 +197,9 @@ filesIncoming,
 /// The network dropped; reconnect attempt `x` of `y` is under way (`label`).
 /// Input is ignored until `Status` with `connected` arrives again.
 reconnecting,
+/// A copy of incoming files was cancelled from this side (the partial
+/// file was removed; anything already fully received was kept).
+filesCancelled,
                     ;
                     
                 }

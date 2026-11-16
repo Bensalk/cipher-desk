@@ -461,6 +461,21 @@ impl Session {
     /// Offers files to the remote computer, which downloads them. Does nothing
     /// if clipboard sharing to the remote is off for this connection, or if no
     /// path is a readable file within the size limit.
+    /// Stops a copy arriving from the remote right now, if there is one.
+    /// The file being written is removed; anything already fully received
+    /// from the same copy is left alone. Does nothing if nothing is arriving
+    /// (for example, it already finished just before this call).
+    pub fn cancel_incoming_files(&mut self) -> bool {
+        let Some(clip) = self.clip.as_mut() else {
+            return false;
+        };
+        let was_receiving = clip.receiving.take().is_some();
+        if was_receiving {
+            tracing::info!("clip: file receive cancelled from this side");
+        }
+        was_receiving
+    }
+
     pub fn send_files(&mut self, paths: Vec<PathBuf>) -> Result<(), ConnectionError> {
         tracing::info!(
             count = paths.len(),

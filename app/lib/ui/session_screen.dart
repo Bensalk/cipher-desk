@@ -518,6 +518,10 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
               ? 'Received "$name" — press Ctrl+V in any folder to place it there.'
               : 'Received "$name" into: $_receiveDir'),
         ));
+      case UpdateKind.filesCancelled:
+        if (!mounted) return;
+        setState(() => _transferProgress = null);
+        _notice(const SnackBar(content: Text('Copy cancelled.')));
     }
   }
 
@@ -607,7 +611,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     if (!mounted) return;
     // TODO(next-bump): update this when pubspec version changes.
     // Adding package_info_plus would let us read it at runtime.
-    const version = '0.3.32';
+    const version = '1.0.0';
     final content = rust_log.sessionLogExport(appVersion: version);
     final fileName = 'cipher-desk-log-${DateTime.now().millisecondsSinceEpoch}.txt';
 
@@ -1211,24 +1215,41 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
                 left: 0,
                 right: 0,
                 top: 0,
-                child: IgnorePointer(
-                  child: Material(
-                    key: const Key('transfer-progress'),
-                    color: Theme.of(context).colorScheme.surface.withAlpha(217),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Receiving files… ${(_transferProgress! * 100).round()}%'
-                            '${_transferText.isEmpty ? '' : ' ($_transferText)'}',
+                child: Material(
+                  key: const Key('transfer-progress'),
+                  color: Theme.of(context).colorScheme.surface.withAlpha(217),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 6, 4, 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Receiving files… ${(_transferProgress! * 100).round()}%'
+                                '${_transferText.isEmpty ? '' : ' ($_transferText)'}',
+                              ),
+                              const SizedBox(height: 4),
+                              LinearProgressIndicator(value: _transferProgress),
+                            ],
                           ),
-                          const SizedBox(height: 4),
-                          LinearProgressIndicator(value: _transferProgress),
-                        ],
-                      ),
+                        ),
+                        IconButton(
+                          key: const Key('transfer-cancel'),
+                          icon: const Icon(Icons.close),
+                          tooltip: 'Cancel this copy',
+                          iconSize: 20,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          onPressed: () {
+                            _session.cancelIncomingFiles();
+                            setState(() => _transferProgress = null);
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 ),

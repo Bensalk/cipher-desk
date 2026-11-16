@@ -91,6 +91,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 RdpSession crateApiSessionRdpSessionCreate();
 
+void crateApiSessionRdpSessionCancelIncomingFiles({required RdpSession that });
+
 void crateApiSessionRdpSessionCtrlAltDel({required RdpSession that });
 
 void crateApiSessionRdpSessionDisconnect({required RdpSession that });
@@ -276,14 +278,39 @@ sse_encode_bool(approve, serializer);
         );
         
 
+@override void crateApiSessionRdpSessionCancelIncomingFiles({required RdpSession that })  { return handler.executeSync(SyncTask(
+            callFfi: () {
+
+            final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
+            return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 58)!;
+
+            },
+            codec:
+        SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        )
+        ,
+            constMeta: kCrateApiSessionRdpSessionCancelIncomingFilesConstMeta,
+            argValues: [that],
+            apiImpl: this,
+        )); }
+
+
+        TaskConstMeta get kCrateApiSessionRdpSessionCancelIncomingFilesConstMeta => const TaskConstMeta(
+            debugName: "RdpSession_cancel_incoming_files",
+            argNames: ["that"],
+        );
+
+
 @override void crateApiSessionRdpSessionCtrlAltDel({required RdpSession that })  { return handler.executeSync(SyncTask(
             callFfi: () {
-              
+
             final serializer = SseSerializer(generalizedFrbRustBinding);sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(that, serializer);
             return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
-            
+
             },
-            codec: 
+            codec:
         SseCodec(
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: null,
@@ -2558,6 +2585,12 @@ sse_encode_i_32(self.index, serializer); }
 
                 /// Answers the certificate prompt.
  void  approveCertificate({required bool approve })=>RustLib.instance.api.crateApiSessionRdpSessionApproveCertificate(that: this, approve: approve);
+
+
+/// Stops a copy of files arriving from the remote computer right now.
+/// The file still being written is deleted; anything from the same copy
+/// that already finished is kept. Does nothing if nothing is arriving.
+ void  cancelIncomingFiles()=>RustLib.instance.api.crateApiSessionRdpSessionCancelIncomingFiles(that: this, );
 
 
 /// Sends Ctrl+Alt+Del to the remote computer.
