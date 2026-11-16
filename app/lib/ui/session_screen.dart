@@ -260,7 +260,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     if (_receiveDir.isNotEmpty && files.every((f) => f.startsWith(_receiveDir))) return;
     _session.sendFiles(paths: files);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    _notice(SnackBar(
       content: Text(files.length == 1
           ? 'Copying "${files.first.split(Platform.pathSeparator).last}" to the remote computer. '
               'Paste it there with Ctrl+V when it has arrived.'
@@ -362,7 +362,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     // already-saved one like this can still be off even after that is
     // turned on — this button fixes THIS connection, with no settings menu.)
     if (clipboard == ClipboardMode.off && widget.profile.method.supportsClipboard) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      _notice(SnackBar(
         duration: const Duration(seconds: 60),
         content: const Text(
           'Copy and paste is off for this connection. '
@@ -481,12 +481,12 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
         });
       case UpdateKind.remoteClipboardTooLarge:
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        _notice(const SnackBar(
           content: Text('Text copied on the remote computer was larger than 1 MB and was not copied.'),
         ));
       case UpdateKind.filesIncoming:
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        _notice(SnackBar(
           content: Text('Receiving ${u.text ?? 'files'} from the remote computer…'),
           duration: const Duration(seconds: 6),
         ));
@@ -495,13 +495,22 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
         final name = u.text ?? 'a file';
         final path = u.label;
         if (path != null && path.isNotEmpty) _putReceivedOnClipboard(path);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        _notice(SnackBar(
           duration: const Duration(seconds: 10),
           content: Text(FileClipboard.supported
               ? 'Received "$name" — press Ctrl+V in any folder to place it there.'
               : 'Received "$name" into: $_receiveDir'),
         ));
     }
+  }
+
+  /// Shows a short message at the bottom. A new message replaces the one on
+  /// screen instead of queueing behind it, so a burst of transfers does not
+  /// leave old notices playing for minutes afterwards.
+  void _notice(SnackBar bar) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.showSnackBar(bar);
   }
 
   /// Picks local files and sends them to the remote computer.
@@ -511,7 +520,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     _session.sendFiles(paths: files.map((f) => f.path).toList());
     if (!mounted) return;
     final many = files.length > 1;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    _notice(SnackBar(
       duration: const Duration(seconds: 10),
       content: Text(many
           ? '${files.length} files ready — press Ctrl+V in a folder on the remote computer to paste them there.'
@@ -581,7 +590,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     if (!mounted) return;
     // TODO(next-bump): update this when pubspec version changes.
     // Adding package_info_plus would let us read it at runtime.
-    const version = '0.3.27';
+    const version = '0.3.28';
     final content = rust_log.sessionLogExport(appVersion: version);
     final fileName = 'cipher-desk-log-${DateTime.now().millisecondsSinceEpoch}.txt';
 
@@ -606,7 +615,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
       final file = File(location.path);
       await file.writeAsString(content);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      _notice(
         SnackBar(content: Text('Log saved to ${location.path}')),
       );
     }

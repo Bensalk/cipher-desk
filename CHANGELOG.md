@@ -2,6 +2,15 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.28 (16 Nov 2026)
+
+### Added
+- **A Windows pop-up on the shared computer when someone connects or disconnects**, like AnyDesk, so you know without looking at the tray icon.
+
+### Fixed
+- **One copy on the shared computer could reach the viewer two or three times.** Windows sometimes announces a single Ctrl+C more than once; the same files are now sent only once.
+- **Messages at the bottom of the viewer could keep appearing long after a transfer.** Each received file queued its own message; a new message now replaces the one on screen.
+
 ## v0.3.27 (16 Nov 2026)
 
 ### Added
@@ -14,10 +23,6 @@ Download any version from the [Releases page](https://github.com/Bensalk/cipher-
 - **Copying files from the shared computer to the viewer**: the background service runs under the Windows system account, and Windows does not let that account see what the signed-in person copies in File Explorer. The new icon runs as the signed-in person, reads the copied files for the service, and does so only while a viewer is connected.
 - **Files sent to the viewer are opened with the signed-in person's own rights**, never with the system account's. With nobody signed in, no files are sent.
 - **Host logs keep working if a log file is deleted or moved** while the service runs. A new file is started within a few seconds.
-- **A Windows pop-up (above the tray icon) when someone connects or disconnects**, the same way AnyDesk notifies you — so you don't have to glance at the icon to know.
-
-### Fixed
-- **Copying the same file twice in quick succession on the host sent it to the viewer twice.** Windows can announce one Ctrl+C as two separate clipboard changes; the host now recognises that and sends it once.
 
 ## v0.3.26 (15 Nov 2026)
 
