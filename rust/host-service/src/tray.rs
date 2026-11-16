@@ -264,6 +264,13 @@ fn poll() {
                 }
                 _ => {}
             }
+            if r.failures != tray.failures {
+                tracing::info!(
+                    failures = r.failures,
+                    last = r.last_failure.as_deref().unwrap_or("-"),
+                    "tray: wrong passwords reported by the worker"
+                );
+            }
             tray.failures_seen = Some(r.failures);
             tray.failures = r.failures;
             tray.last_failure.clone_from(&r.last_failure);
@@ -386,6 +393,7 @@ fn notify(tray: &Tray, message: NOTIFY_ICON_MESSAGE, popup: Option<Popup>) -> bo
         .take(nid.szTip.len() - 1)
         .collect();
     nid.szTip[..tip.len()].copy_from_slice(&tip);
+    let shown_popup = popup.as_ref().map(|p| (p.warning, p.text.clone()));
     if let Some(Popup { text, warning }) = popup {
         nid.uFlags |= NIF_INFO;
         nid.dwInfoFlags = if warning { NIIF_WARNING } else { NIIF_INFO };
@@ -403,7 +411,12 @@ fn notify(tray: &Tray, message: NOTIFY_ICON_MESSAGE, popup: Option<Popup>) -> bo
         nid.szInfo[..b.len()].copy_from_slice(&b);
     }
     // SAFETY: `nid` is a fully initialised NOTIFYICONDATAW that outlives the call.
-    unsafe { Shell_NotifyIconW(message, &nid) }.as_bool()
+    let ok = unsafe { Shell_NotifyIconW(message, &nid) }.as_bool();
+    if let Some((warning, text)) = shown_popup {
+        // Which pop-ups Windows was asked to show (to check one that was missed).
+        tracing::info!(warning, ok, text = %text.replace('\n', " / "), "tray: pop-up");
+    }
+    ok
 }
 
 fn show_menu(hwnd: HWND) {
