@@ -10,7 +10,7 @@ use windows_service::service::{
 };
 use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
 
-use crate::result_path::{validate_result_path, RESULT_NAME};
+use crate::result_path::validate_result_path;
 use crate::service::{DISPLAY_NAME, SERVICE_NAME};
 
 /// Collects `KEY=value` lines, prints them (for a person) and writes them to
@@ -23,8 +23,9 @@ struct Report {
     lines: Vec<String>,
 }
 
-/// The `--result` file, if given and safe: named [`RESULT_NAME`], in an
-/// existing folder named "Cipher Desk", neither of them a link.
+/// The `--result` file, if given and safe: named
+/// [`RESULT_NAME`](crate::result_path::RESULT_NAME), in an existing folder
+/// named "Cipher Desk", neither of them a link.
 fn result_path() -> Option<std::path::PathBuf> {
     let mut args = std::env::args_os().skip_while(|a| a != "--result");
     args.next()?;
