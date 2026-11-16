@@ -11,6 +11,7 @@ IronRDP's protocol parsers are fuzzed upstream (`ironrdp-fuzzing`).
 | `desktop_size` | remote computer (desktop size) | only sizes within the 8K limit are accepted |
 | `files` | app data / imported files | connections, import, settings and pin files: limits respected, only valid entries kept, imports never enable clipboard |
 | `form_fields` | the user | addresses, usernames, names, ports and MAC addresses parse safely and round-trip |
+| `safe_file_name` | remote computer (clipboard file transfer, host and viewer sides) | a name turned safe never has a separator, `..`, a reserved Windows device name, or any character Windows itself would refuse |
 
 Run (stable Rust; needs a C++ compiler for libFuzzer):
 
