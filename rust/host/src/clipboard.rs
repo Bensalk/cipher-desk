@@ -98,6 +98,7 @@ impl HostClipboard {
         max_bytes: usize,
     ) -> Self {
         let receive_dir_str = receive_dir.to_string_lossy().into_owned();
+        let last_sent = load_last_sent(&receive_dir);
         Self {
             inner: Arc::new(Inner {
                 sender: Mutex::new(None),
@@ -112,7 +113,7 @@ impl HostClipboard {
                 hdrop_pending: AtomicBool::new(false),
                 last_text: Mutex::new(None),
                 text_cached_ms: AtomicU64::new(0),
-                last_offered: Mutex::new((load_last_sent(&receive_dir), 0)),
+                last_offered: Mutex::new((last_sent, 0)),
             }),
         }
     }
