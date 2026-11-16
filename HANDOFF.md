@@ -9,6 +9,34 @@ _Last updated: 16 Nov 2026._
 
 - **Work is now on `main`** — the `connection-methods` branch was merged.
   All releases now dispatch from `main`.
+- **v0.3.29 (16 Nov 2026) — waiting for Bensal's test.** Tray shows who is
+  connected (reverse-DNS name + IP), warns on wrong passwords, Connection
+  history (`connections.log`). Security fix C1 below. v0.3.27/28 confirmed:
+  file copy both ways works, no duplicates.
+- **SECURITY REVIEW (16 Nov 2026, independent agent) — fix before v1.0, in order:**
+  - C1 FIXED v0.3.29: received name `C:evil.dll` escaped the Received folder
+    (SYSTEM wrote into System32). Names now strict, paths checked, no overwrite,
+    worker/tray cwd = data dir.
+  - C2: service registered from `current_exe()` in the per-user install folder
+    (%LOCALAPPDATA%), user-writable → swap exe/DLL = SYSTEM. Fix: copy to
+    %ProgramFiles% (admin-only) at install and register that copy.
+  - H1: `C:\ProgramData\Cipher Desk\host-service` has default ACL: users can read
+    host_private_key.pem, password.bin/twostep.bin (machine DPAPI = any local
+    process decrypts), last-result.txt (PASSWORD= in plain text!), and can plant
+    twostep-devices.txt / config.txt / a `Received` junction (cleanup deletes as
+    SYSTEM). Fix: protected ACL (SYSTEM+Admins), refuse reparse points, no
+    secrets in last-result.txt, stronger secret protection.
+  - H2: "ask to connect" door always on, public creds, binds 0.0.0.0. Fix: off by
+    default, bind/firewall both ports to Tailscale range 100.64.0.0/10.
+  - M1: one idle TCP connection blocks the owner (no pre-login timeout, one
+    connection at a time); lockout is global, so an attacker can keep the owner
+    locked out. Fix: handshake timeout, per-IP failures.
+  - M2: tray pipe can be squatted; verify server/client process identity,
+    random pipe name, timeouts. M3: `sc control CipherDeskHost 130` may work
+    for non-admins (check `sc sdshow`); set service DACL. M4: SYSTEM worker still
+    parses clipboard (CIDA) and calls OLE; in service mode read only via tray.
+  - Low: no size cap on received files; history writable by user; TOTP code
+    reuse; add explicit sspi=off in service log filter.
 - **v0.3.27 (16 Nov 2026) — waiting for Bensal's test.** Fix for host→viewer
   file copy + tray icon:
   - Clean v0.3.26 retest (other remote-access app closed) confirmed the cause: host copy
