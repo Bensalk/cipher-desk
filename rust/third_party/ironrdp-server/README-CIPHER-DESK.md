@@ -30,3 +30,11 @@ Changes from 0.13.0:
   password (CredSSP) is accepted, the client's Client Info cookie is checked
   (two-step verification); a refused client gets
   `ServerSetErrorInfo(ServerFreshCredentialsRequired)` and is closed.
+
+`scripts/check-vendored-ironrdp.sh` (run in CI on every push/PR) downloads the
+real 0.13.0 release from crates.io and fails if any file in `src/` differs
+from it other than the four listed above — so an unreviewed change to this
+copy, or a file quietly added or removed, gets caught instead of sitting here
+unnoticed. Changing which files are expected to differ, or re-basing onto a
+newer upstream release, means updating both this list and the script's own
+`EXPECTED_CHANGED` / `UPSTREAM_VERSION` / `EXPECTED_SHA256` together.
