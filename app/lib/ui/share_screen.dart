@@ -128,71 +128,11 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
   /// Asks the user to type their own sharing password. Returns it, or null if
   /// cancelled. Warns (but allows) if it looks weak.
   Future<String?> _askCustomPassword() async {
-    final controller = TextEditingController();
-    var obscure = true;
-    try {
-      final result = await showDialog<String>(
-        context: context,
-        builder: (context) => StatefulBuilder(
-          builder: (context, setLocal) {
-            final pw = controller.text;
-            final weak = pw.length < 10;
-            return AlertDialog(
-              title: const Text('Set your own password'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    key: const Key('custom-password-field'),
-                    controller: controller,
-                    autofocus: true,
-                    obscureText: obscure,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    enableIMEPersonalizedLearning: false,
-                    keyboardType: TextInputType.visiblePassword,
-                    onChanged: (_) => setLocal(() {}),
-                    decoration: InputDecoration(
-                      labelText: 'New sharing password',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: Icon(obscure ? Icons.visibility : Icons.visibility_off),
-                        onPressed: () => setLocal(() => obscure = !obscure),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    pw.isEmpty
-                        ? 'Anyone connecting will type this. Use at least 10 characters.'
-                        : weak
-                            ? '⚠ That is short. A longer password is much safer over a network.'
-                            : '✓ Looks reasonable.',
-                    style: TextStyle(
-                      color: weak && pw.isNotEmpty ? Theme.of(context).colorScheme.error : null,
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                FilledButton(
-                  key: const Key('custom-password-save'),
-                  onPressed: pw.isEmpty ? null : () => Navigator.pop(context, pw),
-                  child: const Text('Save'),
-                ),
-              ],
-            );
-          },
-        ),
-      );
-      return (result != null && result.isNotEmpty) ? result : null;
-    } finally {
-      // Runs whichever way the dialog closes: Save, Cancel, back button, or
-      // tapping outside it.
-      controller.dispose();
-    }
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => const _CustomPasswordDialog(),
+    );
+    return (result != null && result.isNotEmpty) ? result : null;
   }
 
   Future<void> _setOwnInSessionPassword() async {
@@ -906,6 +846,83 @@ class SharingBanner extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Asks for a sharing password. Its own widget, not a local function
+/// closure, so the TextEditingController is disposed by Flutter once this
+/// widget actually leaves the tree for good — not the instant the dialog's
+/// own Future resolves, which can still be mid-exit-animation and rebuilding
+/// the field (that earlier shape raised "A TextEditingController was used
+/// after being disposed").
+class _CustomPasswordDialog extends StatefulWidget {
+  const _CustomPasswordDialog();
+
+  @override
+  State<_CustomPasswordDialog> createState() => _CustomPasswordDialogState();
+}
+
+class _CustomPasswordDialogState extends State<_CustomPasswordDialog> {
+  final _controller = TextEditingController();
+  var _obscure = true;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pw = _controller.text;
+    final weak = pw.length < 10;
+    return AlertDialog(
+      title: const Text('Set your own password'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            key: const Key('custom-password-field'),
+            controller: _controller,
+            autofocus: true,
+            obscureText: _obscure,
+            autocorrect: false,
+            enableSuggestions: false,
+            enableIMEPersonalizedLearning: false,
+            keyboardType: TextInputType.visiblePassword,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              labelText: 'New sharing password',
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+                onPressed: () => setState(() => _obscure = !_obscure),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            pw.isEmpty
+                ? 'Anyone connecting will type this. Use at least 10 characters.'
+                : weak
+                    ? '⚠ That is short. A longer password is much safer over a network.'
+                    : '✓ Looks reasonable.',
+            style: TextStyle(
+              color: weak && pw.isNotEmpty ? Theme.of(context).colorScheme.error : null,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        FilledButton(
+          key: const Key('custom-password-save'),
+          onPressed: pw.isEmpty ? null : () => Navigator.pop(context, pw),
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }
