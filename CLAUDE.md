@@ -1,6 +1,6 @@
 # CLAUDE.md — Cipher Desk
 
-Secure, open-source Remote Desktop (RDP) viewer by Bensal for Windows, Linux and Android. Public repo (since 30 Oct 2026): write docs and changelog for users, not about the development history. Teal / amber app theme (Material 3, seed colour teal).
+Security-focused, open-source Remote Desktop (RDP) viewer by Bensal for Windows, Linux and Android. Public repo (since 30 Oct 2026): write docs and changelog for users, not about the development history. Teal / amber app theme (Material 3, seed colour teal).
 
 ## Repo layout
 
