@@ -134,8 +134,15 @@ fn show_ip(addr: SocketAddr) -> String {
     }
 }
 
-/// True for addresses on a Tailscale network (100.64.0.0/10 and
-/// fd7a:115c:a1e0::/48) and for this computer itself.
+/// True for addresses on a Tailscale network and for this computer itself.
+/// The IPv6 range (`fd7a:115c:a1e0::/48`) is Tailscale's own prefix, so it is
+/// a real check. The IPv4 range (`100.64.0.0/10`) is not: it is the whole
+/// IANA carrier-grade-NAT block, which some ISPs also hand out to ordinary
+/// mobile and broadband customers, so an address in it does not prove the
+/// peer is actually on this Tailscale network — only that it looks like it
+/// could be. The listener binds to all interfaces, so this is the only
+/// check standing between "Tailscale only" and a non-Tailscale peer whose
+/// address happens to fall in the same IPv4 block.
 pub fn is_tailnet_or_local(ip: std::net::IpAddr) -> bool {
     use std::net::IpAddr;
     let ip = match ip {
