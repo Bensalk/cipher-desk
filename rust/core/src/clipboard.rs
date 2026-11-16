@@ -190,7 +190,7 @@ impl CliprdrBackend for QueueBackend {
 
 /// Decodes CF_UNICODETEXT bytes (UTF-16LE, usually NUL-terminated).
 pub(crate) fn decode_unicode_text(bytes: &[u8]) -> Option<String> {
-    if bytes.len() % 2 != 0 {
+    if !bytes.len().is_multiple_of(2) {
         return None;
     }
     let units: Vec<u16> = bytes

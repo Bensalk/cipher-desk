@@ -856,7 +856,7 @@ impl CliprdrBackend for Backend {
 
 /// Decodes CF_UNICODETEXT bytes (UTF-16LE, usually NUL-terminated) to a string.
 fn decode_unicode_text(bytes: &[u8]) -> Option<String> {
-    if bytes.len() % 2 != 0 {
+    if !bytes.len().is_multiple_of(2) {
         return None;
     }
     let units: Vec<u16> = bytes

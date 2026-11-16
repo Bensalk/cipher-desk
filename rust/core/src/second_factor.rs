@@ -45,7 +45,7 @@ impl SecondFactor {
         if let Some(code) = &self.code {
             out.extend(code.bytes().filter(u8::is_ascii_digit).take(8));
         }
-        if out.len() % 2 != 0 {
+        if !out.len().is_multiple_of(2) {
             out.push(b' ');
         }
         out

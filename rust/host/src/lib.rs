@@ -190,7 +190,7 @@ pub fn generate_password() -> anyhow::Result<SecretString> {
     const ALPHABET: &[u8] = b"abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let rng = ring::rand::SystemRandom::new();
     let mut out = String::with_capacity(19);
-    let mut i = 0;
+    let mut i = 0usize;
     while i < 16 {
         let mut b = [0u8; 1];
         ring::rand::SecureRandom::fill(&rng, &mut b)
@@ -200,7 +200,7 @@ pub fn generate_password() -> anyhow::Result<SecretString> {
         if usize::from(b[0]) >= limit {
             continue;
         }
-        if i > 0 && i % 4 == 0 {
+        if i > 0 && i.is_multiple_of(4) {
             out.push('-');
         }
         out.push(char::from(ALPHABET[usize::from(b[0]) % ALPHABET.len()]));
