@@ -65,7 +65,10 @@ with a **Stop** button at the top of Cipher Desk.
 ## Good to know
 
 - **Security:** the connection is encrypted (TLS) and needs the password. After 5
-  wrong passwords, new connections are refused for 15 minutes.
+  wrong passwords from one device, connections from *that device* are refused for
+  15 minutes; other devices can still connect normally. (A flood of wrong passwords
+  from many different devices at once refuses everyone for 15 minutes, as a
+  separate safety net against a real attack.)
 - **Always-allow connections:** open the connection's detail page and turn on *Always
   allow* to skip the approval prompt for that device every time. Leave the default
   *Ask each time* for devices you don't own or fully trust.
@@ -120,7 +123,7 @@ Notes:
 |---|---|
 | *The computer does not answer on port 3395* | Is sharing **on** (Share page says "waiting for a viewer")? Is the network **Private**? Did you allow Cipher Desk in the Windows firewall? Is Tailscale connected on both devices? |
 | *Wrong username or password* | Type them exactly as on the Share page (the password has dashes). |
-| *Sharing paused after wrong passwords* | Wait 15 minutes, or stop and start sharing. If you didn't type wrong passwords yourself, make a new password. |
+| *Sharing paused after wrong passwords* | Wait 15 minutes (only the device that got it wrong is blocked, unless many different devices tried together). If you didn't type wrong passwords yourself, make a new password. |
 | *The sharing port is already in use* | Another program uses 3395. Choose another port on the Share page and use it on the phone too. |
 | The picture freezes on a lock screen | The computer locked. Sign in at the computer, and see step 8. |
 
