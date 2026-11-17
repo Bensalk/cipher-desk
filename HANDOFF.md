@@ -8,6 +8,29 @@ _Last updated: 17 Nov 2026._
 ## Current branch and build
 
 - **Work is on `main`.** All releases dispatch from `main`.
+- **17 Nov 2026 (after v1.0.0): all CI jobs green for the first time** on
+  `715dcbf` (Rust ×2, live RDP host tests, Flutter Linux/Windows/Android,
+  Android emulator, security scans). Since the v1.0.0 tag: review-round fixes
+  (result file no longer locked to admins; password dialog is its own
+  widget), the bridge code regenerated with the real FRB 2.13.0 tool on a
+  GitHub runner (the hand-written log/lock-keys additions had drifted the
+  funcId order), one unused `_syncLockKeys` removed, and two stale
+  clipboard-default test assertions corrected (default is on since v0.3.6).
+  **No new release cut for these yet** — needs a version bump + Bensal's test.
+- **Bridge codegen tip:** the sandbox can't run `flutter_rust_bridge_codegen`.
+  Instead of hand-writing bindings, add a temporary `workflow_dispatch`
+  workflow that runs the tool on `ubuntu-latest` and commits the output
+  (it must exist on `main` before GitHub will dispatch it), then remove it.
+- **Owner decisions still open:** `pending-password.bin` ACL (accept vs.
+  tested ACL); `.claude/settings.json` tracked or local; keep/trim
+  `CLAUDE.md`/`HANDOFF.md` in the public repo; badge option A/B/C; VNC CGNAT
+  check now or later; commit identity. README/THREAT_MODEL still say
+  clipboard is "off by default" while the app-wide default is on — owner to
+  pick which is right.
+- Leftover remote branch `regen-bridge-codegen` (proxy blocks deleting it);
+  Bensal can delete it on GitHub.
+- Bensal asked for a deep, audit-style security review next (findings report
+  first, then fixes with his OK).
 - **v1.0.0 (17 Nov 2026) — first stable release, build in progress / awaiting
   Bensal's test.** Combines two fixes into one release:
   - **Lockout bug fix:** the global "many devices guessing together" lockout
