@@ -35,6 +35,23 @@ use tokio::sync::{Mutex, mpsc, oneshot};
 /// session starts (TLS, sign-in, setup). The server takes one connection at a
 /// time, so a silent one must not block everyone else.
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Cipher Desk: how long a new connection may stay silent before its first
+/// bytes. A real viewer starts talking at once; an "is it online?" check
+/// closes at once; only a connection meant to hold the queue stays silent.
+const FIRST_BYTES_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Cipher Desk: the error a connection handler gets for a connection that
+/// sent nothing within [`FIRST_BYTES_TIMEOUT`].
+pub const SILENT_CONNECTION: &str = "sent nothing after connecting";
+
+/// Cipher Desk: what a new connection did within [`FIRST_BYTES_TIMEOUT`].
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FirstBytes {
+    Arrived,
+    Closed,
+    Silent,
+}
 use tokio::task;
 use tokio_rustls::TlsAcceptor;
 use tracing::{debug, error, trace, warn};
@@ -1015,9 +1032,39 @@ impl RdpServer {
                         .as_mut()
                         .is_none_or(|h| h.on_accept(peer, conn_local));
 
+                    // Cipher Desk: connections are served one at a time, so
+                    // wait only briefly for the first bytes. One closed at once
+                    // (an "is it online?" check) is dropped quietly; one that
+                    // stays silent is closed and reported to the handler, which
+                    // counts it like a wrong password.
+                    let first = if accepted {
+                        let mut byte = [0u8; 1];
+                        match tokio::time::timeout(FIRST_BYTES_TIMEOUT, stream.peek(&mut byte)).await {
+                            Ok(Ok(n)) if n > 0 => FirstBytes::Arrived,
+                            Ok(_) => FirstBytes::Closed,
+                            Err(_) => FirstBytes::Silent,
+                        }
+                    } else {
+                        FirstBytes::Closed
+                    };
+
                     if !accepted {
                         debug!(?peer, "Connection rejected by handler");
                         drop(stream);
+                    } else if first == FirstBytes::Closed {
+                        debug!(?peer, "Connection closed before sending anything");
+                        drop(stream);
+                    } else if first == FirstBytes::Silent {
+                        warn!(?peer, "Connection sent nothing; closed");
+                        drop(stream);
+                        if let Some(ref mut handler) = self.connection_handler {
+                            let error = anyhow::anyhow!(SILENT_CONNECTION);
+                            let action = handler.on_disconnected(peer, FIRST_BYTES_TIMEOUT, Some(&error));
+                            if action == PostConnectionAction::Stop {
+                                debug!(?peer, "Handler requested stop after disconnect");
+                                break;
+                            }
+                        }
                     } else {
                         let started = tokio::time::Instant::now();
                         let result = self.run_connection(stream).await;

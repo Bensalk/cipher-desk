@@ -11,6 +11,7 @@ Download any version from the [Releases page](https://github.com/Bensalk/cipher-
 - **The background service's folder can't be set up by someone else first** on a computer with several accounts; such a folder is moved aside unused.
 - **Two-step verification:** each code works only once, and the "remember this device" key is kept in Windows Credential Manager (or the Linux keyring), not in a file.
 - **File names that disguise their real type are refused.**
+- **A connection that opens and stays silent can no longer hold the computer up.** Connections are served one at a time; a silent one used to block everyone for 30 seconds, again and again. It is now closed after 10 seconds and counted like a wrong password, so a device that keeps doing it is blocked for 15 minutes. Quick "is it online?" checks are not counted.
 
 ### Added
 - **Unblock from the tray** after too many wrong passwords, with a pop-up when a device is blocked.

@@ -43,6 +43,12 @@ Changes from 0.13.0:
   computer, so an unapproved viewer could type on the computer.
   `scripts/check-policy.sh` fails if the backlog handling comes back.
 
+- `server.rs`: a new connection must send its first bytes within 10 seconds
+  (`FIRST_BYTES_TIMEOUT`); one that closes at once is dropped quietly, one that
+  stays silent is closed and reported to the connection handler with
+  `SILENT_CONNECTION` (exported), so the lockout counts it. Connections are
+  served one at a time, so a silent one used to block everyone for 30 seconds.
+
 `scripts/check-vendored-ironrdp.sh` (run in CI on every push/PR) downloads the
 real 0.13.0 release from crates.io and fails if any file in `src/` differs
 from it other than the four listed above — so an unreviewed change to this

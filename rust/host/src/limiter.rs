@@ -292,11 +292,13 @@ impl ConnectionHandler for Limiter {
         error: Option<&anyhow::Error>,
     ) -> PostConnectionAction {
         let _ = self.events.send(HostEvent::ViewerDisconnected);
-        // Only credential failures count toward lockout. TLS noise from relay
-        // networks (accept_begin failed, UnknownCA) and post-auth network drops
-        // must not trigger the 15-minute lockout: they are not password guesses.
-        let failed = is_credential_failure(error);
-        if failed {
+        // Only credential failures, and connections that stayed silent to hold
+        // the one-at-a-time queue, count toward lockout. TLS noise from relay
+        // networks (accept_begin failed, UnknownCA), "is it online?" checks and
+        // post-auth network drops must not trigger the 15-minute lockout.
+        let wrong_password = is_credential_failure(error);
+        let failed = wrong_password || is_silent_connection(error);
+        if wrong_password {
             let _ = self.events.send(HostEvent::SignInFailed {
                 address: show_ip(peer),
             });
@@ -319,6 +321,12 @@ impl ConnectionHandler for Limiter {
 /// True only when the error chain contains evidence of a failed sign-in
 /// (wrong password / wrong user). Pure TLS errors, early connection drops, and
 /// network noise return false and are not counted against the lockout budget.
+/// A connection that sent nothing for several seconds after connecting: it
+/// held up everyone else (connections are served one at a time).
+fn is_silent_connection(error: Option<&anyhow::Error>) -> bool {
+    error.is_some_and(|e| format!("{e:#}").contains(ironrdp_server::SILENT_CONNECTION))
+}
+
 fn is_credential_failure(error: Option<&anyhow::Error>) -> bool {
     let Some(err) = error else { return false };
     // The CredSSP server reports "LogonDenied" when NLA credentials are wrong.
@@ -441,6 +449,26 @@ mod tests {
         // Another device is not blocked by the first one's mistakes.
         assert!(!l.locked(b, t0 + Duration::from_secs(6)));
         assert!(!l.locked(a, t0 + Duration::from_secs(5) + LOCKOUT + s1));
+    }
+
+    #[test]
+    fn only_wrong_passwords_and_silent_connections_count() {
+        let silent = anyhow::anyhow!(ironrdp_server::SILENT_CONNECTION);
+        assert!(is_silent_connection(Some(&silent)));
+        assert!(!is_credential_failure(Some(&silent)));
+
+        // An unanswered or declined "Allow?", relay noise and an online check
+        // that sent nothing and closed are not counted.
+        for not_counted in [
+            "client loop failure: viewer was not allowed",
+            "accept_begin failed: [read frame by hint] custom error: not enough bytes",
+            "TLS handshake failed: UnknownCA",
+        ] {
+            let e = anyhow::anyhow!(not_counted);
+            assert!(!is_silent_connection(Some(&e)), "{not_counted}");
+            assert!(!is_credential_failure(Some(&e)), "{not_counted}");
+        }
+        assert!(!is_silent_connection(None));
     }
 
     #[test]
