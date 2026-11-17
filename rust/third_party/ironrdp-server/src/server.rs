@@ -1461,16 +1461,17 @@ impl RdpServer {
             }
         }
 
+        // Cipher Desk: input a client sends while the connection is still
+        // being finalised is dropped, never applied. Upstream applies it here,
+        // which is before `client_loop` asks the display handler for updates —
+        // and that is where "ask to connect" waits for the person at the
+        // computer to allow the viewer. Applying it would let an unapproved
+        // viewer type on this computer. Real clients do not depend on it.
         if !result.input_events.is_empty() {
-            debug!("Handling input event backlog from acceptor sequence");
-            self.handle_input_backlog(
-                writer,
-                result.io_channel_id,
-                result.user_channel_id,
-                result.message_channel_id,
-                result.input_events,
-            )
-            .await?;
+            warn!(
+                count = result.input_events.len(),
+                "Dropped input sent before the session started"
+            );
         }
 
         self.static_channels = result.static_channels;
@@ -1597,36 +1598,6 @@ impl RdpServer {
             .context("client loop failure")?;
 
         Ok(state)
-    }
-
-    async fn handle_input_backlog(
-        &mut self,
-        writer: &mut impl FramedWrite,
-        io_channel_id: u16,
-        user_channel_id: u16,
-        message_channel_id: Option<u16>,
-        frames: Vec<Vec<u8>>,
-    ) -> Result<()> {
-        for frame in frames {
-            match Action::from_fp_output_header(frame[0]) {
-                Ok(Action::FastPath) => {
-                    let input = decode(&frame)?;
-                    self.handle_fastpath(input).await;
-                }
-
-                Ok(Action::X224) => {
-                    let _ = self
-                        .handle_x224(writer, io_channel_id, user_channel_id, message_channel_id, &frame)
-                        .await;
-                }
-
-                // the frame here is always valid, because otherwise it would
-                // have failed during the acceptor loop
-                Err(_) => unreachable!(),
-            }
-        }
-
-        Ok(())
     }
 
     async fn handle_fastpath(&mut self, input: FastPathInput) {

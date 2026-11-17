@@ -36,6 +36,12 @@ Changes from 0.13.0:
   which network interface a connection actually arrived on, not only what
   address the peer claims — see `rust/host/src/limiter.rs`
   `local_address_allowed` and `docs/THREAT_MODEL.md` H7.
+- `server.rs`: input the client sends while the connection is still being
+  finalised (the acceptor's input backlog) is dropped instead of applied.
+  Upstream applies it before `client_loop` asks the display handler for
+  updates, which is where "ask to connect" waits for the person at the
+  computer, so an unapproved viewer could type on the computer.
+  `scripts/check-policy.sh` fails if the backlog handling comes back.
 
 `scripts/check-vendored-ironrdp.sh` (run in CI on every push/PR) downloads the
 real 0.13.0 release from crates.io and fails if any file in `src/` differs
