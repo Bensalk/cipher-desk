@@ -122,11 +122,18 @@ pub struct HostHandle {
     stop: Option<tokio::sync::oneshot::Sender<()>>,
     thread: Option<std::thread::JoinHandle<()>>,
     approvals: tokio::sync::mpsc::UnboundedSender<bool>,
+    unblock: Arc<std::sync::atomic::AtomicBool>,
     #[cfg(windows)]
     clip: Option<clipboard::ClipHandle>,
 }
 
 impl HostHandle {
+    /// A handle the person at this computer can use (from another thread) to
+    /// let devices blocked after too many wrong passwords try again at once.
+    pub fn unblocker(&self) -> Unblocker {
+        Unblocker(Arc::clone(&self.unblock))
+    }
+
     /// Allows (`true`) or refuses (`false`) a viewer waiting after
     /// [`HostEvent::ApprovalRequested`]. Ignored if nothing is waiting.
     pub fn approve(&self, allow: bool) {
@@ -164,6 +171,19 @@ impl HostHandle {
         if let Some(thread) = self.thread.take() {
             let _ = thread.join();
         }
+    }
+}
+
+/// Clears wrong-password blocks; see [`HostHandle::unblocker`]. Only for the
+/// person at this computer: never wire it to anything a viewer can reach.
+#[derive(Clone)]
+pub struct Unblocker(Arc<std::sync::atomic::AtomicBool>);
+
+impl Unblocker {
+    /// Every blocked device may try again; the counts start from zero. Takes
+    /// effect at the next connection attempt.
+    pub fn unblock(&self) {
+        self.0.store(true, std::sync::atomic::Ordering::SeqCst);
     }
 }
 
@@ -281,7 +301,13 @@ where
     let username = config.username.trim().to_owned();
     let password = config.password;
     let second_factor = config.second_factor;
-    let limiter = limiter::Limiter::new(events.clone(), peer, config.tailnet_only);
+    let unblock = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let limiter = limiter::Limiter::new(
+        events.clone(),
+        peer,
+        config.tailnet_only,
+        Arc::clone(&unblock),
+    );
 
     // Text + file clipboard bridge (Windows only). Files the viewer sends land
     // in a "Received" folder beside the app's data; `clip` lets the app offer
@@ -357,6 +383,7 @@ where
         stop: Some(stop),
         thread: Some(thread),
         approvals: approve_tx,
+        unblock,
         #[cfg(windows)]
         clip,
     })

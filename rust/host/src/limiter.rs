@@ -11,6 +11,7 @@
 
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -184,6 +185,9 @@ pub(crate) struct Limiter {
     events: mpsc::Sender<HostEvent>,
     peer: Peer,
     tailnet_only: bool,
+    /// Set by the person at this computer (see [`crate::Unblocker`]): forget
+    /// every wrong-password block before the next connection is checked.
+    unblock: Arc<AtomicBool>,
 }
 
 /// What a wrong password led to.
@@ -197,17 +201,28 @@ enum Lock {
 }
 
 impl Limiter {
-    pub(crate) fn new(events: mpsc::Sender<HostEvent>, peer: Peer, tailnet_only: bool) -> Self {
+    pub(crate) fn new(
+        events: mpsc::Sender<HostEvent>,
+        peer: Peer,
+        tailnet_only: bool,
+        unblock: Arc<AtomicBool>,
+    ) -> Self {
         Self {
             devices: HashMap::new(),
             all: AllCounter::default(),
             events,
             peer,
             tailnet_only,
+            unblock,
         }
     }
 
     fn locked(&mut self, ip: IpAddr, now: Instant) -> bool {
+        if self.unblock.swap(false, Ordering::SeqCst) {
+            self.devices.clear();
+            self.all = AllCounter::default();
+            tracing::info!("wrong-password blocks cleared by the person at this computer");
+        }
         self.all.locked(now) || self.devices.get_mut(&ip).is_some_and(|c| c.locked(now))
     }
 
@@ -348,7 +363,7 @@ mod tests {
             );
         }
         let (tx, _rx) = mpsc::channel();
-        let mut l = Limiter::new(tx, Peer::default(), true);
+        let mut l = Limiter::new(tx, Peer::default(), true, Arc::default());
         let any_local: SocketAddr = "100.64.0.9:3389".parse().unwrap_or_else(|_| panic!());
         assert!(!l.on_accept(
             "192.168.1.5:5000".parse().unwrap_or_else(|_| panic!()),
@@ -384,7 +399,7 @@ mod tests {
     #[test]
     fn on_accept_refuses_a_connection_that_did_not_arrive_on_the_tailscale_interface() {
         let (tx, _rx) = mpsc::channel();
-        let mut l = Limiter::new(tx, Peer::default(), true);
+        let mut l = Limiter::new(tx, Peer::default(), true, Arc::default());
         // The peer's address alone looks like Tailscale/CGNAT, but the
         // connection actually came in on this computer's plain LAN address —
         // refused.
@@ -407,7 +422,7 @@ mod tests {
     #[test]
     fn five_quick_failures_lock_that_device_only_and_the_lock_expires() {
         let (tx, _rx) = mpsc::channel();
-        let mut l = Limiter::new(tx, Peer::default(), false);
+        let mut l = Limiter::new(tx, Peer::default(), false, Arc::default());
         let (a, b) = (ip("100.64.0.1"), ip("100.64.0.2"));
         let t0 = Instant::now();
         let s1 = Duration::from_secs(1);
@@ -429,9 +444,39 @@ mod tests {
     }
 
     #[test]
+    fn unblock_clears_device_and_everyone_blocks_once() {
+        let (tx, _rx) = mpsc::channel();
+        let unblock = Arc::new(AtomicBool::new(false));
+        let mut l = Limiter::new(tx, Peer::default(), false, Arc::clone(&unblock));
+        let t0 = Instant::now();
+        let s1 = Duration::from_secs(1);
+        let a = ip("100.64.0.1");
+        for _ in 0..MAX_FAILURES {
+            l.record(a, t0, s1, true);
+        }
+        for i in 0..MAX_FAILURES_ALL {
+            l.record(ip(&format!("100.64.1.{i}")), t0, s1, true);
+        }
+        assert!(l.locked(a, t0 + s1));
+        assert!(l.locked(ip("100.64.9.9"), t0 + s1));
+
+        crate::Unblocker(Arc::clone(&unblock)).unblock();
+        assert!(!l.locked(a, t0 + s1));
+        assert!(!l.locked(ip("100.64.9.9"), t0 + s1));
+        assert!(!unblock.load(Ordering::SeqCst), "the request is used up");
+
+        // Counting starts again from zero: it takes a full set of new wrong
+        // passwords to block that device again.
+        for _ in 0..MAX_FAILURES - 1 {
+            assert_eq!(l.record(a, t0 + s1, s1, true), Lock::None);
+        }
+        assert_eq!(l.record(a, t0 + s1, s1, true), Lock::Device);
+    }
+
+    #[test]
     fn many_devices_guessing_together_lock_everyone() {
         let (tx, _rx) = mpsc::channel();
-        let mut l = Limiter::new(tx, Peer::default(), false);
+        let mut l = Limiter::new(tx, Peer::default(), false, Arc::default());
         let t0 = Instant::now();
         let s1 = Duration::from_secs(1);
         let mut last = Lock::None;
@@ -446,7 +491,7 @@ mod tests {
     #[test]
     fn old_failures_and_long_sessions_do_not_count() {
         let (tx, _rx) = mpsc::channel();
-        let mut l = Limiter::new(tx, Peer::default(), false);
+        let mut l = Limiter::new(tx, Peer::default(), false, Arc::default());
         let a = ip("100.64.0.1");
         let t0 = Instant::now();
         let s1 = Duration::from_secs(1);
@@ -485,7 +530,7 @@ mod tests {
     #[test]
     fn a_flood_of_devices_does_not_grow_without_bound_or_panic() {
         let (tx, _rx) = mpsc::channel();
-        let mut l = Limiter::new(tx, Peer::default(), false);
+        let mut l = Limiter::new(tx, Peer::default(), false, Arc::default());
         let t0 = Instant::now();
         let s1 = Duration::from_secs(1);
         for i in 0..20_000u32 {
@@ -510,7 +555,7 @@ mod tests {
     #[test]
     fn repeated_reconnect_cycles_do_not_leave_a_stuck_lock() {
         let (tx, _rx) = mpsc::channel();
-        let mut l = Limiter::new(tx, Peer::default(), false);
+        let mut l = Limiter::new(tx, Peer::default(), false, Arc::default());
         let a = ip("100.64.5.5");
         let mut t = Instant::now();
         let s1 = Duration::from_secs(1);
