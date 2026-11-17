@@ -24,9 +24,8 @@ _Last updated: 17 Nov 2026._
 - **Owner decisions still open:** `pending-password.bin` ACL (accept vs.
   tested ACL); `.claude/settings.json` tracked or local; keep/trim
   `CLAUDE.md`/`HANDOFF.md` in the public repo; badge option A/B/C; VNC CGNAT
-  check now or later; commit identity. README/THREAT_MODEL still say
-  clipboard is "off by default" while the app-wide default is on — owner to
-  pick which is right.
+  check now or later; commit identity. (Decided: clipboard sharing stays
+  on by default; docs updated to match.)
 - Leftover remote branch `regen-bridge-codegen` (proxy blocks deleting it);
   Bensal can delete it on GitHub.
 - Bensal asked for a deep, audit-style security review next (findings report

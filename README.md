@@ -52,7 +52,7 @@ Cipher Desk connects to your own computers from a PC, a Linux machine or an Andr
 - **View modes** – *Original size* (one remote pixel per screen pixel), *Shrink to fit* and *Stretch to fill*, switchable from the session toolbar.
 - **Online / offline dot** on each saved connection – a green dot means the computer answers right now, red means it doesn't. Checked every 15 seconds.
 - **Always-on sharing** – Share screen keeps working in the background as a Windows service, even when no one is signed in. Set it to start when Windows starts; approve trusted devices to connect without being asked each time.
-- **Clipboard sharing** – two-way text clipboard, off by default; allow it per connection, in one direction or both.
+- **Clipboard sharing** – two-way text clipboard, on by default for new connections; turn it off in Settings or per connection, or limit it to one direction.
 - **Works on touch screens** – tap to click, long-press to right-click, two-finger scroll, trackpad mode, pinch to zoom up to 4×, and a floating key bar (drag it anywhere) with Ctrl, Alt and Shift that stay held (for Ctrl+C or Alt+Tab), Ctrl+Alt+Del, Windows key, Esc, Tab, arrows, F1–F12 and *Type text*.
 - **Saved connections** – search, Wake-on-LAN, a *Check readiness* test, connection history, and export / import without passwords.
 - **Reliable** – reconnects by itself after a network drop (retries for about 1.5 minutes before giving up), and never retries a wrong password, so accounts don't get locked.
@@ -162,7 +162,7 @@ $ flutter run -d linux                       # or: -d windows, or an Android dev
 - **No accounts, no tracking.** Cipher Desk has no analytics, telemetry or ads, and there is no Cipher Desk server: it talks to your computers directly.
 - **Passwords stay on your device.** Saved connection passwords live only in the operating system's secure storage. They are never written to the app's files, never exported, and never logged. Setting up or changing Share screen's own sharing password briefly uses a short-lived handoff file in your own app folder instead, locked to your account and deleted right after use (see `docs/THREAT_MODEL.md`).
 - **Identity checked every time.** Each computer's certificate is pinned after you approve it; a changed certificate blocks the connection.
-- **Clipboard off by default**, and screenshots of the app blocked on Android and Windows by default. While sharing its screen, the Cipher Desk window is always hidden from the viewer.
+- **Clipboard per connection**: on by default for convenience, and easy to turn off in Settings (for new connections) or per connection, or to limit to one direction. Screenshots of the app are blocked on Android and Windows by default. While sharing its screen, the Cipher Desk window is always hidden from the viewer.
 - **VNC only where it is safe.** VNC isn't encrypted, so it is used only with addresses on your own network or Tailscale.
 - **Android permissions, and why:**
 

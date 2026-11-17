@@ -2,6 +2,15 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v1.0.1 (17 Nov 2026)
+
+### Fixed
+- **Sharing password after setting up the always-on service.** The app could fail to read back the password (and the service status) right after setup, so setup looked like it had failed. Fixed.
+- **"Set your own password" box** could, in rare cases, cause an error while closing. Fixed.
+
+### Changed
+- The documentation now says what the app already does: clipboard sharing is on by default for new connections, and can be turned off in Settings or per connection.
+
 ## v1.0.0 (17 Nov 2026)
 
 The first stable release.
