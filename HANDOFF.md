@@ -7,23 +7,19 @@ _Last updated: 17 Nov 2026._
 
 ## Current branch and build
 
-- **v0.3.34 test build (17 Nov 2026), awaiting Bensal's test**:
-  https://github.com/Bensalk/cipher-desk/actions/runs/44018687535 (build only,
-  no tag/release). All CI jobs green on `4d7ba9e`. Contains the deep security
-  review fixes (report kept out of the repo): early input dropped before
-  "Ask to connect" approval (`bcb3824`); planted ProgramData folder moved
-  aside (`147e88c`); two-step code single-use (`909bb8d`); bidi characters
-  refused in file names (`557f908`); two-step device id in the OS vault
-  (`d210372`, `6ca3d2d`); tray Unblock + blocked pop-up (`c6b9d55`); viewer
-  "blocked until HH:MM" (`915b7ba`); received files deleted once off the
-  clipboard (`4d7ba9e`). Accepted risks R-15..R-17 in THREAT_MODEL.
-- **Next:** if 0.3.34 passes, release 1.0.0: bump pubspec/Cargo to 1.0.0,
-  v1.0.0 CHANGELOG entry, check README badge + download file names, dispatch
-  release.yml with `make_release=true` (tag push is blocked here), verify CI job
-  by job and the draft's files + SHA256SUMS; Bensal publishes. Delete the old
-  v1.0.0 draft (built from older code) first, or the workflow may skip.
-
-- **Work is on `main`.** All releases dispatch from `main`.
+- **v1.0.0 DRAFT ready (17 Nov 2026), waiting for Bensal to publish.**
+  Release commit `5370aec`; every check green (CI 7/7, CodeQL, cargo-deny,
+  OSV, gitleaks, fuzz, vendored drift, release builds). Draft id 448424104:
+  10 files, all 9 SHA256SUMS entries verified by downloading. Built from the
+  v0.3.34 test build Bensal passed on two Windows PCs, plus `5370aec`
+  (silent connections closed after 10 s and counted by the lockout; found by
+  a stress test, verified by loopback stress: 1 silent conn 30.2 s -> 10.2 s,
+  5 block the device, 100 online checks not counted). The draft is marked
+  pre-release by the workflow: untick that when publishing.
+- **After publishing:** 1.0.1 ideas: quiet the "Connection ended" log noise;
+  viewer log should say why a blocked try failed; change totp/winsecret tests
+  so CodeQL stops flagging the sample password (alert #9 dismissed as tests);
+  proper per-user access for the service Received folder (R-15).
 - **17 Nov 2026 (after v1.0.0): all CI jobs green for the first time** on
   `715dcbf` (Rust ×2, live RDP host tests, Flutter Linux/Windows/Android,
   Android emulator, security scans). Since the v1.0.0 tag: review-round fixes
