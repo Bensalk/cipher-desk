@@ -121,14 +121,26 @@ impl Totp {
 
     /// Whether `code` is right at `now` (one step of drift either way).
     pub fn verify(&self, code: &str, now: SystemTime) -> bool {
+        self.matching_step(code, now).is_some()
+    }
+
+    /// The 30-second step `code` belongs to, if it is right at `now` (one
+    /// step of drift either way). Every candidate is compared, so the time
+    /// taken does not depend on which one matches.
+    pub fn matching_step(&self, code: &str, now: SystemTime) -> Option<u64> {
         let code = code.trim();
         if code.len() != 6 || !code.bytes().all(|b| b.is_ascii_digit()) {
-            return false;
+            return None;
         }
         let step = now.duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs()) / STEP;
         let lo = step.saturating_sub(DRIFT_STEPS);
-        (lo..=step + DRIFT_STEPS)
-            .any(|s| constant_time_eq(self.code_at_step(s).as_bytes(), code.as_bytes()))
+        let mut found = None;
+        for s in lo..=step + DRIFT_STEPS {
+            if constant_time_eq(self.code_at_step(s).as_bytes(), code.as_bytes()) {
+                found = Some(s);
+            }
+        }
+        found
     }
 }
 
@@ -174,6 +186,9 @@ pub struct Gate {
 struct GateState {
     fails: Vec<SystemTime>,
     locked_until: Option<SystemTime>,
+    /// The step of the last code accepted: that code, and any earlier one,
+    /// is never accepted again (someone who saw it typed cannot reuse it).
+    last_step: Option<u64>,
 }
 
 impl Gate {
@@ -221,7 +236,11 @@ impl Gate {
             tracing::warn!("authenticator code refused: too many wrong codes");
             return false;
         }
-        if totp.verify(&code, now) {
+        let step = totp
+            .matching_step(&code, now)
+            .filter(|s| st.last_step.is_none_or(|last| *s > last));
+        if let Some(step) = step {
+            st.last_step = Some(step);
             st.fails.clear();
             remembered.insert(device, now + REMEMBER);
             self.save(&remembered);
@@ -358,6 +377,30 @@ mod tests {
             !gate.check_at(Some(&cookie(1, None)), expired),
             "forgotten after 30 days"
         );
+    }
+
+    #[test]
+    fn a_code_is_accepted_only_once() {
+        let dir = tempfile::tempdir().expect("dir");
+        let totp = Totp::new(vec![6; 20]);
+        let gate = Gate::new(totp.clone(), dir.path().join("devices.txt"));
+        let now = UNIX_EPOCH + Duration::from_secs(1_850_000_000);
+        let step = 1_850_000_000 / STEP;
+        let code = totp.code_at_step(step);
+
+        assert!(gate.check_at(Some(&cookie(1, Some(code.clone()))), now));
+        // Someone who saw it typed tries it from another device.
+        assert!(
+            !gate.check_at(Some(&cookie(2, Some(code))), now),
+            "the same code again"
+        );
+        // An older code that is still within the drift window is refused too.
+        let older = totp.code_at_step(step - 1);
+        assert!(!gate.check_at(Some(&cookie(3, Some(older))), now));
+        // The next code works.
+        let next_time = now + Duration::from_secs(STEP);
+        let next = totp.code_at_step(step + 1);
+        assert!(gate.check_at(Some(&cookie(4, Some(next))), next_time));
     }
 
     #[test]
