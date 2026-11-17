@@ -7,6 +7,22 @@ _Last updated: 17 Nov 2026._
 
 ## Current branch and build
 
+- **v0.3.34 test build (17 Nov 2026), awaiting Bensal's test**:
+  https://github.com/Bensalk/cipher-desk/actions/runs/44018687535 (build only,
+  no tag/release). All CI jobs green on `4d7ba9e`. Contains the deep security
+  review fixes (report kept out of the repo): early input dropped before
+  "Ask to connect" approval (`bcb3824`); planted ProgramData folder moved
+  aside (`147e88c`); two-step code single-use (`909bb8d`); bidi characters
+  refused in file names (`557f908`); two-step device id in the OS vault
+  (`d210372`, `6ca3d2d`); tray Unblock + blocked pop-up (`c6b9d55`); viewer
+  "blocked until HH:MM" (`915b7ba`); received files deleted once off the
+  clipboard (`4d7ba9e`). Accepted risks R-15..R-17 in THREAT_MODEL.
+- **Next:** if 0.3.34 passes, release 1.0.0: bump pubspec/Cargo to 1.0.0,
+  v1.0.0 CHANGELOG entry, check README badge + download file names, dispatch
+  release.yml with `make_release=true` (tag push is blocked here), verify CI job
+  by job and the draft's files + SHA256SUMS; Bensal publishes. Delete the old
+  v1.0.0 draft (built from older code) first, or the workflow may skip.
+
 - **Work is on `main`.** All releases dispatch from `main`.
 - **17 Nov 2026 (after v1.0.0): all CI jobs green for the first time** on
   `715dcbf` (Rust ×2, live RDP host tests, Flutter Linux/Windows/Android,
