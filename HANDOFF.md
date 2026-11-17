@@ -19,7 +19,11 @@ _Last updated: 17 Nov 2026._
 - **After publishing:** 1.0.1 ideas: quiet the "Connection ended" log noise;
   viewer log should say why a blocked try failed; change totp/winsecret tests
   so CodeQL stops flagging the sample password (alert #9 dismissed as tests);
-  proper per-user access for the service Received folder (R-15).
+  proper per-user access for the service Received folder (R-15); desktop
+  notification on the host PC whenever someone connects via the always-on
+  background service (not just when blocked) — right now the only way to
+  notice is checking the tray icon. Bensal asked for this earlier and it
+  was missed; now tracked here so it isn't lost again.
 - **17 Nov 2026 (after v1.0.0): all CI jobs green for the first time** on
   `715dcbf` (Rust ×2, live RDP host tests, Flutter Linux/Windows/Android,
   Android emulator, security scans). Since the v1.0.0 tag: review-round fixes
