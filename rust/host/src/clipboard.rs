@@ -228,6 +228,33 @@ impl CliprdrBackendFactory for HostClipboard {
 
 impl CliprdrServerFactory for HostClipboard {}
 
+/// Received files are only meant to be pasted (Ctrl+V) where the user wants
+/// them. Once something else has replaced them on the clipboard, they can no
+/// longer be pasted, so they are deleted from the Received folder instead of
+/// lingering there. Nothing is deleted while files are still arriving, or
+/// when it cannot be told what the clipboard holds now.
+fn forget_received_if_gone(inner: &Inner) {
+    let busy = inner.receiving.lock().map(|r| r.is_some()).unwrap_or(true);
+    if busy {
+        return;
+    }
+    let files =
+        winclip::read_files().or_else(|| COPIED_FILES_SOURCE.get().and_then(|source| source()));
+    let gone = match files {
+        Some(paths) => !paths.iter().any(|p| p.starts_with(&inner.receive_dir)),
+        None => winclip::has_text(),
+    };
+    if gone {
+        let removed = xfer::clear_received(&inner.receive_dir);
+        if removed > 0 {
+            tracing::info!(
+                removed,
+                "host clip: received files deleted (no longer on the clipboard)"
+            );
+        }
+    }
+}
+
 /// Deletes files left in `dir` from previous sessions so the Received folder
 /// does not accumulate duplicates across connections. Silently ignores errors.
 fn cleanup_received_dir(dir: &std::path::Path) {
@@ -482,7 +509,9 @@ fn spawn_poller(inner: Arc<Inner>) -> Poller {
                             tracing::info!(
                                 "host clip: in quiet window but text found — advertising text"
                             );
-                            inner.hdrop_pending.store(false, Ordering::Relaxed);
+                            if inner.hdrop_pending.swap(false, Ordering::Relaxed) {
+                                forget_received_if_gone(&inner);
+                            }
                             advertise(&inner);
                         } else {
                             tracing::info!(
@@ -494,7 +523,9 @@ fn spawn_poller(inner: Arc<Inner>) -> Poller {
                     }
                     // A genuine new copy on the host: clear the flag so the
                     // viewer's format list can be accepted again next time.
-                    inner.hdrop_pending.store(false, Ordering::Relaxed);
+                    if inner.hdrop_pending.swap(false, Ordering::Relaxed) {
+                        forget_received_if_gone(&inner);
+                    }
                     tracing::info!(seq, "host clip: clipboard changed — checking format");
                     // Files copied here go to the viewer; otherwise text (or
                     // nothing). Files already on the clipboard when the viewer
@@ -788,7 +819,9 @@ impl CliprdrBackend for Backend {
         if let Some(text) = decode_unicode_text(data) {
             if !text.is_empty() && winclip::write_text(&text).is_ok() {
                 // Text from viewer replaced the clipboard; CF_HDROP is gone.
-                self.inner.hdrop_pending.store(false, Ordering::Relaxed);
+                if self.inner.hdrop_pending.swap(false, Ordering::Relaxed) {
+                    forget_received_if_gone(&self.inner);
+                }
             }
         }
     }

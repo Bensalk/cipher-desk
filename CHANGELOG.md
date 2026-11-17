@@ -16,6 +16,7 @@ Test build with the results of a security review.
 - **Unblock from the tray.** When a device is blocked after too many wrong passwords, the tray icon says so; right-click it and choose **Unblock** to let the device try again at once.
 - **The viewer says how long it is blocked**, and warns when only one or two tries are left before Share screen blocks this device for 15 minutes.
 - On the Share screen page, a blocked-device message now says that turning sharing off and on lets devices try again.
+- **Received files no longer linger.** Files sent to this computer are deleted from the Received folder as soon as something else replaces them on the clipboard (they can't be pasted any more by then). They were already cleared at the next connection.
 
 ## v0.3.33 (17 Nov 2026, pre-release)
 
