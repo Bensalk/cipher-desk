@@ -302,7 +302,8 @@ class ShareController extends ChangeNotifier {
       case HostUpdateKind.lockedOut:
         status = ShareStatus.lockedOut;
         message = 'Too many wrong passwords. New connections are refused for '
-            '${u.minutes} minutes.';
+            '${u.minutes} minutes. To let them try again now, turn sharing off '
+            'and on.';
       case HostUpdateKind.fileReceived:
         onFileReceived?.call(u.message ?? 'a file');
         return; // a one-off notice, not a status change
