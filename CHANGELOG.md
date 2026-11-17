@@ -2,6 +2,21 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v0.3.34 (17 Nov 2026, pre-release)
+
+Test build with the results of a security review.
+
+### Security
+- **"Ask to connect" could be typed into before you allowed it.** Keys and mouse moves a specially made viewer sent while sign-in was finishing reached the computer before the "Allow?" question was answered. They are now thrown away.
+- **The background service's folder is protected against being set up by someone else first.** On a computer with several accounts, another person could create Cipher Desk's folder in ProgramData before the service was installed and keep control of what they put in it. Such a folder is now moved aside unused and a fresh one is made.
+- **Two-step verification:** each code now works only once, and the "remember this device" key is kept in Windows Credential Manager (or the Linux keyring) instead of a file, so a copy of the app's folder cannot skip the code.
+- **File names that hide their real type are refused**, for example a program whose name uses invisible characters to look like a PDF.
+
+### Added
+- **Unblock from the tray.** When a device is blocked after too many wrong passwords, the tray icon says so; right-click it and choose **Unblock** to let the device try again at once.
+- **The viewer says how long it is blocked**, and warns when only one or two tries are left before Share screen blocks this device for 15 minutes.
+- On the Share screen page, a blocked-device message now says that turning sharing off and on lets devices try again.
+
 ## v0.3.33 (17 Nov 2026, pre-release)
 
 Test build before the first stable release.
