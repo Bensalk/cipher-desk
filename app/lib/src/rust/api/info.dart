@@ -4,19 +4,15 @@
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
 import '../frb_generated.dart';
+
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-
-            
-
-            /// One-line build summary, e.g. "Cipher Desk 0.1.0 (IronRDP 0.17, release)".
-String  coreSummary() => RustLib.instance.api.crateApiInfoCoreSummary();
+/// One-line build summary, e.g. "Cipher Desk 0.1.0 (IronRDP 0.17, release)".
+String coreSummary() => RustLib.instance.api.crateApiInfoCoreSummary();
 
 /// Greeting shown on the Stage 2 start screen to prove the bridge works.
-String  helloFromRust() => RustLib.instance.api.crateApiInfoHelloFromRust();
+String helloFromRust() => RustLib.instance.api.crateApiInfoHelloFromRust();
 
 /// Security defaults, as plain text lines for the About screen.
-List<String>  securityDefaultsSummary() => RustLib.instance.api.crateApiInfoSecurityDefaultsSummary();
-
-            
-            
+List<String> securityDefaultsSummary() =>
+    RustLib.instance.api.crateApiInfoSecurityDefaultsSummary();
