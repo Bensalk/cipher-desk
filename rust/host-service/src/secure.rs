@@ -17,10 +17,12 @@ use anyhow::Context as _;
 use windows::core::{BOOL, PCWSTR};
 use windows::Win32::Foundation::{LocalFree, HLOCAL};
 use windows::Win32::Security::Authorization::{
-    ConvertStringSecurityDescriptorToSecurityDescriptorW, SetNamedSecurityInfoW, SE_FILE_OBJECT,
+    ConvertStringSecurityDescriptorToSecurityDescriptorW, GetNamedSecurityInfoW,
+    SetNamedSecurityInfoW, SE_FILE_OBJECT,
 };
 use windows::Win32::Security::{
-    GetSecurityDescriptorDacl, GetSecurityDescriptorOwner, ACL, DACL_SECURITY_INFORMATION,
+    GetSecurityDescriptorDacl, GetSecurityDescriptorOwner, IsWellKnownSid,
+    WinBuiltinAdministratorsSid, WinLocalSystemSid, ACL, DACL_SECURITY_INFORMATION,
     OWNER_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, PSID,
 };
 
@@ -45,6 +47,7 @@ const OLD_SECRETS: [&str; 4] = [
 pub fn lock_down(dir: &Path) -> anyhow::Result<()> {
     if let Some(parent) = dir.parent() {
         replace_link(parent)?;
+        move_aside_if_made_by_someone_else(parent)?;
         std::fs::create_dir_all(parent).context("create the Cipher Desk folder")?;
         apply(parent, FOLDER_SDDL).context("lock the Cipher Desk folder")?;
     }
@@ -89,6 +92,78 @@ pub fn lock_down(dir: &Path) -> anyhow::Result<()> {
         crate::config::save_settings(&settings)?;
     }
     Ok(())
+}
+
+/// Any Windows account may create folders in `ProgramData`. Someone could
+/// make `ProgramData\Cipher Desk` (and files inside it, with permissions of
+/// their own) before the service is installed, and keep control of what they
+/// made: settings, the always-allowed devices, the Received folder the
+/// service writes to. Cipher Desk's own copy is always owned by Windows
+/// itself or by Administrators ([`apply`] sets that), an owner an ordinary
+/// account cannot give a folder; anything else is moved aside, unused, with
+/// everything in it, and a fresh folder is made.
+fn move_aside_if_made_by_someone_else(folder: &Path) -> anyhow::Result<()> {
+    if !folder.exists() {
+        return Ok(());
+    }
+    let ours = owned_by_system_or_admins(folder).with_context(|| {
+        format!(
+            "could not check who made {}; remove that folder and try again",
+            folder.display()
+        )
+    })?;
+    if ours {
+        return Ok(());
+    }
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    let aside = folder.with_file_name(format!("Cipher Desk (not trusted, moved {secs})"));
+    tracing::warn!(
+        from = %folder.display(),
+        to = %aside.display(),
+        "the Cipher Desk folder was made by someone else; moving it aside unused"
+    );
+    std::fs::rename(folder, &aside).with_context(|| {
+        format!(
+            "{} was made by someone else and could not be moved aside; remove it and try again",
+            folder.display()
+        )
+    })
+}
+
+/// Whether `path` is owned by Windows itself (SYSTEM) or the Administrators
+/// group. `None` if its owner cannot be read.
+fn owned_by_system_or_admins(path: &Path) -> Option<bool> {
+    let path_w = wide(path.as_os_str());
+    let mut owner = PSID::default();
+    let mut sd = PSECURITY_DESCRIPTOR::default();
+    // SAFETY: NUL-terminated path; valid out-pointers; `sd` is freed below.
+    let err = unsafe {
+        GetNamedSecurityInfoW(
+            PCWSTR(path_w.as_ptr()),
+            SE_FILE_OBJECT,
+            OWNER_SECURITY_INFORMATION,
+            Some(&mut owner),
+            None,
+            None,
+            None,
+            &mut sd,
+        )
+    };
+    if err.0 != 0 {
+        return None;
+    }
+    // SAFETY: `owner` points into `sd`, which is still alive here.
+    let ours = unsafe {
+        IsWellKnownSid(owner, WinBuiltinAdministratorsSid).as_bool()
+            || IsWellKnownSid(owner, WinLocalSystemSid).as_bool()
+    };
+    // SAFETY: `sd` was allocated by Windows with LocalAlloc.
+    unsafe {
+        let _ = LocalFree(Some(HLOCAL(sd.0)));
+    }
+    Some(ours)
 }
 
 /// `<dir>\secrets`, created locked if missing ([`lock_down`] checks the
