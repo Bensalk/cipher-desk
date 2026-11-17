@@ -2,6 +2,30 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v1.0.0 (17 Nov 2026)
+
+**The first stable release.** It contains everything from the v0.3.33 and v0.3.34 test builds below. What changed since v0.3.31:
+
+### Security
+- **"Ask to connect" can no longer be typed into before you press Allow.** Keys sent by a specially made viewer while sign-in was finishing are now thrown away.
+- **The background service's folder can't be set up by someone else first** on a computer with several accounts; such a folder is moved aside unused.
+- **Two-step verification:** each code works only once, and the "remember this device" key is kept in Windows Credential Manager (or the Linux keyring), not in a file.
+- **File names that disguise their real type are refused.**
+
+### Added
+- **Unblock from the tray** after too many wrong passwords, with a pop-up when a device is blocked.
+- **The viewer shows how long it is blocked**, and warns when only one or two tries are left.
+- **Cancel button** on the file-copy progress bar.
+- **Received files no longer linger**: they are deleted once something else replaces them on the clipboard.
+
+### Fixed
+- The "everyone blocked" safety net no longer trips from one device's own wrong passwords.
+- The sharing password is read back reliably right after setting up the always-on service.
+- The "Set your own password" box no longer risks an error while closing.
+
+### Known limits
+- The security review was done by the project itself (with AI help); no independent audit yet. See [SECURITY_REVIEW](https://github.com/Bensalk/cipher-desk/blob/main/docs/SECURITY_REVIEW.md) and [THREAT_MODEL](https://github.com/Bensalk/cipher-desk/blob/main/docs/THREAT_MODEL.md), including the risks kept on purpose (R-15 to R-17).
+
 ## v0.3.34 (17 Nov 2026, pre-release)
 
 Test build with the results of a security review.
