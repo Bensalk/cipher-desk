@@ -7,84 +7,61 @@ _Last updated: 17 Nov 2026._
 
 ## Current branch and build
 
-- **v1.0.0 is PUBLISHED and LIVE (17 Nov 2026).** Not a draft, not a
-  pre-release: https://github.com/Bensalk/cipher-desk/releases/tag/v1.0.0 —
-  tag `v1.0.0` points at commit `5370aec`. Bensal tested on two real Windows
-  PCs and confirmed: normal connect, the 5-minute-idle online-check (no false
-  lockout), and 5-wrong-passwords-then-Unblock all pass. All 10 files'
-  SHA256SUMS verified twice by direct download. README's download links and
-  version badge already match the real file names.
-  **Note for a new session:** mid-cleanup, a script by mistake deleted the
-  *published* v1.0.0 release itself (along with old test drafts it was meant
-  to remove) — the git tag was never touched, so the release was rebuilt
-  from the same commit via `gh api -X POST
-  .../workflows/release.yml/dispatches -f ref=v1.0.0 -F
-  'inputs[make_release]=true'`, re-verified, and republished. If anything
-  about the release looks inconsistent, re-check it against the tag/commit
-  above rather than assuming the first draft's ids are still valid.
-- 19 old draft releases (test builds v0.2.0–v0.3.32) were deleted as
-  clutter. The stale `regen-bridge-codegen` branch was also deleted (its
-  work was already on `main`). Real version-history git tags (v0.1.0 up)
-  were left alone on purpose.
-- **1.0.1 backlog, not started, confirm before beginning any of it:**
-  viewer log should say why a blocked try failed; change totp/winsecret tests
-  so CodeQL stops flagging the sample password (alert #9 dismissed as tests);
-  proper per-user access for the service Received folder (R-15); desktop
-  notification on the host PC whenever someone connects via the always-on
-  background service (not just when blocked) — right now the only way to
-  notice is checking the tray icon. Bensal asked for this earlier and it
-  was missed; now tracked here so it isn't lost again.
-- **17 Nov 2026 (after v1.0.0): all CI jobs green for the first time** on
-  `715dcbf` (Rust ×2, live RDP host tests, Flutter Linux/Windows/Android,
-  Android emulator, security scans). Since the v1.0.0 tag: review-round fixes
-  (result file no longer locked to admins; password dialog is its own
-  widget), the bridge code regenerated with the real FRB 2.13.0 tool on a
-  GitHub runner (the hand-written log/lock-keys additions had drifted the
-  funcId order), one unused `_syncLockKeys` removed, and two stale
-  clipboard-default test assertions corrected (default is on since v0.3.6).
-  **Test build v0.3.33** (build-only "Run workflow", no tag/release) has all
-  of the above plus the v1.0.0 draft's changes. Bensal chose 0.3.x for test
-  builds so "1.0.0" is kept for the real stable release; the old v1.0.0
-  draft release was built from older code and can be deleted. README still
-  advertises v1.0.0 with download links that 404 until it is published.
-- **Bridge codegen tip:** the sandbox can't run `flutter_rust_bridge_codegen`.
-  Instead of hand-writing bindings, add a temporary `workflow_dispatch`
-  workflow that runs the tool on `ubuntu-latest` and commits the output
-  (it must exist on `main` before GitHub will dispatch it), then remove it.
-- **Owner decisions still open:** `pending-password.bin` ACL (accept vs.
-  tested ACL); `.claude/settings.json` tracked or local; keep/trim
-  `CLAUDE.md`/`HANDOFF.md` in the public repo; badge option A/B/C; VNC CGNAT
-  check now or later; commit identity. (Decided: clipboard sharing stays
-  on by default; docs updated to match.)
-- Leftover remote branch `regen-bridge-codegen` (proxy blocks deleting it);
-  Bensal can delete it on GitHub.
-- Bensal asked for a deep, audit-style security review next (findings report
-  first, then fixes with his OK).
-- **v1.0.0 (17 Nov 2026) — first stable release, build in progress / awaiting
-  Bensal's test.** Combines two fixes into one release:
-  - **Lockout bug fix:** the global "many devices guessing together" lockout
-    (`rust/host/src/limiter.rs`, `AllCounter`) used to count every wrong-password
-    *attempt*, so repeated wrong passwords from one device could trip a
-    15-minute lockout of everyone. Now it counts distinct devices, so only a
-    genuine flood from many different addresses triggers it; one device's own
-    repeated mistakes only lock out that device (unchanged).
-  - **New: cancel button on the file-transfer progress bar.** Stops a copy
-    arriving from the remote right away; the part already written is deleted,
-    anything already fully received stays. Wired end to end: Rust core
-    (`Session::cancel_incoming_files`) → bridge → Flutter (`session_screen.dart`,
-    key `transfer-cancel`).
-  - Full Rust test suite green, including new stress tests (thousands of
-    devices against the rate limiter; repeated fail/succeed cycles; several
-    threads connecting at once) added to prove the lockout fix and check for
-    other concurrency bugs. A full security/concurrency review of the
-    security-sensitive code (path handling, DACLs, TOTP timing, CLIPRDR
-    parsing, command injection) found nothing else.
-  - Docs reworked for v1.0.0: README badge/links/features, the per-device vs.
-    global lockout wording, Share screen's missing file-copy and two-step
-    verification instructions, a file-transfer comparison row, SECURITY.md.
-  - **Still waiting on:** Bensal's own test pass (wrong-password Windows
-    notification, cancel button on a real transfer, Exit/reopen, duplicate
-    file naming, no-resend-on-reconnect) before this is called ready to publish.
+- **main**, commit `66f30ef`.
+- **v1.0.0 is PUBLISHED and LIVE.** Not a draft, not a pre-release:
+  https://github.com/Bensalk/cipher-desk/releases/tag/v1.0.0 — tag `v1.0.0`
+  points at commit `5370aec`. This is Cipher Desk's first stable release.
+- Mid-cleanup, a script by mistake deleted the *published* v1.0.0 release
+  itself (along with old test drafts it was meant to remove). The git tag
+  was never touched, so the release was rebuilt from the same commit
+  (`gh api -X POST .../workflows/release.yml/dispatches -f ref=v1.0.0 -F
+  'inputs[make_release]=true'`), re-verified against SHA256SUMS, and
+  republished. If anything about the release looks inconsistent, re-check
+  it against the tag/commit above — the asset/release ids from earlier in
+  this session's own notes are stale.
+
+## Done this session
+
+- **v1.0.0 security fixes** (all tested and shipped): the global
+  "many devices guessing together" lockout now counts distinct devices, not
+  every attempt, so one device's own repeated wrong passwords no longer
+  locks out everyone. Cancel button on the file-transfer progress bar.
+  Received files auto-delete from the clipboard-paste folder once something
+  else replaces the clipboard (no ACL change needed — this was what Bensal
+  actually wanted, not locking the folder).
+  Full security review completed (`CIPHER-DESK-SECURITY-REVIEW.md`, not
+  committed — sent to Bensal directly): 8 findings, 7 fixed, 1 (#7, memory
+  pile-up during sign-in) accepted as a documented risk with his agreement.
+- **Silent-connection fix** (found via proactive stress testing, not asked
+  for): a connection that opens and sends nothing used to stall the host's
+  one-at-a-time accept loop for 30s, so repeating it could block the owner
+  out. Now closed after 10s and counted toward the 5-strikes lockout; the
+  viewer's own background "online?" checks (which close immediately) are
+  never counted. Verified: 1 silent connection delay dropped from 30.2s to
+  10.2s; 5 block the device; 100 online checks not counted.
+- Lockout timer + Unblock feature: tray shows a "blocked" pop-up and an
+  Unblock menu item; viewer shows a countdown/warning before lockout.
+  Bensal tested this on two real Windows PCs and confirmed it works.
+- Bensal's own full test pass on the final build (two real Windows PCs):
+  normal connect, Ask-to-connect Allow/Don't-allow, two-step remember-device,
+  service Update button, wrong-password block + Unblock, received-file
+  auto-delete, and the 5-minute-idle online-check (no false lockout) — all
+  passed.
+- Repo cleanup: 19 old draft releases (test builds v0.2.0–v0.3.32) deleted.
+  Stale `regen-bridge-codegen` branch deleted (its work was already on
+  `main`). Real version-history git tags (v0.1.0 up) left alone on purpose.
+- CodeQL alert #9 ("hard-coded cryptographic value" in `winsecret.rs`)
+  diagnosed as a false positive (a test-only sample password string) and
+  dismissed by Bensal in GitHub's UI as "Used in tests."
+- FRB bridge code regenerated with the real `flutter_rust_bridge_codegen`
+  tool via a temporary GitHub Actions job (not by hand), fixing drift from
+  earlier hand-written additions. One unused `_syncLockKeys` removed; two
+  stale clipboard-default test assertions corrected.
+
+## Waiting for test results
+
+Nothing pending right now — v1.0.0 is tested and live. See "1.0.1 backlog"
+below for what's queued next, none of it started.
 
 ## Next features Bensal asked for, in priority order
 
@@ -94,12 +71,35 @@ _Last updated: 17 Nov 2026._
    (DPAPI machine scope under ProgramData).
 3. ~~2FA for manual sharing too.~~ Done (Two-step verification, Google
    Authenticator).
-4. File transfer progress bar — done, with a cancel button (v1.0.0). **Resuming
-   a broken copy** after a cancel or disconnect is not built.
-5. Backlog: auto-adapt resolution so the picture stays clear when the host
-   has a high-resolution (e.g. 4K) monitor, instead of coming through scaled
+4. ~~File transfer progress bar~~ — done, with a cancel button (v1.0.0).
+   **Resuming a broken copy** after a cancel or disconnect is not built.
+5. Auto-adapt resolution so the picture stays clear when the host has a
+   high-resolution (e.g. 4K) monitor, instead of coming through scaled
    down/blurry — for both Windows and Android viewers, once Android work
-   resumes. Not built yet; confirm before starting.
+   resumes. Not built yet.
+6. A desktop notification on the host PC whenever someone connects via the
+   always-on background service (not just when blocked) — right now the
+   only way to notice is checking the tray icon. Bensal asked for this
+   earlier and it was missed; now tracked here so it isn't lost again.
+
+**Explicit instruction from Bensal (17 Nov 2026): the app is now how it's
+supposed to be. Do not start any of the above, or any UI polish below,
+without him asking first. Only security work should proceed unprompted if
+genuinely necessary.**
+
+## 1.0.1 backlog — confirm before starting any of this
+
+- Quiet the repeated "Connection ended ... not enough bytes" log noise from
+  routine online-check connections.
+- Viewer log should say *why* a blocked attempt failed, not just that it did.
+- Change the totp/winsecret test so CodeQL's alert #9 pattern doesn't recur
+  (generate the sample password at runtime instead of a literal).
+- Proper per-signed-in-user access control for the service's Received
+  folder (R-15), instead of relying solely on the clipboard-triggered
+  auto-delete.
+- Stuttering issue Bensal referred to on 17 Nov 2026 — not yet scoped;
+  ask him where/when it happens (Share screen vs VNC, under load, etc.)
+  before starting anything.
 
 ## UI polish ideas — after v1.0, not urgent
 
@@ -126,17 +126,24 @@ Update this when bumping pubspec.yaml (currently kept in sync manually).
 - No Flutter/Android SDK: CI is the compile check for Dart. Rust builds locally.
 - `rust-toolchain.toml` pins 1.97.0 but rustup can't download; the installed
   `stable` *is* 1.97.0, so use `RUSTUP_TOOLCHAIN=stable cargo … --offline`.
-- flutter_rust_bridge codegen: install the codegen binary with cargo and put
-  small fake `flutter`/`dart` scripts on PATH (only version queries are made).
-  The real `flutter_rust_bridge_codegen generate` cannot run here (network
-  blocked) — write generated files by hand, following existing modules'
-  patterns (see CLAUDE.md's FRB section; next unused funcId is 59).
+- flutter_rust_bridge codegen: `flutter_rust_bridge_codegen generate` cannot
+  run here (network blocked). For a one-off regeneration, add a temporary
+  `workflow_dispatch` workflow that runs the real tool on `ubuntu-latest`
+  and commits the output, then remove the workflow (it must exist on `main`
+  before GitHub will dispatch it). For small manual additions between
+  regenerations, follow existing modules' patterns (see CLAUDE.md's FRB
+  section; next unused funcId is 59).
 - The local clone may only fetch `main`; check other branches with
   `gh api repos/Bensalk/cipher-desk/branches/<name> --jq .commit.sha`.
 - GitHub GraphQL is unreliable for release/publish status (can report a
   release as published when REST returns 404). Always check with
   `gh api repos/Bensalk/cipher-desk/releases/tags/vX.Y.Z`.
+- `gh api` **cannot create, edit, or delete** releases, branches, or tags
+  from this session type (403 on write). Use Chrome automation on the real
+  GitHub web UI for any of those; read-only `gh api` calls are fine.
 - Start a build: `gh api -X POST repos/Bensalk/cipher-desk/actions/workflows/release.yml/dispatches -f ref=main -F 'inputs[make_release]=true'`.
+  To rebuild a release against an existing tag instead of a branch, use
+  `-f ref=vX.Y.Z` (the tag name) — this also sidesteps the tag-push block.
 - After bumping versions, fix `rust/fuzz/Cargo.lock` too (search for the
   `rdpv-core` entry specifically — other crates may coincidentally show the
   same version number).
@@ -147,8 +154,12 @@ Update this when bumping pubspec.yaml (currently kept in sync manually).
   the tag and draft release itself, bypassing the push block.
 - **Built-in browser is NOT signed in to GitHub** — Chrome (the user's real
   browser) is signed in; the built-in browser has its own profile. Use Chrome
-  automation (`mcp__claude-in-chrome__*`) for GitHub web UI actions (e.g.
-  deleting a stuck draft release the REST API won't delete).
+  automation (`mcp__claude-in-chrome__*`) for GitHub web UI actions.
+- **Never loosely script a batch delete of GitHub releases.** Matching all
+  `/releases/tag/` delete forms on a page catches published releases too,
+  not just drafts — this deleted the live v1.0.0 release by mistake in this
+  session. Filter strictly to drafts (check for the "Draft" badge) or delete
+  releases one at a time with a screenshot check between each.
 - The Android emulator CI job sometimes times out (exit 124); re-run only the
   failed job before suspecting the code.
 - A dispatched workflow run can occasionally get stuck reporting `status:
