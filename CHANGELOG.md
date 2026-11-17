@@ -2,24 +2,20 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
-## v1.0.1 (17 Nov 2026)
+## v0.3.33 (17 Nov 2026, pre-release)
 
-### Fixed
-- **Sharing password after setting up the always-on service.** The app could fail to read back the password (and the service status) right after setup, so setup looked like it had failed. Fixed.
-- **"Set your own password" box** could, in rare cases, cause an error while closing. Fixed.
-
-### Changed
-- The documentation now says what the app already does: clipboard sharing is on by default for new connections, and can be turned off in Settings or per connection.
-
-## v1.0.0 (17 Nov 2026)
-
-The first stable release.
+Test build before the first stable release.
 
 ### Added
 - **Cancel button on the file-transfer progress bar.** Stops the copy from the remote computer right away; the file still being written is deleted, anything already fully received is kept.
 
 ### Fixed
 - **The "everyone blocked" safety net could trip from one device's own repeated wrong passwords**, even with successful sign-ins in between, instead of only from a flood of different addresses guessing together as intended. It now counts how many *different* devices tried a wrong password, not how many attempts happened — so retrying from the same PC never locks out both PCs for 15 minutes on its own.
+- **Sharing password after setting up the always-on service.** The app could fail to read back the password (and the service status) right after setup, so setup looked like it had failed.
+- **"Set your own password" box** could, in rare cases, cause an error while closing.
+
+### Changed
+- The documentation now says what the app already does: clipboard sharing is on by default for new connections, and can be turned off in Settings or per connection.
 
 ## v0.3.31 (16 Nov 2026)
 

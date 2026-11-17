@@ -16,7 +16,11 @@ _Last updated: 17 Nov 2026._
   GitHub runner (the hand-written log/lock-keys additions had drifted the
   funcId order), one unused `_syncLockKeys` removed, and two stale
   clipboard-default test assertions corrected (default is on since v0.3.6).
-  **No new release cut for these yet** — needs a version bump + Bensal's test.
+  **Test build v0.3.33** (build-only "Run workflow", no tag/release) has all
+  of the above plus the v1.0.0 draft's changes. Bensal chose 0.3.x for test
+  builds so "1.0.0" is kept for the real stable release; the old v1.0.0
+  draft release was built from older code and can be deleted. README still
+  advertises v1.0.0 with download links that 404 until it is published.
 - **Bridge codegen tip:** the sandbox can't run `flutter_rust_bridge_codegen`.
   Instead of hand-writing bindings, add a temporary `workflow_dispatch`
   workflow that runs the tool on `ubuntu-latest` and commits the output
