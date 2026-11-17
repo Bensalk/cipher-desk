@@ -89,12 +89,26 @@ const VAULT_NAME: &str = "cipherdesk-twostep-device";
 /// it and cannot skip the authenticator code. An id older versions kept in
 /// `dir/device-id` is moved there, so computers that remember this device
 /// still do. Without a usable vault the id lasts for this run of the app only,
-/// and the code is asked for again next time.
+/// and the code is asked for again next time. Within one run it never changes.
 ///
 /// Android: `dir/device-id`, inside the app's private storage (the vault
 /// there is used from Kotlin, not from here).
 #[cfg(any(windows, target_os = "linux"))]
 pub fn device_id(dir: &Path) -> std::io::Result<DeviceId> {
+    // The same id for the whole run, whatever the vault does in between
+    // (it can be locked, or come back later), so a reconnect is recognised.
+    static CHOSEN: std::sync::OnceLock<DeviceId> = std::sync::OnceLock::new();
+    if let Some(id) = CHOSEN.get() {
+        return Ok(*id);
+    }
+    let id = device_id_from_vault(dir)?;
+    Ok(*CHOSEN.get_or_init(|| id))
+}
+
+/// The id kept in the vault, moving an older file's id there or making a new
+/// one; a new random id if the vault cannot be used.
+#[cfg(any(windows, target_os = "linux"))]
+fn device_id_from_vault(dir: &Path) -> std::io::Result<DeviceId> {
     use crate::secret::SecretString;
     use crate::vault::{self, VaultError};
 
@@ -107,19 +121,16 @@ pub fn device_id(dir: &Path) -> std::io::Result<DeviceId> {
             }
         }
         Err(VaultError::NotFound) => {}
-        Err(_) => return run_only_id(),
+        Err(_) => return random_id(),
     }
     let id = match read_file_id(&old)? {
         Some(id) => id,
         None => random_id()?,
     };
-    match vault::save(VAULT_NAME, &SecretString::new(to_hex(&id))) {
-        Ok(()) => {
-            let _ = std::fs::remove_file(&old);
-            Ok(id)
-        }
-        Err(_) => run_only_id(),
+    if vault::save(VAULT_NAME, &SecretString::new(to_hex(&id))).is_ok() {
+        let _ = std::fs::remove_file(&old);
     }
+    Ok(id)
 }
 
 /// See the Windows/Linux version: on Android the id stays in the app's
@@ -140,17 +151,6 @@ fn device_id_in_file(dir: &Path) -> std::io::Result<DeviceId> {
     std::fs::create_dir_all(dir)?;
     crate::fsutil::write_atomically(&path, &id)?;
     Ok(id)
-}
-
-/// An id that lasts while the app runs (no vault to keep one in).
-#[cfg(any(windows, target_os = "linux"))]
-fn run_only_id() -> std::io::Result<DeviceId> {
-    static ID: std::sync::OnceLock<DeviceId> = std::sync::OnceLock::new();
-    if let Some(id) = ID.get() {
-        return Ok(*id);
-    }
-    let id = random_id()?;
-    Ok(*ID.get_or_init(|| id))
 }
 
 fn read_file_id(path: &Path) -> std::io::Result<Option<DeviceId>> {
