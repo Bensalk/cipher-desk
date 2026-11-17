@@ -7,16 +7,26 @@ _Last updated: 17 Nov 2026._
 
 ## Current branch and build
 
-- **v1.0.0 DRAFT ready (17 Nov 2026), waiting for Bensal to publish.**
-  Release commit `5370aec`; every check green (CI 7/7, CodeQL, cargo-deny,
-  OSV, gitleaks, fuzz, vendored drift, release builds). Draft id 448424104:
-  10 files, all 9 SHA256SUMS entries verified by downloading. Built from the
-  v0.3.34 test build Bensal passed on two Windows PCs, plus `5370aec`
-  (silent connections closed after 10 s and counted by the lockout; found by
-  a stress test, verified by loopback stress: 1 silent conn 30.2 s -> 10.2 s,
-  5 block the device, 100 online checks not counted). The draft is marked
-  pre-release by the workflow: untick that when publishing.
-- **After publishing:** 1.0.1 ideas: quiet the "Connection ended" log noise;
+- **v1.0.0 is PUBLISHED and LIVE (17 Nov 2026).** Not a draft, not a
+  pre-release: https://github.com/Bensalk/cipher-desk/releases/tag/v1.0.0 —
+  tag `v1.0.0` points at commit `5370aec`. Bensal tested on two real Windows
+  PCs and confirmed: normal connect, the 5-minute-idle online-check (no false
+  lockout), and 5-wrong-passwords-then-Unblock all pass. All 10 files'
+  SHA256SUMS verified twice by direct download. README's download links and
+  version badge already match the real file names.
+  **Note for a new session:** mid-cleanup, a script by mistake deleted the
+  *published* v1.0.0 release itself (along with old test drafts it was meant
+  to remove) — the git tag was never touched, so the release was rebuilt
+  from the same commit via `gh api -X POST
+  .../workflows/release.yml/dispatches -f ref=v1.0.0 -F
+  'inputs[make_release]=true'`, re-verified, and republished. If anything
+  about the release looks inconsistent, re-check it against the tag/commit
+  above rather than assuming the first draft's ids are still valid.
+- 19 old draft releases (test builds v0.2.0–v0.3.32) were deleted as
+  clutter. The stale `regen-bridge-codegen` branch was also deleted (its
+  work was already on `main`). Real version-history git tags (v0.1.0 up)
+  were left alone on purpose.
+- **1.0.1 backlog, not started, confirm before beginning any of it:**
   viewer log should say why a blocked try failed; change totp/winsecret tests
   so CodeQL stops flagging the sample password (alert #9 dismissed as tests);
   proper per-user access for the service Received folder (R-15); desktop
@@ -86,7 +96,10 @@ _Last updated: 17 Nov 2026._
    Authenticator).
 4. File transfer progress bar — done, with a cancel button (v1.0.0). **Resuming
    a broken copy** after a cancel or disconnect is not built.
-5. Backlog: auto-adapt host resolution to the viewer's window size.
+5. Backlog: auto-adapt resolution so the picture stays clear when the host
+   has a high-resolution (e.g. 4K) monitor, instead of coming through scaled
+   down/blurry — for both Windows and Android viewers, once Android work
+   resumes. Not built yet; confirm before starting.
 
 ## UI polish ideas — after v1.0, not urgent
 
