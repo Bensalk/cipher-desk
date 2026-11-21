@@ -10,16 +10,20 @@
 //! The tray always starts the conversation, one line per request, one line
 //! per answer:
 //!
-//! - `POLL` → five fields separated by tabs: `online` or `connected`; `n`
+//! - `POLL` → six fields separated by tabs: `online` or `connected`; `n`
 //!   (> 0 means "please send the files copied right now, as answer number
 //!   `n`"); who is connected (device name and address, or `-`); how many
-//!   wrong sign-ins so far; and who made the last one (or `-`).
+//!   wrong sign-ins so far; who made the last one (or `-`); and who is
+//!   blocked right now after too many wrong passwords (or `-`).
 //! - `FILES <n>` then the paths, each after a tab → `ok`. (Tabs cannot appear
 //!   in Windows file names.)
 //! - `OFFLINE` → `ok`, then the worker ends and the service keeps sharing off
 //!   until "Go online" or the next restart.
 //! - `DISCONNECT` → `ok`, then the worker ends; the service starts a fresh one
 //!   at once, which drops the viewer.
+//! - `UNBLOCK` → `ok`: devices blocked after too many wrong passwords may try
+//!   again at once (the person at this computer chose to; only the tray,
+//!   running as that person, can ask).
 //!
 //! Only this computer can reach the pipe (remote clients are refused), only
 //! the system account and signed-in people may open it, and each side checks
@@ -93,6 +97,10 @@ pub struct Link {
     who: Mutex<[Option<String>; 2]>,
     /// Wrong sign-ins seen by this worker, and who made the last one.
     failures: Mutex<(u64, String)>,
+    /// Who was last blocked after too many wrong passwords, and until when.
+    blocked: Mutex<Option<(String, Instant)>>,
+    /// Clear the wrong-password blocks of each listener (set once they run).
+    unblockers: Mutex<Vec<rdpv_host::Unblocker>>,
     tray_seen_ms: AtomicU64,
     ask: Mutex<Ask>,
     answered: Condvar,
@@ -139,6 +147,31 @@ impl Link {
             .lock()
             .ok()
             .and_then(|mut w| w.get_mut(door as usize).and_then(Option::take))
+    }
+
+    /// The listeners' handles for clearing wrong-password blocks.
+    pub fn set_unblockers(&self, unblockers: Vec<rdpv_host::Unblocker>) {
+        if let Ok(mut u) = self.unblockers.lock() {
+            *u = unblockers;
+        }
+    }
+
+    /// `who` is refused for `minutes` after too many wrong passwords.
+    pub fn locked_out(&self, who: String, minutes: u64) {
+        if let Ok(mut b) = self.blocked.lock() {
+            *b = Some((who, Instant::now() + Duration::from_secs(minutes * 60)));
+        }
+    }
+
+    /// Who is blocked right now, if anyone.
+    fn blocked_now(&self) -> Option<String> {
+        let mut b = self.blocked.lock().ok()?;
+        if b.as_ref()
+            .is_some_and(|(_, until)| Instant::now() >= *until)
+        {
+            *b = None;
+        }
+        b.as_ref().map(|(who, _)| who.clone())
     }
 
     /// A wrong user name or password was tried (`who`: name and address).
@@ -214,11 +247,13 @@ impl Link {
                     )
                 })
                 .unwrap_or((0, "-".into()));
+            let blocked = self.blocked_now().unwrap_or_else(|| "-".into());
             return (
                 format!(
-                    "{state}\t{want}\t{}\t{count}\t{}",
+                    "{state}\t{want}\t{}\t{count}\t{}\t{}",
                     clean(&who),
-                    clean(&last)
+                    clean(&last),
+                    clean(&blocked)
                 ),
                 None,
             );
@@ -248,6 +283,18 @@ impl Link {
             "DISCONNECT" => {
                 tracing::info!("tray: disconnect the viewer");
                 ("ok".into(), Some(EXIT_RESTART))
+            }
+            "UNBLOCK" => {
+                tracing::info!("tray: unblock devices blocked after wrong passwords");
+                if let Ok(u) = self.unblockers.lock() {
+                    for unblocker in u.iter() {
+                        unblocker.unblock();
+                    }
+                }
+                if let Ok(mut b) = self.blocked.lock() {
+                    *b = None;
+                }
+                ("ok".into(), None)
             }
             _ => ("?".into(), None),
         }
@@ -393,6 +440,8 @@ pub struct Report {
     pub failures: u64,
     /// Who made the last wrong sign-in.
     pub last_failure: Option<String>,
+    /// Who is blocked right now after too many wrong passwords.
+    pub blocked: Option<String>,
 }
 
 /// What the worker says about sharing.
@@ -453,12 +502,14 @@ impl Client {
         let who = field(parts.next());
         let failures = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
         let last_failure = field(parts.next());
+        let blocked = field(parts.next());
         Ok(Report {
             status,
             want,
             who,
             failures,
             last_failure,
+            blocked,
         })
     }
 
@@ -482,5 +533,9 @@ impl Client {
 
     pub fn disconnect_viewer(&mut self) -> std::io::Result<()> {
         self.request("DISCONNECT").map(|_| ())
+    }
+
+    pub fn unblock_devices(&mut self) -> std::io::Result<()> {
+        self.request("UNBLOCK").map(|_| ())
     }
 }

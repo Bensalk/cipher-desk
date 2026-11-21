@@ -54,6 +54,7 @@ const CMD_OFFLINE: usize = 11;
 const CMD_ONLINE: usize = 12;
 const CMD_HISTORY: usize = 13;
 const CMD_EXIT: usize = 14;
+const CMD_UNBLOCK: usize = 15;
 
 /// "Exit" was chosen: end with [`crate::link::EXIT_QUIT`].
 static EXITING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -93,6 +94,10 @@ struct Tray {
     last_failure: Option<String>,
     /// Wrong sign-ins already mentioned in a "Connected" pop-up.
     failures_told: u64,
+    /// Who is blocked right now after too many wrong passwords, and the last
+    /// block a pop-up was shown for.
+    blocked: Option<String>,
+    blocked_told: Option<String>,
 }
 
 /// A message popped up above the icon.
@@ -177,6 +182,8 @@ pub fn run() -> anyhow::Result<()> {
                 failures: 0,
                 last_failure: None,
                 failures_told: 0,
+                blocked: None,
+                blocked_told: None,
             });
         });
         poll();
@@ -274,6 +281,19 @@ fn poll() {
             tray.failures_seen = Some(r.failures);
             tray.failures = r.failures;
             tray.last_failure.clone_from(&r.last_failure);
+            // A device was just blocked: say so, and how to let it in again.
+            if r.blocked != tray.blocked_told {
+                if let Some(who) = &r.blocked {
+                    popup = Some(Popup {
+                        text: format!(
+                            "Blocked for up to 15 minutes after too many wrong passwords: {who}\nTo let it try again now, right-click this icon and choose Unblock."
+                        ),
+                        warning: true,
+                    });
+                }
+                tray.blocked_told.clone_from(&r.blocked);
+            }
+            tray.blocked.clone_from(&r.blocked);
         }
 
         let previous = tray.status;
@@ -420,14 +440,14 @@ fn notify(tray: &Tray, message: NOTIFY_ICON_MESSAGE, popup: Option<Popup>) -> bo
 }
 
 fn show_menu(hwnd: HWND) {
-    let (status, who, failures) = with_tray(|t| {
+    let (status, who, failures, blocked) = with_tray(|t| {
         let failures = (t.failures > 0).then(|| {
             let last = t.last_failure.clone().unwrap_or_else(|| "unknown".into());
             format!("Wrong passwords: {} (last from {last})", t.failures)
         });
-        (t.status, t.who.clone(), failures)
+        (t.status, t.who.clone(), failures, t.blocked.is_some())
     })
-    .unwrap_or((Status::Offline, None, None));
+    .unwrap_or((Status::Offline, None, None, false));
     let failures_line: Option<Vec<u16>> = failures.map(|f| f.encode_utf16().chain([0]).collect());
     let title: Vec<u16> = status_text(status).encode_utf16().chain([0]).collect();
     let who_line: Option<Vec<u16>> = who.filter(|_| status == Status::Connected).map(|w| {
@@ -446,6 +466,14 @@ fn show_menu(hwnd: HWND) {
         }
         if let Some(line) = &failures_line {
             let _ = AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, PCWSTR(line.as_ptr()));
+        }
+        if blocked && status != Status::Offline {
+            let _ = AppendMenuW(
+                menu,
+                MF_STRING,
+                CMD_UNBLOCK,
+                w!("Unblock (let blocked devices try again now)"),
+            );
         }
         let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
         match status {
@@ -501,6 +529,28 @@ fn command(id: usize) {
                 tray.retry_at = Instant::now() + RECONNECT;
                 tray.status = Status::Offline;
                 notify(tray, NIM_MODIFY, None);
+            });
+        }
+        CMD_UNBLOCK => {
+            with_tray(|tray| {
+                let done = tray
+                    .link
+                    .as_mut()
+                    .is_some_and(|link| link.unblock_devices().is_ok());
+                tracing::info!(done, "tray: unblock");
+                if done {
+                    tray.blocked = None;
+                    tray.blocked_told = None;
+                    notify(
+                        tray,
+                        NIM_MODIFY,
+                        Some(Popup {
+                            text: "Unblocked: blocked devices can try their password again now."
+                                .into(),
+                            warning: false,
+                        }),
+                    );
+                }
             });
         }
         CMD_ONLINE => go_online(),

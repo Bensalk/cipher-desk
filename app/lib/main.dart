@@ -41,6 +41,10 @@ Future<void> main(List<String> args) async {
   // Opening the app turns screen sharing back on after "Exit" in the tray
   // icon (if the background service is installed). No prompt, no waiting.
   HostService.goOnlineQuietly();
+  // A previous run that crashed or was closed mid-setup may have left a
+  // result or pending-password file behind; neither should sit on disk
+  // longer than it has to.
+  HostService.cleanupLeftoverSecrets();
 }
 
 class CipherDeskApp extends StatelessWidget {

@@ -27,6 +27,10 @@ mod link;
 mod logfiles;
 #[cfg(windows)]
 mod manage;
+// Not Windows-gated: this is pure path logic with no Windows dependency of
+// its own, and its tests need to run on Linux CI too (manage.rs, which uses
+// it, is Windows-only like the rest of this binary).
+mod result_path;
 #[cfg(windows)]
 mod secure;
 #[cfg(windows)]

@@ -5,193 +5,263 @@
 
 import '../frb_generated.dart';
 import 'errors.dart';
+
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-
-            // These functions are ignored because they are not marked as `pub`: `approval`, `changed`, `clamped`, `describe_files`, `disconnect`, `drive`, `ended`, `file_received`, `frame_ready`, `frame`, `from_core`, `keep_running`, `new`, `offer_local_clipboard`, `pause`, `pending_disconnect`, `policy`, `poll`, `reconnect`, `reconnecting`, `region_pixels`, `remote_clipboard`, `resized`, `run`, `send_files`, `send_input`, `send`, `size`, `spawn`, `status`, `to_core`, `union`, `vnc`, `wait_for_approval`
+// These functions are ignored because they are not marked as `pub`: `approval`, `cancel_incoming_files`, `changed`, `clamped`, `describe_files`, `describe_size`, `disconnect`, `drive`, `ended`, `file_received`, `frame_ready`, `frame`, `from_core`, `keep_running`, `new`, `offer_local_clipboard`, `pause`, `pending_disconnect`, `policy`, `poll`, `reconnect`, `reconnecting`, `region_pixels`, `remote_clipboard`, `resized`, `run`, `send_files`, `send_input`, `send`, `size`, `spawn`, `status`, `to_core`, `union`, `vnc`, `wait_for_approval`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Command`, `Drive`, `Reconnect`, `Remote`, `Target`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`
 
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RdpSession>>
+abstract class RdpSession implements RustOpaqueInterface {
+  /// Answers the certificate prompt.
+  void approveCertificate({required bool approve});
 
-            
+  /// Stops a copy of files arriving from the remote computer right now.
+  /// The file still being written is deleted; anything from the same copy
+  /// that already finished is kept. Does nothing if nothing is arriving.
+  void cancelIncomingFiles();
 
-            
-                // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RdpSession>>
-                abstract class RdpSession implements RustOpaqueInterface {
-                    /// Answers the certificate prompt.
- void  approveCertificate({required bool approve });
+  /// Creates a handle (no connection yet).
+  static RdpSession create() =>
+      RustLib.instance.api.crateApiSessionRdpSessionCreate();
 
+  /// Sends Ctrl+Alt+Del to the remote computer.
+  void ctrlAltDel();
 
-/// Creates a handle (no connection yet).
-static RdpSession  create()=>RustLib.instance.api.crateApiSessionRdpSessionCreate();
+  /// Disconnects politely.
+  void disconnect();
 
+  /// Disconnects politely because the app stayed in the background too long
+  /// (Android, decision 8). The session ends with that reason, so the UI can
+  /// explain it and offer to reconnect.
+  void disconnectInBackground();
 
-/// Sends Ctrl+Alt+Del to the remote computer.
- void  ctrlAltDel();
+  /// Presses or releases a key by PC scancode (set 1).
+  void key({required int scancode, required bool extended, required bool down});
 
+  /// Presses or releases a mouse button: 0 = left, 1 = right, 2 = middle.
+  void mouseButton({
+    required int x,
+    required int y,
+    required int button,
+    required bool down,
+  });
 
-/// Disconnects politely.
- void  disconnect();
+  /// Moves the remote mouse pointer (remote-desktop coordinates).
+  void mouseMove({required int x, required int y});
 
+  /// Offers this device's clipboard text to the remote computer. It is sent
+  /// only if clipboard sharing to the remote is allowed for this connection,
+  /// and only when the remote pastes.
+  void offerClipboardText({required String text});
 
-/// Disconnects politely because the app stayed in the background too long
-/// (Android, decision 8). The session ends with that reason, so the UI can
-/// explain it and offer to reconnect.
- void  disconnectInBackground();
+  /// Sends local files to the remote computer, which downloads them. Sent
+  /// only if clipboard sharing to the remote is allowed for this connection.
+  void sendFiles({required List<String> paths});
 
+  /// Connects on a worker thread; updates arrive on `sink` (a Dart stream).
+  /// The password is used for this connection only and never stored here.
+  /// `pins_path` is the certificate pin file in the app's private data folder.
+  /// Can be called once per handle.
+  Stream<SessionUpdate> start({
+    required String host,
+    required int port,
+    required String username,
+    required String password,
+    required int width,
+    required int height,
+    required String pinsPath,
+    required ClipboardMode clipboardDirection,
+    required String downloadDir,
+    required int idleMinutes,
+    required PictureQuality quality,
+    required bool shareScreen,
+    required String authCode,
+  });
 
-/// Presses or releases a key by PC scancode (set 1).
- void  key({required int scancode , required bool extended , required bool down });
+  /// Connects with the VNC method (no username; no clipboard or certificate).
+  /// Only addresses on the own network or Tailscale are allowed.
+  Stream<SessionUpdate> startVnc({
+    required String host,
+    required int port,
+    required String password,
+    required int idleMinutes,
+  });
 
+  /// Like [`RdpSession::start_vnc`], with the password saved in the OS vault.
+  Stream<SessionUpdate> startVncWithSavedPassword({
+    required String connectionId,
+    required String host,
+    required int port,
+    required int idleMinutes,
+  });
 
-/// Presses or releases a mouse button: 0 = left, 1 = right, 2 = middle.
- void  mouseButton({required int x , required int y , required int button , required bool down });
+  /// Like [`RdpSession::start`], but reads the saved password from the OS
+  /// vault inside Rust, so it never passes through the UI (Windows, Linux).
+  /// The caller must have confirmed the user's identity first (S5).
+  Stream<SessionUpdate> startWithSavedPassword({
+    required String connectionId,
+    required String host,
+    required int port,
+    required String username,
+    required int width,
+    required int height,
+    required String pinsPath,
+    required ClipboardMode clipboardDirection,
+    required String downloadDir,
+    required int idleMinutes,
+    required PictureQuality quality,
+    required bool shareScreen,
+    required String authCode,
+  });
 
+  /// Sends the viewer's lock-key state to the host so both keyboards are in
+  /// sync. Call once right after the session connects.
+  void syncLockKeys({
+    required bool capsLock,
+    required bool numLock,
+    required bool scrollLock,
+  });
 
-/// Moves the remote mouse pointer (remote-desktop coordinates).
- void  mouseMove({required int x , required int y });
+  /// Types text (on-screen keyboards, IMEs, pasted text is NOT sent this way).
+  void typeText({required String text});
 
-
-/// Offers this device's clipboard text to the remote computer. It is sent
-/// only if clipboard sharing to the remote is allowed for this connection,
-/// and only when the remote pastes.
- void  offerClipboardText({required String text });
-
-
-/// Sends local files to the remote computer, which downloads them. Sent
-/// only if clipboard sharing to the remote is allowed for this connection.
- void  sendFiles({required List<String> paths });
-
-
-/// Connects on a worker thread; updates arrive on `sink` (a Dart stream).
-/// The password is used for this connection only and never stored here.
-/// `pins_path` is the certificate pin file in the app's private data folder.
-/// Can be called once per handle.
- Stream<SessionUpdate>  start({required String host , required int port , required String username , required String password , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality , required bool shareScreen , required String authCode });
-
-
-/// Connects with the VNC method (no username; no clipboard or certificate).
-/// Only addresses on the own network or Tailscale are allowed.
- Stream<SessionUpdate>  startVnc({required String host , required int port , required String password , required int idleMinutes });
-
-
-/// Like [`RdpSession::start_vnc`], with the password saved in the OS vault.
- Stream<SessionUpdate>  startVncWithSavedPassword({required String connectionId , required String host , required int port , required int idleMinutes });
-
-
-/// Like [`RdpSession::start`], but reads the saved password from the OS
-/// vault inside Rust, so it never passes through the UI (Windows, Linux).
-/// The caller must have confirmed the user's identity first (S5).
- Stream<SessionUpdate>  startWithSavedPassword({required String connectionId , required String host , required int port , required String username , required int width , required int height , required String pinsPath , required ClipboardMode clipboardDirection , required String downloadDir , required int idleMinutes , required PictureQuality quality , required bool shareScreen , required String authCode });
-
-
-/// Sends the viewer's lock-key state to the host so both keyboards are in
-/// sync. Call once right after the session connects.
- void  syncLockKeys({required bool capsLock , required bool numLock , required bool scrollLock });
-
-
-/// Types text (on-screen keyboards, IMEs, pasted text is NOT sent this way).
- void  typeText({required String text });
-
-
-/// Scrolls; one notch is 120, positive scrolls up.
- void  wheel({required bool vertical , required int delta });
-
-
-
-                    
-                }
-                
+  /// Scrolls; one notch is 120, positive scrolls up.
+  void wheel({required bool vertical, required int delta});
+}
 
 /// Clipboard sharing for one connection (S6).
 enum ClipboardMode {
-                    off,
-/// Both directions.
-both,
-/// Only from this device to the remote computer.
-toRemoteOnly,
-/// Only from the remote computer to this device.
-fromRemoteOnly,
-                    ;
-                    
-                }
+  off,
+
+  /// Both directions.
+  both,
+
+  /// Only from this device to the remote computer.
+  toRemoteOnly,
+
+  /// Only from the remote computer to this device.
+  fromRemoteOnly,
+}
 
 /// Picture quality of a connection.
 enum PictureQuality {
-                    /// Exact pixels with Cipher Desk Host; uses the most data.
-best,
-/// Sharp picture with compression; good for most links.
-balanced,
-/// Least data and quickest response on slow links.
-speed,
-                    ;
-                    
-                }
+  /// Exact pixels with Cipher Desk Host; uses the most data.
+  best,
+
+  /// Sharp picture with compression; good for most links.
+  balanced,
+
+  /// Least data and quickest response on slow links.
+  speed,
+}
 
 /// Something the UI should show. Only the fields named for its `kind` are set.
-class SessionUpdate  {
-                final UpdateKind kind;
-final String? label;
-final bool connected;
-final String? fingerprint;
-final String? pinned;
-final int x;
-final int y;
-final int width;
-final int height;
-final Uint8List rgba;
-final ErrorInfo? error;
-final String? text;
+class SessionUpdate {
+  final UpdateKind kind;
+  final String? label;
+  final bool connected;
+  final String? fingerprint;
+  final String? pinned;
+  final int x;
+  final int y;
+  final int width;
+  final int height;
+  final Uint8List rgba;
+  final ErrorInfo? error;
+  final String? text;
 
-                const SessionUpdate({required this.kind ,this.label ,required this.connected ,this.fingerprint ,this.pinned ,required this.x ,required this.y ,required this.width ,required this.height ,required this.rgba ,this.error ,this.text ,});
+  const SessionUpdate({
+    required this.kind,
+    this.label,
+    required this.connected,
+    this.fingerprint,
+    this.pinned,
+    required this.x,
+    required this.y,
+    required this.width,
+    required this.height,
+    required this.rgba,
+    this.error,
+    this.text,
+  });
 
+  @override
+  int get hashCode =>
+      kind.hashCode ^
+      label.hashCode ^
+      connected.hashCode ^
+      fingerprint.hashCode ^
+      pinned.hashCode ^
+      x.hashCode ^
+      y.hashCode ^
+      width.hashCode ^
+      height.hashCode ^
+      rgba.hashCode ^
+      error.hashCode ^
+      text.hashCode;
 
-
-
-
-        @override
-        int get hashCode => kind.hashCode^label.hashCode^connected.hashCode^fingerprint.hashCode^pinned.hashCode^x.hashCode^y.hashCode^width.hashCode^height.hashCode^rgba.hashCode^error.hashCode^text.hashCode;
-
-
-
-        @override
-        bool operator ==(Object other) =>
-            identical(this, other) ||
-            other is SessionUpdate &&
-                runtimeType == other.runtimeType
-                && kind == other.kind&& label == other.label&& connected == other.connected&& fingerprint == other.fingerprint&& pinned == other.pinned&& x == other.x&& y == other.y&& width == other.width&& height == other.height&& rgba == other.rgba&& error == other.error&& text == other.text;
-
-            }
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SessionUpdate &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          label == other.label &&
+          connected == other.connected &&
+          fingerprint == other.fingerprint &&
+          pinned == other.pinned &&
+          x == other.x &&
+          y == other.y &&
+          width == other.width &&
+          height == other.height &&
+          rgba == other.rgba &&
+          error == other.error &&
+          text == other.text;
+}
 
 /// What kind of [`SessionUpdate`] this is.
 enum UpdateKind {
-                    /// Status text for the status indicator (`label`, `connected`).
-status,
-/// First connection to this computer: ask the user to compare and approve
-/// `fingerprint`. Nothing has been sent to the computer.
-certificateApproval,
-/// The certificate changed since it was approved (`pinned`, `fingerprint` =
-/// presented). The connection was blocked and nothing was sent.
-certificateChanged,
-/// The desktop size (`width`, `height`), before the first frame and after resizes.
-resized,
-/// Changed pixels: `rgba` rows for the rectangle (`x`, `y`, `width`, `height`).
-frame,
-/// The session ended. `error` is `None` when the user disconnected.
-ended,
-/// Text copied on the remote computer (`text`), for this device's clipboard.
-remoteClipboard,
-/// Text copied on the remote computer was larger than allowed and was dropped.
-remoteClipboardTooLarge,
-/// A file sent by the remote finished arriving (`text` = its name).
-fileReceived,
-/// Files copied on the remote started arriving; `text` says how many and
-/// how big (e.g. "3 files, 1.2 GB").
-filesIncoming,
-/// The network dropped; reconnect attempt `x` of `y` is under way (`label`).
-/// Input is ignored until `Status` with `connected` arrives again.
-reconnecting,
-                    ;
-                    
-                }
-            
+  /// Status text for the status indicator (`label`, `connected`).
+  status,
+
+  /// First connection to this computer: ask the user to compare and approve
+  /// `fingerprint`. Nothing has been sent to the computer.
+  certificateApproval,
+
+  /// The certificate changed since it was approved (`pinned`, `fingerprint` =
+  /// presented). The connection was blocked and nothing was sent.
+  certificateChanged,
+
+  /// The desktop size (`width`, `height`), before the first frame and after resizes.
+  resized,
+
+  /// Changed pixels: `rgba` rows for the rectangle (`x`, `y`, `width`, `height`).
+  frame,
+
+  /// The session ended. `error` is `None` when the user disconnected.
+  ended,
+
+  /// Text copied on the remote computer (`text`), for this device's clipboard.
+  remoteClipboard,
+
+  /// Text copied on the remote computer was larger than allowed and was dropped.
+  remoteClipboardTooLarge,
+
+  /// A file sent by the remote finished arriving (`text` = its name).
+  fileReceived,
+
+  /// Files copied on the remote started arriving; `text` says how many and
+  /// how big (e.g. "3 files, 1.2 GB"). Also sent while they arrive, with
+  /// `label` = "progress", `x` = percent done and `text` = "12.0 MB of 1.2 GB".
+  filesIncoming,
+
+  /// The network dropped; reconnect attempt `x` of `y` is under way (`label`).
+  /// Input is ignored until `Status` with `connected` arrives again.
+  reconnecting,
+
+  /// A copy of incoming files was cancelled from this side (the partial
+  /// file was removed; anything already fully received was kept).
+  filesCancelled,
+}

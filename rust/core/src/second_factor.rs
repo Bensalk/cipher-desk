@@ -45,7 +45,7 @@ impl SecondFactor {
         if let Some(code) = &self.code {
             out.extend(code.bytes().filter(u8::is_ascii_digit).take(8));
         }
-        if out.len() % 2 != 0 {
+        if !out.len().is_multiple_of(2) {
             out.push(b' ');
         }
         out
@@ -74,22 +74,114 @@ impl SecondFactor {
     }
 }
 
-/// This app install's device id, kept in `dir/device-id` (made on first use).
+/// Where older versions (and Android) keep the device id: `dir/device-id`.
+const FILE_NAME: &str = "device-id";
+
+/// The device id's entry in the OS vault (Windows Credential Manager, Linux
+/// Secret Service). Not a valid connection id, so it never clashes with one.
+#[cfg(any(windows, target_os = "linux"))]
+const VAULT_NAME: &str = "cipherdesk-twostep-device";
+
+/// This app install's device id (made on first use).
+///
+/// Windows and Linux: kept in the OS vault, like saved passwords, so a copy of
+/// the app's folder (a backup, a portable copy on a USB stick) does not carry
+/// it and cannot skip the authenticator code. An id older versions kept in
+/// `dir/device-id` is moved there, so computers that remember this device
+/// still do. Without a usable vault the id lasts for this run of the app only,
+/// and the code is asked for again next time. Within one run it never changes.
+///
+/// Android: `dir/device-id`, inside the app's private storage (the vault
+/// there is used from Kotlin, not from here).
+#[cfg(any(windows, target_os = "linux"))]
 pub fn device_id(dir: &Path) -> std::io::Result<DeviceId> {
-    let path = dir.join("device-id");
-    if let Some(bytes) = crate::fsutil::read_limited(&path)? {
-        if let Ok(id) = DeviceId::try_from(bytes.as_slice()) {
-            return Ok(id);
-        }
+    // The same id for the whole run, whatever the vault does in between
+    // (it can be locked, or come back later), so a reconnect is recognised.
+    static CHOSEN: std::sync::OnceLock<DeviceId> = std::sync::OnceLock::new();
+    if let Some(id) = CHOSEN.get() {
+        return Ok(*id);
     }
+    let id = device_id_from_vault(dir)?;
+    Ok(*CHOSEN.get_or_init(|| id))
+}
+
+/// The id kept in the vault, moving an older file's id there or making a new
+/// one; a new random id if the vault cannot be used.
+#[cfg(any(windows, target_os = "linux"))]
+fn device_id_from_vault(dir: &Path) -> std::io::Result<DeviceId> {
+    use crate::secret::SecretString;
+    use crate::vault::{self, VaultError};
+
+    let old = dir.join(FILE_NAME);
+    match vault::load(VAULT_NAME) {
+        Ok(hex) => {
+            if let Some(id) = from_hex(hex.expose()) {
+                let _ = std::fs::remove_file(&old);
+                return Ok(id);
+            }
+        }
+        Err(VaultError::NotFound) => {}
+        Err(_) => return random_id(),
+    }
+    let id = match read_file_id(&old)? {
+        Some(id) => id,
+        None => random_id()?,
+    };
+    if vault::save(VAULT_NAME, &SecretString::new(to_hex(&id))).is_ok() {
+        let _ = std::fs::remove_file(&old);
+    }
+    Ok(id)
+}
+
+/// See the Windows/Linux version: on Android the id stays in the app's
+/// private storage.
+#[cfg(not(any(windows, target_os = "linux")))]
+pub fn device_id(dir: &Path) -> std::io::Result<DeviceId> {
+    device_id_in_file(dir)
+}
+
+/// The id in `dir/device-id`, made and saved there if missing.
+#[cfg(any(test, not(any(windows, target_os = "linux"))))]
+fn device_id_in_file(dir: &Path) -> std::io::Result<DeviceId> {
+    let path = dir.join(FILE_NAME);
+    if let Some(id) = read_file_id(&path)? {
+        return Ok(id);
+    }
+    let id = random_id()?;
+    std::fs::create_dir_all(dir)?;
+    crate::fsutil::write_atomically(&path, &id)?;
+    Ok(id)
+}
+
+fn read_file_id(path: &Path) -> std::io::Result<Option<DeviceId>> {
+    Ok(crate::fsutil::read_limited(path)?.and_then(|b| DeviceId::try_from(b.as_slice()).ok()))
+}
+
+fn random_id() -> std::io::Result<DeviceId> {
     let mut id = [0u8; DEVICE_ID_LEN];
     rustls::crypto::ring::default_provider()
         .secure_random
         .fill(&mut id)
         .map_err(|_| std::io::Error::other("no randomness"))?;
-    std::fs::create_dir_all(dir)?;
-    crate::fsutil::write_atomically(&path, &id)?;
     Ok(id)
+}
+
+#[cfg(any(test, windows, target_os = "linux"))]
+fn to_hex(id: &DeviceId) -> String {
+    id.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+#[cfg(any(test, windows, target_os = "linux"))]
+fn from_hex(text: &str) -> Option<DeviceId> {
+    let text = text.trim();
+    if text.len() != DEVICE_ID_LEN * 2 {
+        return None;
+    }
+    let mut id = [0u8; DEVICE_ID_LEN];
+    for (i, slot) in id.iter_mut().enumerate() {
+        *slot = u8::from_str_radix(text.get(i * 2..i * 2 + 2)?, 16).ok()?;
+    }
+    Some(id)
 }
 
 #[cfg(test)]
@@ -138,11 +230,31 @@ mod tests {
     }
 
     #[test]
-    fn device_id_is_made_once() {
+    fn device_id_in_a_file_is_made_once() {
         let dir = std::env::temp_dir().join(format!("cd-dev-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
+        let a = device_id_in_file(&dir).expect("made");
+        let b = device_id_in_file(&dir).expect("read back");
+        assert_eq!(a, b);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn device_id_hex_round_trips() {
+        let id = [0xa5u8; DEVICE_ID_LEN];
+        assert_eq!(from_hex(&to_hex(&id)), Some(id));
+        assert_eq!(from_hex("abc"), None);
+        assert_eq!(from_hex(&"zz".repeat(DEVICE_ID_LEN)), None);
+    }
+
+    /// Whatever the vault does on this machine (none on a CI runner without a
+    /// keyring), the id stays the same for the whole run, so a reconnect is
+    /// recognised.
+    #[test]
+    fn device_id_is_stable_within_a_run() {
+        let dir = std::env::temp_dir().join(format!("cd-dev2-{}", std::process::id()));
         let a = device_id(&dir).expect("made");
-        let b = device_id(&dir).expect("read back");
+        let b = device_id(&dir).expect("again");
         assert_eq!(a, b);
         let _ = std::fs::remove_dir_all(&dir);
     }

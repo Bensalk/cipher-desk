@@ -10,6 +10,7 @@ use windows_service::service::{
 };
 use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
 
+use crate::result_path::validate_result_path;
 use crate::service::{DISPLAY_NAME, SERVICE_NAME};
 
 /// Collects `KEY=value` lines, prints them (for a person) and writes them to
@@ -22,23 +23,21 @@ struct Report {
     lines: Vec<String>,
 }
 
-/// File name the app asks results to be written to.
-const RESULT_NAME: &str = "service-result.txt";
-
-/// The `--result` file, if given and safe: named [`RESULT_NAME`], in an
-/// existing folder named "Cipher Desk", neither of them a link.
+/// The `--result` file, if given and safe: named
+/// [`RESULT_NAME`](crate::result_path::RESULT_NAME), in an existing folder
+/// named "Cipher Desk", neither of them a link.
 fn result_path() -> Option<std::path::PathBuf> {
     let mut args = std::env::args_os().skip_while(|a| a != "--result");
     args.next()?;
     let path = std::path::PathBuf::from(args.next()?);
-    let parent = path.parent()?;
-    let named = path.file_name().is_some_and(|n| n == RESULT_NAME)
-        && parent.file_name().is_some_and(|n| n == "Cipher Desk");
-    if !named || !parent.is_dir() || crate::secure::is_link(parent) || crate::secure::is_link(&path)
-    {
-        return None;
-    }
-    Some(path)
+    let parent = path.parent()?.to_owned();
+    let ok = validate_result_path(
+        &path,
+        parent.is_dir(),
+        || crate::secure::is_link(&path),
+        || crate::secure::is_link(&parent),
+    );
+    ok.then_some(path)
 }
 
 impl Report {
@@ -47,16 +46,58 @@ impl Report {
     }
 
     /// Writes the result file and prints the lines, then any closing note.
+    ///
+    /// `result_path()` already refused a link at the time it checked; this
+    /// narrows the window between that check and actually writing by
+    /// re-checking right before creating the file, and again right after —
+    /// a normal user controls this folder, so a link that appears between
+    /// the two checks, or even between `create_new` succeeding and the
+    /// attributes check below, is refused rather than written to. This does
+    /// not close the window entirely (that needs verifying the open
+    /// handle's own final path, not just re-reading attributes by name),
+    /// but it is a meaningful narrowing with only safe, already-used code.
     fn finish(self, note: &str) {
         if let Some(path) = result_path() {
             use std::io::Write as _;
             let _ = std::fs::remove_file(&path);
-            if let Ok(mut f) = std::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&path)
+            if !crate::secure::is_link(&path)
+                && path.parent().is_some_and(|p| !crate::secure::is_link(p))
             {
-                let _ = f.write_all(self.lines.join("\n").as_bytes());
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(&path)
+                {
+                    if crate::secure::is_link(&path) {
+                        // Something replaced it with a link in the instant
+                        // between create_new succeeding and this check.
+                        // Refuse it: remove whatever is there now and write
+                        // nothing.
+                        drop(f);
+                        let _ = std::fs::remove_file(&path);
+                        tracing::warn!("refused to write the result file: it became a link");
+                    } else {
+                        let _ = f.write_all(self.lines.join("\n").as_bytes());
+                        drop(f);
+                        // Deliberately not locked down like a secret in
+                        // `secrets`: this is written by the elevated admin
+                        // command, but read and deleted by the app's own,
+                        // non-elevated process. Locking it to Windows itself
+                        // and administrators only (as an earlier version of
+                        // this code did) left the signed-in user's own,
+                        // non-elevated process without read access to its
+                        // own file, which broke reading the result back
+                        // after every admin command. It relies instead on
+                        // the containing folder's own permissions:
+                        // `%LOCALAPPDATA%\Cipher Desk` is already private to
+                        // the signed-in user (plus Windows itself and
+                        // administrators) by Windows' own default ACL
+                        // inheritance, since it sits under the user's own
+                        // profile.
+                    }
+                }
+            } else {
+                tracing::warn!("refused to write the result file: a link appeared");
             }
         }
         for line in &self.lines {

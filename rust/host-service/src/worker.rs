@@ -120,6 +120,13 @@ pub fn run() -> anyhow::Result<()> {
     if !settings.tailnet_only {
         tracing::warn!("accepting connections from any network (Tailscale only is off)");
     }
+    // "Unblock" in the tray menu clears the wrong-password blocks of both
+    // listeners.
+    link.set_unblockers(
+        std::iter::once(password_host.unblocker())
+            .chain(ask_host.as_ref().map(HostHandle::unblocker))
+            .collect(),
+    );
 
     // Stay alive, logging what happens, until the service ends this process.
     loop {
@@ -202,6 +209,16 @@ pub fn run() -> anyhow::Result<()> {
                 let what = format!("BLOCKED {minutes} MIN");
                 let who = format!("{address} (too many wrong passwords)");
                 crate::history::record(&time, &what, &who, door.label());
+                // Tell the tray, which offers to unblock it.
+                let link = std::sync::Arc::clone(&link);
+                std::thread::spawn(move || {
+                    let who = if address.parse::<std::net::IpAddr>().is_ok() {
+                        who_is(&address)
+                    } else {
+                        address
+                    };
+                    link.locked_out(who, minutes);
+                });
             }
             Ok((Door::Password, HostEvent::Failed { message })) => {
                 tracing::error!(%message, "service host failed");

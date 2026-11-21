@@ -2,10 +2,61 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
-## v0.3.32 (16 Nov 2026)
+## v1.0.0 (17 Nov 2026)
+
+**The first stable release.** It contains everything from the v0.3.33 and v0.3.34 test builds below. What changed since v0.3.31:
+
+### Security
+- **"Ask to connect" can no longer be typed into before you press Allow.** Keys sent by a specially made viewer while sign-in was finishing are now thrown away.
+- **The background service's folder can't be set up by someone else first** on a computer with several accounts; such a folder is moved aside unused.
+- **Two-step verification:** each code works only once, and the "remember this device" key is kept in Windows Credential Manager (or the Linux keyring), not in a file.
+- **File names that disguise their real type are refused.**
+- **A connection that opens and stays silent can no longer hold the computer up.** Connections are served one at a time; a silent one used to block everyone for 30 seconds, again and again. It is now closed after 10 seconds and counted like a wrong password, so a device that keeps doing it is blocked for 15 minutes. Quick "is it online?" checks are not counted.
+
+### Added
+- **Unblock from the tray** after too many wrong passwords, with a pop-up when a device is blocked.
+- **The viewer shows how long it is blocked**, and warns when only one or two tries are left.
+- **Cancel button** on the file-copy progress bar.
+- **Received files no longer linger**: they are deleted once something else replaces them on the clipboard.
+
+### Fixed
+- The "everyone blocked" safety net no longer trips from one device's own wrong passwords.
+- The sharing password is read back reliably right after setting up the always-on service.
+- The "Set your own password" box no longer risks an error while closing.
+
+### Known limits
+- The security review was done by the project itself (with AI help); no independent audit yet. See [SECURITY_REVIEW](https://github.com/Bensalk/cipher-desk/blob/main/docs/SECURITY_REVIEW.md) and [THREAT_MODEL](https://github.com/Bensalk/cipher-desk/blob/main/docs/THREAT_MODEL.md), including the risks kept on purpose (R-15 to R-17).
+
+## v0.3.34 (17 Nov 2026, pre-release)
+
+Test build with the results of a security review.
+
+### Security
+- **"Ask to connect" could be typed into before you allowed it.** Keys and mouse moves a specially made viewer sent while sign-in was finishing reached the computer before the "Allow?" question was answered. They are now thrown away.
+- **The background service's folder is protected against being set up by someone else first.** On a computer with several accounts, another person could create Cipher Desk's folder in ProgramData before the service was installed and keep control of what they put in it. Such a folder is now moved aside unused and a fresh one is made.
+- **Two-step verification:** each code now works only once, and the "remember this device" key is kept in Windows Credential Manager (or the Linux keyring) instead of a file, so a copy of the app's folder cannot skip the code.
+- **File names that hide their real type are refused**, for example a program whose name uses invisible characters to look like a PDF.
+
+### Added
+- **Unblock from the tray.** When a device is blocked after too many wrong passwords, the tray icon says so; right-click it and choose **Unblock** to let the device try again at once.
+- **The viewer says how long it is blocked**, and warns when only one or two tries are left before Share screen blocks this device for 15 minutes.
+- On the Share screen page, a blocked-device message now says that turning sharing off and on lets devices try again.
+- **Received files no longer linger.** Files sent to this computer are deleted from the Received folder as soon as something else replaces them on the clipboard (they can't be pasted any more by then). They were already cleared at the next connection.
+
+## v0.3.33 (17 Nov 2026, pre-release)
+
+Test build before the first stable release.
+
+### Added
+- **Cancel button on the file-transfer progress bar.** Stops the copy from the remote computer right away; the file still being written is deleted, anything already fully received is kept.
 
 ### Fixed
 - **The "everyone blocked" safety net could trip from one device's own repeated wrong passwords**, even with successful sign-ins in between, instead of only from a flood of different addresses guessing together as intended. It now counts how many *different* devices tried a wrong password, not how many attempts happened — so retrying from the same PC never locks out both PCs for 15 minutes on its own.
+- **Sharing password after setting up the always-on service.** The app could fail to read back the password (and the service status) right after setup, so setup looked like it had failed.
+- **"Set your own password" box** could, in rare cases, cause an error while closing.
+
+### Changed
+- The documentation now says what the app already does: clipboard sharing is on by default for new connections, and can be turned off in Settings or per connection.
 
 ## v0.3.31 (16 Nov 2026)
 

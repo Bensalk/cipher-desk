@@ -23,6 +23,7 @@ import '../src/rust/api/log.dart' as rust_log;
 import '../src/rust/api/pins.dart';
 import '../src/rust/api/session.dart';
 import '../src/rust/api/store.dart' show ConnectionMethod;
+import '../state/lockout_tracker.dart';
 import '../state/profiles.dart';
 import 'connection_methods.dart';
 import 'error_banner.dart';
@@ -117,6 +118,10 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   ErrorInfo? _error;
   bool _ended = false;
   bool _wasConnected = false;
+  /// When the session was first connected (for the wrong-password tracker).
+  DateTime? _connectedAt;
+  /// Share screen: what the wrong-password tracker says after this ending.
+  String? _lockoutHint;
 
   // View: zoom and pan (pinch-zoom), and trackpad mode for touch screens.
   double _zoom = 1;
@@ -198,17 +203,6 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     // Start after the first frame: _start reads the window size with View.of,
     // which must not be called from initState.
     WidgetsBinding.instance.addPostFrameCallback((_) => _start());
-  }
-
-  /// Send the viewer's current CapsLock / NumLock / ScrollLock state to the
-  /// host immediately after connecting, so both sides start in sync.
-  void _syncLockKeys() {
-    final locks = HardwareKeyboard.instance.lockModesEnabled;
-    _session.syncLockKeys(
-      capsLock: locks.contains(KeyboardLockMode.capsLock),
-      numLock: locks.contains(KeyboardLockMode.numLock),
-      scrollLock: locks.contains(KeyboardLockMode.scrollLock),
-    );
   }
 
   /// Desktop: check this device's clipboard every second while connected.
@@ -446,6 +440,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
         });
         if (u.connected) {
           _wasConnected = true;
+          _connectedAt ??= DateTime.now();
           if (!_serviceStarted) {
             _serviceStarted = true;
             SessionService.start();
@@ -518,6 +513,10 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
               ? 'Received "$name" — press Ctrl+V in any folder to place it there.'
               : 'Received "$name" into: $_receiveDir'),
         ));
+      case UpdateKind.filesCancelled:
+        if (!mounted) return;
+        setState(() => _transferProgress = null);
+        _notice(const SnackBar(content: Text('Copy cancelled.')));
     }
   }
 
@@ -589,7 +588,9 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     if (_serviceStarted) SessionService.stop();
     if (_ended) return;
     widget.onOutcome?.call(error?.id ?? (_wasConnected ? 'connected' : 'cancelled'));
+    final hint = _trackLockout(error);
     setState(() {
+      _lockoutHint = hint;
       _ended = true;
       _error = error;
       _state = error == null ? RdpConnectionState.disconnected : RdpConnectionState.failed;
@@ -601,13 +602,47 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     }
   }
 
+  /// Share screen computers refuse a device for a while after too many wrong
+  /// passwords. Keeps count on this side and returns what to tell the user:
+  /// how long the computer will refuse this device, or how many tries are
+  /// left. `null` when there is nothing to say.
+  String? _trackLockout(ErrorInfo? error) {
+    final p = widget.profile;
+    if (p.method != ConnectionMethod.shareScreen) return null;
+    final key = LockoutTracker.keyFor(p.host, p.port);
+    final started = _connectedAt;
+    if (started != null) {
+      lockoutTracker.sessionEnded(key, DateTime.now().difference(started));
+    }
+    if (error?.id == 'WrongCredentials') lockoutTracker.wrongPassword(key);
+    if (error == null) return null;
+    final until = lockoutTracker.lockedUntil(key);
+    if (until != null) {
+      final minutes = lockoutTracker.minutesLeft(key) ?? LockoutTracker.lockout.inMinutes;
+      final at = '${until.hour.toString().padLeft(2, '0')}:'
+          '${until.minute.toString().padLeft(2, '0')}';
+      return 'Too many wrong passwords from this device. That computer refuses it '
+          'for about $minutes more minute${minutes == 1 ? '' : 's'} (until $at). '
+          'The person at that computer can let it try again now: right-click the '
+          'Cipher Desk icon in the taskbar and choose Unblock.';
+    }
+    if (error.id == 'WrongCredentials') {
+      final left = lockoutTracker.triesLeft(key);
+      if (left <= 2) {
+        return '$left more wrong password${left == 1 ? '' : 's'} and that computer '
+            'refuses this device for ${LockoutTracker.lockout.inMinutes} minutes.';
+      }
+    }
+    return null;
+  }
+
   /// Exports the in-memory session log so the user can share it.
   /// Android: share sheet.  Windows/Linux: file-save dialog → Desktop.
   Future<void> _reportProblem() async {
     if (!mounted) return;
     // TODO(next-bump): update this when pubspec version changes.
     // Adding package_info_plus would let us read it at runtime.
-    const version = '0.3.32';
+    const version = '1.0.0';
     final content = rust_log.sessionLogExport(appVersion: version);
     final fileName = 'cipher-desk-log-${DateTime.now().millisecondsSinceEpoch}.txt';
 
@@ -1211,24 +1246,41 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
                 left: 0,
                 right: 0,
                 top: 0,
-                child: IgnorePointer(
-                  child: Material(
-                    key: const Key('transfer-progress'),
-                    color: Theme.of(context).colorScheme.surface.withAlpha(217),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Receiving files… ${(_transferProgress! * 100).round()}%'
-                            '${_transferText.isEmpty ? '' : ' ($_transferText)'}',
+                child: Material(
+                  key: const Key('transfer-progress'),
+                  color: Theme.of(context).colorScheme.surface.withAlpha(217),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 6, 4, 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Receiving files… ${(_transferProgress! * 100).round()}%'
+                                '${_transferText.isEmpty ? '' : ' ($_transferText)'}',
+                              ),
+                              const SizedBox(height: 4),
+                              LinearProgressIndicator(value: _transferProgress),
+                            ],
                           ),
-                          const SizedBox(height: 4),
-                          LinearProgressIndicator(value: _transferProgress),
-                        ],
-                      ),
+                        ),
+                        IconButton(
+                          key: const Key('transfer-cancel'),
+                          icon: const Icon(Icons.close),
+                          tooltip: 'Cancel this copy',
+                          iconSize: 20,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          onPressed: () {
+                            _session.cancelIncomingFiles();
+                            setState(() => _transferProgress = null);
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1395,6 +1447,20 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
             Padding(
               padding: const EdgeInsets.all(12),
               child: ErrorBanner(error: _error!),
+            ),
+          if (_error != null && _lockoutHint != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.lock_clock, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(_lockoutHint!, key: const Key('lockout-hint')),
+                  ),
+                ],
+              ),
             ),
           if (changed != null)
             Padding(

@@ -146,7 +146,10 @@ void main() {
     test('secure defaults', () {
       final s = AppSettings();
       expect(s.blockScreenshots, isTrue);
-      expect(s.clipboardDefault, isFalse);
+      // On by default since v0.3.6 ("Copy and paste on by default", S3/S6 in
+      // settings.dart). Each saved connection still starts with its own
+      // clipboard off unless this default turns it on in the form.
+      expect(s.clipboardDefault, isTrue);
       expect(s.confirmSavedPassword, isTrue);
       expect(s.idleMinutes, 30);
     });

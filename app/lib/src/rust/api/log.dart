@@ -4,14 +4,35 @@
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
 import '../frb_generated.dart';
+
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 /// Set up the global tracing subscriber for the viewer app.
+///
+/// Must be called once, right after `RustLib.init()`, before any session
+/// starts. Safe to call again — subsequent calls are no-ops because
+/// [`tracing_subscriber::Registry`] uses a `Once` guard internally.
+///
+/// Two layers are registered:
+/// 1. A fmt layer that writes to stderr (visible in `adb logcat` on Android,
+///    or the console on Windows/Linux).  It is a no-op in release builds at
+///    the tracing crate level (`release_max_level_info` feature).
+/// 2. [`rdpv_core::session_log::SessionLog`] — the in-memory ring buffer that
+///    powers the "Report Problem" export.
 void initLogging() => RustLib.instance.api.crateApiLogInitLogging();
 
 /// Export the in-memory session log as plain text.
+///
+/// Returns the last ≤ 1 000 log lines from the most recent session, with a
+/// header that includes `app_version`.  Call this after a session ends (or
+/// while it is still running) to get a log file the user can share.
+///
+/// The result never contains passwords or screen content.
 String sessionLogExport({required String appVersion}) =>
     RustLib.instance.api.crateApiLogSessionLogExport(appVersion: appVersion);
 
 /// Clear the in-memory log buffer.
+///
+/// Called by the Flutter session service at the start of each new connection
+/// attempt so the exported file covers only the current session.
 void sessionLogClear() => RustLib.instance.api.crateApiLogSessionLogClear();

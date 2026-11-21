@@ -64,6 +64,16 @@ jobs:
           path: rust/fuzz/artifacts/
           retention-days: 14
 
+  vendored-ironrdp:
+    name: Vendored ironrdp-server has no undocumented drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Diff our copy against the real crates.io release
+        run: bash scripts/check-vendored-ironrdp.sh
+
   osv:
     name: Known vulnerabilities (OSV-Scanner, all ecosystems)
     runs-on: ubuntu-latest
