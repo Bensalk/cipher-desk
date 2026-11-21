@@ -21,7 +21,7 @@ EXPECTED_SHA256="1d3922b23ad9f262b932d42fa37df87f7e45c2d12f45433c0cc084f8762fb09
 
 # Files README-CIPHER-DESK.md says we changed. If the real diff names any
 # other file, that's undocumented drift and this script fails.
-EXPECTED_CHANGED=("src/encoder/mod.rs" "src/encoder/rfx.rs" "src/lib.rs" "src/server.rs")
+EXPECTED_CHANGED=("src/encoder/mod.rs" "src/encoder/rfx.rs" "src/helper.rs" "src/lib.rs" "src/server.rs")
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT

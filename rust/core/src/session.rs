@@ -1296,8 +1296,8 @@ fn tls_upgrade(
 pub(crate) fn server_public_key(cert_der: &[u8]) -> Option<Vec<u8>> {
     use x509_cert::der::Decode as _;
     let cert = x509_cert::Certificate::from_der(cert_der).ok()?;
-    cert.tbs_certificate
-        .subject_public_key_info
+    cert.tbs_certificate()
+        .subject_public_key_info()
         .subject_public_key
         .as_bytes()
         .map(<[u8]>::to_vec)

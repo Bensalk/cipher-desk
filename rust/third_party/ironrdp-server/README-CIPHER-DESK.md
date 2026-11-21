@@ -48,10 +48,14 @@ Changes from 0.13.0:
   stays silent is closed and reported to the connection handler with
   `SILENT_CONNECTION` (exported), so the lockout counts it. Connections are
   served one at a time, so a silent one used to block everyone for 30 seconds.
+- `helper.rs`: `cert.tbs_certificate` / `.subject_public_key_info` are now
+  `cert.tbs_certificate()` / `.subject_public_key_info()` — `x509-cert` 0.3.0
+  made these fields private and added matching accessor methods with the
+  same return type. No behavior change, just following the new API.
 
 `scripts/check-vendored-ironrdp.sh` (run in CI on every push/PR) downloads the
 real 0.13.0 release from crates.io and fails if any file in `src/` differs
-from it other than the four listed above — so an unreviewed change to this
+from it other than the five listed above — so an unreviewed change to this
 copy, or a file quietly added or removed, gets caught instead of sitting here
 unnoticed. Changing which files are expected to differ, or re-basing onto a
 newer upstream release, means updating both this list and the script's own
