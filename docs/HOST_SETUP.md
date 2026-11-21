@@ -69,6 +69,16 @@ To connect from outside your network, first join it through a VPN such as
 account. Then connect with the app as if you were at home. Wake-on-LAN usually
 does not work through a VPN (it needs the local network).
 
+**Share screen's "Only over Tailscale" toggle** checks not just that the
+connecting device's address looks like a Tailscale address, but that the
+connection actually arrived on this computer's own Tailscale network
+interface. One side effect: if someone reaches this computer through a
+**Tailscale subnet router** (a device that relays Tailscale traffic onto a
+separate LAN rather than running Tailscale itself), the connection arrives on
+this computer's ordinary LAN interface, not its Tailscale one, and
+"Only over Tailscale" refuses it. Turn that toggle off (and rely on the
+VPN/firewall setup above instead) if you use a subnet router this way.
+
 ## 9. Wake-on-LAN (optional)
 
 Turn on *Wake on Magic Packet* in the network adapter's settings (*Device Manager →

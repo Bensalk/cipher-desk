@@ -22,6 +22,7 @@ pub mod frames;
 pub mod identity;
 pub mod input;
 mod limiter;
+pub use limiter::is_tailnet_or_local;
 pub mod totp;
 #[cfg(windows)]
 pub mod win;
@@ -59,16 +60,21 @@ const SEND_WAIT_STEP: Duration = Duration::from_millis(2);
 pub enum HostEvent {
     /// Listening for viewers on this port.
     Listening { port: u16 },
-    /// A viewer signed in and is now seeing the screen.
+    /// A viewer signed in and is now seeing the screen. `address`: the
+    /// connecting computer's IP address as this computer sees it.
     ViewerConnected { address: String },
+    /// Someone tried to sign in with a wrong user name or password.
+    SignInFailed { address: String },
     /// The viewer left (or the connection ended).
     ViewerDisconnected,
     /// Too many wrong passwords: new connections are refused for a while.
-    LockedOut { minutes: u64 },
+    /// `address`: the device that is refused, or "all devices".
+    LockedOut { minutes: u64, address: String },
     /// A viewer has signed in and is waiting for the person at this computer to
     /// allow or refuse it (only when "ask before each connection" is on).
     /// Answer with [`HostHandle::approve`].
-    ApprovalRequested,
+    /// `address`: the device asking (IP).
+    ApprovalRequested { address: String },
     /// A file sent by the viewer finished arriving in the Received folder.
     FileReceived { name: String },
     /// The Host could not start or stopped with an error.
@@ -89,6 +95,9 @@ pub struct HostConfig {
     /// Two-step verification: when set, a viewer that passed the password
     /// also needs a remembered device or a correct authenticator code.
     pub second_factor: Option<Arc<totp::Gate>>,
+    /// Accept connections only from the Tailscale network (and this computer
+    /// itself); anything else is closed before sign-in.
+    pub tailnet_only: bool,
 }
 
 /// How long to wait for the person at the computer to allow a viewer before
@@ -113,11 +122,18 @@ pub struct HostHandle {
     stop: Option<tokio::sync::oneshot::Sender<()>>,
     thread: Option<std::thread::JoinHandle<()>>,
     approvals: tokio::sync::mpsc::UnboundedSender<bool>,
+    unblock: Arc<std::sync::atomic::AtomicBool>,
     #[cfg(windows)]
     clip: Option<clipboard::ClipHandle>,
 }
 
 impl HostHandle {
+    /// A handle the person at this computer can use (from another thread) to
+    /// let devices blocked after too many wrong passwords try again at once.
+    pub fn unblocker(&self) -> Unblocker {
+        Unblocker(Arc::clone(&self.unblock))
+    }
+
     /// Allows (`true`) or refuses (`false`) a viewer waiting after
     /// [`HostEvent::ApprovalRequested`]. Ignored if nothing is waiting.
     pub fn approve(&self, allow: bool) {
@@ -158,6 +174,19 @@ impl HostHandle {
     }
 }
 
+/// Clears wrong-password blocks; see [`HostHandle::unblocker`]. Only for the
+/// person at this computer: never wire it to anything a viewer can reach.
+#[derive(Clone)]
+pub struct Unblocker(Arc<std::sync::atomic::AtomicBool>);
+
+impl Unblocker {
+    /// Every blocked device may try again; the counts start from zero. Takes
+    /// effect at the next connection attempt.
+    pub fn unblock(&self) {
+        self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 /// Answers [`HostEvent::ApprovalRequested`]; see [`HostHandle::approver`].
 #[derive(Clone)]
 pub struct Approver(tokio::sync::mpsc::UnboundedSender<bool>);
@@ -181,7 +210,7 @@ pub fn generate_password() -> anyhow::Result<SecretString> {
     const ALPHABET: &[u8] = b"abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let rng = ring::rand::SystemRandom::new();
     let mut out = String::with_capacity(19);
-    let mut i = 0;
+    let mut i = 0usize;
     while i < 16 {
         let mut b = [0u8; 1];
         ring::rand::SecureRandom::fill(&rng, &mut b)
@@ -191,7 +220,7 @@ pub fn generate_password() -> anyhow::Result<SecretString> {
         if usize::from(b[0]) >= limit {
             continue;
         }
-        if i > 0 && i % 4 == 0 {
+        if i > 0 && i.is_multiple_of(4) {
             out.push('-');
         }
         out.push(char::from(ALPHABET[usize::from(b[0]) % ALPHABET.len()]));
@@ -203,6 +232,13 @@ pub fn generate_password() -> anyhow::Result<SecretString> {
 /// Fingerprint of this computer's Host certificate (created if needed), for the UI.
 pub fn fingerprint(data_dir: &std::path::Path) -> anyhow::Result<String> {
     Ok(identity::load_or_create(data_dir)?.fingerprint())
+}
+
+/// The Host certificate's fingerprint without reading the private key (for
+/// someone who may read the certificate but not the key). Errors if the
+/// certificate has not been made yet.
+pub fn cert_fingerprint(data_dir: &std::path::Path) -> anyhow::Result<String> {
+    identity::cert_fingerprint(data_dir)
 }
 
 /// Starts sharing: listens on all network interfaces (the firewall decides who
@@ -254,16 +290,24 @@ where
 
     // Approval channel: the UI answers ApprovalRequested through HostHandle.
     let (approve_tx, approve_rx) = tokio::sync::mpsc::unbounded_channel::<bool>();
+    let peer = limiter::Peer::default();
     let display = ScreenDisplay {
         source: Arc::new(Mutex::new(source)),
         events: events.clone(),
         require_approval: config.require_approval,
         approvals: Arc::new(tokio::sync::Mutex::new(approve_rx)),
+        peer: peer.clone(),
     };
     let username = config.username.trim().to_owned();
     let password = config.password;
     let second_factor = config.second_factor;
-    let limiter = limiter::Limiter::new(events.clone());
+    let unblock = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let limiter = limiter::Limiter::new(
+        events.clone(),
+        peer,
+        config.tailnet_only,
+        Arc::clone(&unblock),
+    );
 
     // Text + file clipboard bridge (Windows only). Files the viewer sends land
     // in a "Received" folder beside the app's data; `clip` lets the app offer
@@ -339,6 +383,7 @@ where
         stop: Some(stop),
         thread: Some(thread),
         approvals: approve_tx,
+        unblock,
         #[cfg(windows)]
         clip,
     })
@@ -351,6 +396,8 @@ struct ScreenDisplay<S: FrameSource> {
     events: mpsc::Sender<HostEvent>,
     require_approval: bool,
     approvals: Arc<tokio::sync::Mutex<tokio::sync::mpsc::UnboundedReceiver<bool>>>,
+    /// Address of the connection being served (set when it is accepted).
+    peer: limiter::Peer,
 }
 
 #[async_trait]
@@ -375,7 +422,9 @@ impl<S: FrameSource + Send + 'static> RdpServerDisplay for ScreenDisplay<S> {
                 let mut rx = self.approvals.lock().await;
                 while rx.try_recv().is_ok() {}
             }
-            let _ = self.events.send(HostEvent::ApprovalRequested);
+            let _ = self.events.send(HostEvent::ApprovalRequested {
+                address: self.peer.ip(),
+            });
             let allowed = {
                 let mut rx = self.approvals.lock().await;
                 matches!(
@@ -389,7 +438,7 @@ impl<S: FrameSource + Send + 'static> RdpServerDisplay for ScreenDisplay<S> {
             }
         }
         let _ = self.events.send(HostEvent::ViewerConnected {
-            address: String::new(),
+            address: self.peer.ip(),
         });
         let (tx, rx) = tokio::sync::mpsc::channel::<DisplayUpdate>(16);
         let source = Arc::clone(&self.source);

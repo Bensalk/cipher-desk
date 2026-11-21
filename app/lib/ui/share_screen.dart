@@ -128,59 +128,9 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
   /// Asks the user to type their own sharing password. Returns it, or null if
   /// cancelled. Warns (but allows) if it looks weak.
   Future<String?> _askCustomPassword() async {
-    final controller = TextEditingController();
-    var obscure = true;
     final result = await showDialog<String>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setLocal) {
-          final pw = controller.text;
-          final weak = pw.length < 10;
-          return AlertDialog(
-            title: const Text('Set your own password'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  key: const Key('custom-password-field'),
-                  controller: controller,
-                  autofocus: true,
-                  obscureText: obscure,
-                  onChanged: (_) => setLocal(() {}),
-                  decoration: InputDecoration(
-                    labelText: 'New sharing password',
-                    border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: Icon(obscure ? Icons.visibility : Icons.visibility_off),
-                      onPressed: () => setLocal(() => obscure = !obscure),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  pw.isEmpty
-                      ? 'Anyone connecting will type this. Use at least 10 characters.'
-                      : weak
-                          ? '⚠ That is short. A longer password is much safer over a network.'
-                          : '✓ Looks reasonable.',
-                  style: TextStyle(
-                    color: weak && pw.isNotEmpty ? Theme.of(context).colorScheme.error : null,
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-              FilledButton(
-                key: const Key('custom-password-save'),
-                onPressed: pw.isEmpty ? null : () => Navigator.pop(context, pw),
-                child: const Text('Save'),
-              ),
-            ],
-          );
-        },
-      ),
+      builder: (_) => const _CustomPasswordDialog(),
     );
     return (result != null && result.isNotEmpty) ? result : null;
   }
@@ -347,7 +297,7 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
     final installed = _service.installed;
     final children = <Widget>[
       // The primary control: one switch that makes this PC always available to
-      // connect (like AnyDesk) without anyone clicking Start Sharing — it runs
+      // connect without anyone clicking Start Sharing — it runs
       // a background service that also reaches the Windows sign-in/lock screen.
       SwitchListTile(
         key: const Key('service-always-allow'),
@@ -383,6 +333,32 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
       ));
     } else {
       children.addAll([
+        if (_service.needsUpdate) ...[
+          const SizedBox(height: 8),
+          Card(
+            color: scheme.tertiaryContainer,
+            child: ListTile(
+              leading: const Icon(Icons.system_update_alt),
+              title: const Text('Update the background service'),
+              subtitle: const Text(
+                'This app was updated. Update the background part too, so it gets '
+                'the same fixes. Asks for administrator approval once.',
+              ),
+              trailing: FilledButton(
+                key: const Key('service-update'),
+                onPressed: () => _runService(() async {
+                  final status = await HostService.update();
+                  if (!status.installed) {
+                    _snack('The update did not finish. Please try again.');
+                  } else {
+                    _snack('The background service is up to date.');
+                  }
+                }, 'Not updated (the admin prompt was declined).'),
+                child: const Text('Update'),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 8),
         ListTile(
           contentPadding: EdgeInsets.zero,
@@ -444,6 +420,32 @@ class _ShareScreenPageState extends State<ShareScreenPage> {
               : 'Off — the password is enough.'),
           value: _service.twoStep,
           onChanged: (on) => on ? _setUpTwoStep() : _turnOffTwoStep(),
+        ),
+        SwitchListTile(
+          key: const Key('service-ask'),
+          contentPadding: EdgeInsets.zero,
+          secondary: const Icon(Icons.front_hand_outlined),
+          title: const Text('Ask to connect'),
+          subtitle: Text(_service.ask
+              ? 'On — anyone who reaches this PC can ask without a password; '
+                  'someone here must click Allow.'
+              : 'Off — only the password works. Turn on when someone here will '
+                  'allow you in.'),
+          value: _service.ask,
+          onChanged: (on) => _runService(() => HostService.setAsk(on),
+              'Not changed (the admin prompt was declined).'),
+        ),
+        SwitchListTile(
+          key: const Key('service-tailscale-only'),
+          contentPadding: EdgeInsets.zero,
+          secondary: const Icon(Icons.vpn_lock_outlined),
+          title: const Text('Only over Tailscale (recommended)'),
+          subtitle: Text(_service.tailscaleOnly
+              ? 'On — devices on your own network or the internet are refused.'
+              : 'Off — any network that can reach this PC may try to sign in.'),
+          value: _service.tailscaleOnly,
+          onChanged: (on) => _runService(() => HostService.setTailscaleOnly(on),
+              'Not changed (the admin prompt was declined).'),
         ),
         if (_serviceFingerprint != null)
           ListTile(
@@ -748,8 +750,21 @@ class _StatusCard extends StatelessWidget {
             ],
             const SizedBox(height: 12),
             if (share.status == ShareStatus.approvalPending) ...[
+              Text('Device asking: ${share.askingAddress ?? 'unknown'}',
+                  key: const Key('share-asking')),
+              const SizedBox(height: 4),
               const Text('Allow this connection? If you do nothing, it is '
                   'refused in a few seconds.'),
+              if (share.askingAddress != null &&
+                  ShareController.canAlwaysAllow(share.askingAddress!))
+                CheckboxListTile(
+                  key: const Key('share-always-allow'),
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: const Text('Always allow this device'),
+                  value: share.alwaysAllow,
+                  onChanged: (v) => share.setAlwaysAllow(v ?? false),
+                ),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -831,6 +846,83 @@ class SharingBanner extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Asks for a sharing password. Its own widget, not a local function
+/// closure, so the TextEditingController is disposed by Flutter once this
+/// widget actually leaves the tree for good — not the instant the dialog's
+/// own Future resolves, which can still be mid-exit-animation and rebuilding
+/// the field (that earlier shape raised "A TextEditingController was used
+/// after being disposed").
+class _CustomPasswordDialog extends StatefulWidget {
+  const _CustomPasswordDialog();
+
+  @override
+  State<_CustomPasswordDialog> createState() => _CustomPasswordDialogState();
+}
+
+class _CustomPasswordDialogState extends State<_CustomPasswordDialog> {
+  final _controller = TextEditingController();
+  var _obscure = true;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pw = _controller.text;
+    final weak = pw.length < 10;
+    return AlertDialog(
+      title: const Text('Set your own password'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            key: const Key('custom-password-field'),
+            controller: _controller,
+            autofocus: true,
+            obscureText: _obscure,
+            autocorrect: false,
+            enableSuggestions: false,
+            enableIMEPersonalizedLearning: false,
+            keyboardType: TextInputType.visiblePassword,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              labelText: 'New sharing password',
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+                onPressed: () => setState(() => _obscure = !_obscure),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            pw.isEmpty
+                ? 'Anyone connecting will type this. Use at least 10 characters.'
+                : weak
+                    ? '⚠ That is short. A longer password is much safer over a network.'
+                    : '✓ Looks reasonable.',
+            style: TextStyle(
+              color: weak && pw.isNotEmpty ? Theme.of(context).colorScheme.error : null,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        FilledButton(
+          key: const Key('custom-password-save'),
+          onPressed: pw.isEmpty ? null : () => Navigator.pop(context, pw),
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }

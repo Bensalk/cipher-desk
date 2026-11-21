@@ -12,6 +12,9 @@ class HostServiceStatus {
     this.port,
     this.fingerprint,
     this.twoStep = false,
+    this.ask = false,
+    this.tailscaleOnly = true,
+    this.needsUpdate = false,
   });
 
   final bool installed;
@@ -22,6 +25,16 @@ class HostServiceStatus {
 
   /// Two-step verification (authenticator app) is on.
   final bool twoStep;
+
+  /// "Ask to connect" (no password; the person at this PC allows it) is on.
+  final bool ask;
+
+  /// Connections are accepted only over Tailscale.
+  final bool tailscaleOnly;
+
+  /// The installed service is older than this app (or in an unsafe place):
+  /// offer to update it.
+  final bool needsUpdate;
 
   static const none = HostServiceStatus(installed: false, running: false);
 }
@@ -35,8 +48,8 @@ class ElevationCancelled implements Exception {}
 ///
 /// The service runs as the system account and needs a one-time Windows admin
 /// prompt to install or remove. Its install/remove output is read from a small
-/// result file, because a program started through the admin prompt can't hand
-/// its output back directly.
+/// result file in this person's own app folder, because a program started
+/// through the admin prompt can't hand its output back directly.
 class HostService {
   static bool get supported => Platform.isWindows;
 
@@ -54,6 +67,18 @@ class HostService {
     return '$base\\Cipher Desk\\host-service';
   }
 
+  /// This person's own Cipher Desk folder (results and the pending password
+  /// go here, never to the shared service folder).
+  static String get _ownDir {
+    final base = Platform.environment['LOCALAPPDATA'] ??
+        '${Platform.environment['USERPROFILE'] ?? r'C:\Users\Public'}\\AppData\\Local';
+    final dir = Directory('$base\\Cipher Desk');
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+    return dir.path;
+  }
+
+  static String get _resultPath => '$_ownDir\\service-result.txt';
+
   static Map<String, String> _parse(String text) {
     final map = <String, String>{};
     for (final line in const LineSplitter().convert(text)) {
@@ -63,17 +88,47 @@ class HostService {
     return map;
   }
 
-  /// Reads (and then deletes) the result file written by the last command.
+  /// Reads the result file written by the last command, and always tries to
+  /// delete it afterwards (it can hold the sharing password or a two-step
+  /// key) — even if reading or parsing it failed.
   static Future<Map<String, String>> _readResult() async {
-    final file = File('$dataDir\\last-result.txt');
+    final file = File(_resultPath);
     if (!await file.exists()) return {};
+    var map = <String, String>{};
     try {
-      final map = _parse(await file.readAsString());
-      await file.delete(); // don't leave a password on disk
-      return map;
+      map = _parse(await file.readAsString());
     } on FileSystemException {
-      return {};
+      // Leave map empty; still fall through to delete the file below.
     }
+    await _deleteSecretFile(file);
+    return map;
+  }
+
+  /// Deletes a file that may hold a secret, retrying once on failure. Never
+  /// logs the file's content, only that a delete did not go through.
+  static Future<void> _deleteSecretFile(File file) async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        if (await file.exists()) await file.delete();
+        return;
+      } on FileSystemException {
+        // Try once more before giving up.
+      }
+    }
+    if (await file.exists()) {
+      stderr.writeln('Cipher Desk: could not remove a leftover file in '
+          '${file.parent.path}. Delete it by hand if it is still there.');
+    }
+  }
+
+  /// Removes any `service-result.txt` or `pending-password.bin` left behind
+  /// by a previous run that was closed or crashed before it could clean up
+  /// (both can hold a secret). Call once at app startup; safe to call even
+  /// when the service was never installed.
+  static Future<void> cleanupLeftoverSecrets() async {
+    if (!supported) return;
+    await _deleteSecretFile(File(_resultPath));
+    await _deleteSecretFile(File('$_ownDir\\pending-password.bin'));
   }
 
   static HostServiceStatus _statusFrom(Map<String, String> m) {
@@ -85,6 +140,9 @@ class HostService {
       port: int.tryParse(m['PORT'] ?? ''),
       fingerprint: m['FINGERPRINT'],
       twoStep: m['TWOSTEP'] == '1',
+      ask: m['ASK'] == '1',
+      tailscaleOnly: m['TAILSCALE_ONLY'] != '0',
+      needsUpdate: m['NEEDS_UPDATE'] == '1',
     );
   }
 
@@ -118,13 +176,16 @@ class HostService {
     if (exe == null) throw ElevationCancelled();
     // Clear any leftover result so we only read this run's output.
     try {
-      final old = File('$dataDir\\last-result.txt');
+      final old = File(_resultPath);
       if (await old.exists()) await old.delete();
     } on FileSystemException {
       // ignore
     }
+    // Single quotes inside a PowerShell '...' string are doubled.
+    String q(String v) => v.replaceAll("'", "''");
+    final args = '$command --result "$_resultPath"';
     final ps =
-        "Start-Process -FilePath '$exe' -ArgumentList '$command' -Verb RunAs -Wait -WindowStyle Hidden";
+        "Start-Process -FilePath '${q(exe)}' -ArgumentList '${q(args)}' -Verb RunAs -Wait -WindowStyle Hidden";
     try {
       final r = await Process.run('powershell', ['-NoProfile', '-Command', ps]);
       if (r.exitCode != 0) throw ElevationCancelled();
@@ -139,6 +200,36 @@ class HostService {
     await _elevated('install');
     final m = await _readResult();
     return (_statusFrom(m), m['PASSWORD']);
+  }
+
+  /// Turns sharing back on if it was turned off with "Exit" or "Go offline"
+  /// in the tray icon. Quiet: no prompt, nothing shown, errors ignored.
+  static Future<void> goOnlineQuietly() async {
+    final exe = exePath();
+    if (exe == null) return;
+    try {
+      await Process.run(exe, ['go-online', '--quiet']);
+    } catch (_) {}
+  }
+
+  /// Updates the installed service to this app's version (same admin
+  /// prompt as installing). Returns the new state.
+  static Future<HostServiceStatus> update() async {
+    await _elevated('install');
+    return _statusFrom(await _readResult());
+  }
+
+  /// Turns "Ask to connect" on or off (restarts sharing).
+  static Future<void> setAsk(bool on) async {
+    await _elevated('set ask=${on ? 'on' : 'off'}');
+    await _readResult();
+  }
+
+  /// Accept connections only over Tailscale, or from any network
+  /// (restarts sharing).
+  static Future<void> setTailscaleOnly(bool on) async {
+    await _elevated('set networks=${on ? 'tailscale' : 'any'}');
+    await _readResult();
   }
 
   /// Stops and removes the service.
@@ -185,24 +276,25 @@ class HostService {
     await _readResult();
   }
 
-  /// Sets a password the user typed. The app machine-encrypts it to a pending
-  /// file (never plain text, never on the command line); the elevated service
-  /// imports and stores it. Returns true on success.
+  /// Sets a password the user typed. Never plain text and never on the
+  /// command line: the app writes it to a pending file in this person's own
+  /// app folder, encrypted with Windows DPAPI at machine scope (any process
+  /// on this computer could decrypt it — the real protection is the file's
+  /// short lifetime and its folder's normal per-account permissions, not
+  /// the encryption itself). The elevated service deletes the file the
+  /// moment it has read it, whether that succeeds or fails. Returns true on
+  /// success.
   static Future<bool> setOwnPassword(String password) async {
     if (!supported) return false;
-    final pending = '$dataDir\\pending-password.bin';
+    final pending = '$_ownDir\\pending-password.bin';
     if (!hostServiceStashPassword(pendingPath: pending, password: password)) {
       return false;
     }
     await _elevated('import-password "$pending"');
     final ok = (await _readResult())['PASSWORD_SET'] == '1';
-    // Best effort: the service deletes the pending file; remove any leftover.
-    try {
-      final f = File(pending);
-      if (await f.exists()) await f.delete();
-    } on FileSystemException {
-      // ignore
-    }
+    // The service deletes the pending file once it has imported it; remove
+    // any leftover (for example if it failed before reaching that step).
+    await _deleteSecretFile(File(pending));
     return ok;
   }
 }

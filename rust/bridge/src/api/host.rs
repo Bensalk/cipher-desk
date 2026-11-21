@@ -72,7 +72,12 @@ pub fn host_supported() -> bool {
 pub fn host_fingerprint(data_dir: String) -> Option<String> {
     #[cfg(windows)]
     {
-        rdpv_host::fingerprint(std::path::Path::new(&data_dir)).ok()
+        let dir = std::path::Path::new(&data_dir);
+        // The certificate alone is enough (the service keeps its private key
+        // where only administrators can read it); make one only if missing.
+        rdpv_host::cert_fingerprint(dir)
+            .or_else(|_| rdpv_host::fingerprint(dir))
+            .ok()
     }
     #[cfg(not(windows))]
     {
@@ -252,6 +257,8 @@ impl ShareHost {
             require_approval,
             // Two-step verification is set up for always-on sharing only.
             second_factor: None,
+            // Manual sharing: the person chose to start it, on any network.
+            tailnet_only: false,
         };
         match rdpv_host::start(
             config,
@@ -262,10 +269,22 @@ impl ShareHost {
             Ok(handle) => *slot = Some(handle),
             Err(e) => {
                 tracing::warn!(error = %e, "sharing did not start");
-                let message = if format!("{e:#}").contains("port") {
-                    "The sharing port is already in use. Choose another port."
-                } else {
+                // The always-on background service usually holds the port.
+                let service_on = std::env::var_os("ProgramData").is_some_and(|d| {
+                    std::path::Path::new(&d)
+                        .join("Cipher Desk")
+                        .join("host-service")
+                        .join("version.txt")
+                        .exists()
+                });
+                let message = if !format!("{e:#}").contains("port") {
                     "Sharing could not start."
+                } else if service_on {
+                    "This computer is already shared by Cipher Desk's background sharing \
+                     (always on). Connect to it from the other device, or choose another \
+                     port here."
+                } else {
+                    "The sharing port is already in use. Choose another port."
                 };
                 return fail(&sink, message);
             }
@@ -285,11 +304,17 @@ impl ShareHost {
                             HostUpdate::of(HostUpdateKind::ViewerConnected)
                         }
                         E::ViewerDisconnected => HostUpdate::of(HostUpdateKind::ViewerDisconnected),
-                        E::LockedOut { minutes } => HostUpdate {
+                        // Already shown as a disconnect; the app page needs no more.
+                        E::SignInFailed { .. } => continue,
+                        E::LockedOut { minutes, .. } => HostUpdate {
                             minutes,
                             ..HostUpdate::of(HostUpdateKind::LockedOut)
                         },
-                        E::ApprovalRequested => HostUpdate::of(HostUpdateKind::ApprovalRequested),
+                        // The device asking, in `message`.
+                        E::ApprovalRequested { address } => HostUpdate {
+                            message: Some(address),
+                            ..HostUpdate::of(HostUpdateKind::ApprovalRequested)
+                        },
                         E::FileReceived { name } => HostUpdate {
                             message: Some(name),
                             ..HostUpdate::of(HostUpdateKind::FileReceived)

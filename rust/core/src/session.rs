@@ -132,6 +132,9 @@ pub enum SessionEvent {
     RemoteClipboardTooLarge,
     /// Files or a folder copied on the remote started arriving.
     FilesIncoming { files: usize, bytes: u64 },
+    /// Files from the remote are arriving: `percent` done, `done` of `total`
+    /// bytes (sent every couple of percent).
+    FileProgress { percent: u8, done: u64, total: u64 },
     /// A file or folder copied on the remote finished arriving in the
     /// receive folder (one event per top-level item). `path` is where it was
     /// saved (the name may have " (1)" added).
@@ -226,6 +229,11 @@ pub fn connect(params: ConnectParams) -> Result<Session, ConnectFailure> {
         connector = connector.with_static_channel(CliprdrClient::new(Box::new(QueueBackend::new(
             std::sync::Arc::clone(&queue),
         ))));
+        tracing::info!(
+            local_to_host = clipboard.local_to_host,
+            host_to_local = clipboard.host_to_local,
+            "clip: session starting with clipboard policy"
+        );
         Some(ClipState {
             policy: clipboard,
             queue,
@@ -453,30 +461,64 @@ impl Session {
     /// Offers files to the remote computer, which downloads them. Does nothing
     /// if clipboard sharing to the remote is off for this connection, or if no
     /// path is a readable file within the size limit.
+    /// Stops a copy arriving from the remote right now, if there is one.
+    /// The file being written is removed; anything already fully received
+    /// from the same copy is left alone. Does nothing if nothing is arriving
+    /// (for example, it already finished just before this call).
+    pub fn cancel_incoming_files(&mut self) -> bool {
+        let Some(clip) = self.clip.as_mut() else {
+            return false;
+        };
+        let was_receiving = clip.receiving.take().is_some();
+        if was_receiving {
+            tracing::info!("clip: file receive cancelled from this side");
+        }
+        was_receiving
+    }
+
     pub fn send_files(&mut self, paths: Vec<PathBuf>) -> Result<(), ConnectionError> {
+        tracing::info!(
+            count = paths.len(),
+            ?paths,
+            "send_files: viewer→host file copy"
+        );
         let descriptors = {
             let Some(clip) = self.clip.as_mut() else {
+                tracing::info!("send_files: no clip state, skipping");
                 return Ok(());
             };
             if !clip.policy.local_to_host {
+                tracing::info!("send_files: local_to_host disabled, skipping");
                 return Ok(());
             }
             let files = crate::xfer::offer(&paths);
             if files.is_empty() {
+                tracing::info!(count = paths.len(), "send_files: offer() produced no files");
                 return Ok(());
             }
+            tracing::info!(offered = files.len(), "send_files: files offered");
             let descriptors: Vec<FileDescriptor> =
                 files.iter().map(|o| o.descriptor.clone()).collect();
             clip.outgoing = files;
             descriptors
         };
-        let msgs = self
+        let result = self
             .stage
             .get_svc_processor_mut::<CliprdrClient>()
-            .ok_or(ConnectionError::Unexpected)?
-            .initiate_file_copy(descriptors)
-            .map_err(|_| ConnectionError::Unexpected)?;
-        self.send_svc(msgs)
+            .ok_or(ConnectionError::Unexpected)
+            .and_then(|c| {
+                c.initiate_file_copy(descriptors).map_err(|e| {
+                    tracing::error!(?e, "send_files: initiate_file_copy failed");
+                    ConnectionError::Unexpected
+                })
+            });
+        match result {
+            Ok(msgs) => {
+                tracing::info!("send_files: initiate_file_copy ok, sending FormatList");
+                self.send_svc(msgs)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     /// Carries out a step of receiving files: ask for the next piece, or
@@ -497,6 +539,10 @@ impl Session {
                 self.send_svc(msgs)
             }
             crate::xfer::Step::Done(top_level) => {
+                tracing::info!(
+                    count = top_level.len(),
+                    "clip: file receive done, writing to events"
+                );
                 if let Some(clip) = self.clip.as_mut() {
                     clip.receiving = None;
                 }
@@ -506,7 +552,10 @@ impl Session {
                             .file_name()
                             .map(|n| n.to_string_lossy().into_owned())
                             .unwrap_or_default();
+                        tracing::info!(%name, "clip: FileReceived event");
                         events.push(SessionEvent::FileReceived { name, path });
+                    } else {
+                        tracing::warn!(?path, "clip: received file path does not exist");
                     }
                 }
                 Ok(())
@@ -585,6 +634,11 @@ impl Session {
                     self.advertise_local()?;
                 }
                 ClipAction::RemoteChanged { has_text } => {
+                    tracing::info!(
+                        has_text,
+                        host_to_local = policy.host_to_local,
+                        "clip: host clipboard changed (RemoteChanged)"
+                    );
                     if has_text && policy.host_to_local {
                         let msgs = self
                             .stage
@@ -592,6 +646,7 @@ impl Session {
                             .ok_or(ConnectionError::Unexpected)?
                             .initiate_paste(ClipboardFormatId::CF_UNICODETEXT)
                             .map_err(|_| ConnectionError::Unexpected)?;
+                        tracing::info!("clip: sent FormatDataRequest for text");
                         self.send_svc(msgs)?;
                     }
                 }
@@ -612,6 +667,7 @@ impl Session {
                     self.send_svc(msgs)?;
                 }
                 ClipAction::DataReceived(Some(bytes)) if policy.host_to_local => {
+                    tracing::info!(bytes = bytes.len(), "clip: received format data from host");
                     if bytes.len() > policy.max_bytes + 2 {
                         events.push(SessionEvent::RemoteClipboardTooLarge);
                         return Ok(());
@@ -620,11 +676,25 @@ impl Session {
                         if !text.is_empty() {
                             clip.last_remote = Some(text.clone());
                             events.push(SessionEvent::RemoteClipboardText(text));
+                        } else {
+                            tracing::warn!("clip: received format data decoded to empty text");
                         }
+                    } else {
+                        tracing::warn!("clip: received format data but unicode decode failed");
                     }
+                }
+                ClipAction::DataReceived(None) if policy.host_to_local => {
+                    tracing::warn!(
+                        "clip: host returned error for FormatDataRequest (DataReceived None)"
+                    );
                 }
                 ClipAction::DataReceived(_) => {}
                 ClipAction::RemoteFiles(format) => {
+                    tracing::info!(
+                        ?format,
+                        host_to_local = policy.host_to_local,
+                        "clip: host offered files (RemoteFiles)"
+                    );
                     if policy.host_to_local {
                         let msgs = self
                             .stage
@@ -632,6 +702,7 @@ impl Session {
                             .ok_or(ConnectionError::Unexpected)?
                             .initiate_paste(format)
                             .map_err(|_| ConnectionError::Unexpected)?;
+                        tracing::info!("clip: sent FormatDataRequest for file list");
                         self.send_svc(msgs)?;
                     }
                 }
@@ -639,13 +710,30 @@ impl Session {
                     files,
                     clip_data_id,
                 } => {
+                    tracing::info!(
+                        file_count = files.len(),
+                        ?clip_data_id,
+                        receive_dir = ?clip.receive_dir,
+                        host_to_local = policy.host_to_local,
+                        "clip: got FileList from host"
+                    );
                     if policy.host_to_local {
                         if let Some(dir) = clip.receive_dir.clone() {
-                            // A new copy replaces one still arriving.
+                            // A new copy replaces one still arriving, and
+                            // the files of earlier copies.
                             clip.receiving = None;
+                            let removed = crate::xfer::clear_received(&dir);
+                            if removed > 0 {
+                                tracing::info!(removed, "clip: cleared earlier received files");
+                            }
                             let (rx, step) =
                                 crate::xfer::Receiver::start(files, clip_data_id, &dir);
                             let count = rx.file_count();
+                            tracing::info!(
+                                count,
+                                total_bytes = rx.total_bytes,
+                                "clip: starting file receive"
+                            );
                             if count > 0 {
                                 events.push(SessionEvent::FilesIncoming {
                                     files: count,
@@ -654,10 +742,21 @@ impl Session {
                             }
                             clip.receiving = Some(rx);
                             self.receive_step(step, events)?;
+                        } else {
+                            tracing::warn!(
+                                "clip: FileList received but receive_dir is None, cannot receive"
+                            );
                         }
                     }
                 }
                 ClipAction::FileRequest(request) => {
+                    tracing::info!(
+                        stream_id = request.stream_id,
+                        index = request.index,
+                        outgoing_count = clip.outgoing.len(),
+                        local_to_host = policy.local_to_host,
+                        "clip: host requesting file data (FileRequest)"
+                    );
                     let answer = if policy.local_to_host {
                         crate::xfer::answer(&clip.outgoing, &request)
                     } else {
@@ -681,10 +780,19 @@ impl Session {
                     self.send_svc(msgs)?;
                 }
                 ClipAction::FileData { stream_id, bytes } => {
-                    let step = clip
-                        .receiving
-                        .as_mut()
-                        .and_then(|rx| rx.on_data(stream_id, bytes.as_deref()));
+                    let mut progress = None;
+                    let step = clip.receiving.as_mut().and_then(|rx| {
+                        let step = rx.on_data(stream_id, bytes.as_deref());
+                        progress = rx.progress();
+                        step
+                    });
+                    if let Some((percent, done, total)) = progress {
+                        events.push(SessionEvent::FileProgress {
+                            percent,
+                            done,
+                            total,
+                        });
+                    }
                     if let Some(step) = step {
                         self.receive_step(step, events)?;
                     }
@@ -797,7 +905,44 @@ impl Session {
             return Err(ConnectionError::ConnectionLost);
         }
         let (w, h) = self.size();
-        let ops = ops.into_iter().filter_map(|op| op.into_operation(w, h));
+
+        // SyncLockKeys is handled separately: it produces a Synchronize PDU
+        // directly rather than going through the input Database.
+        let mut extra: Vec<ironrdp_pdu::input::fast_path::FastPathInputEvent> = Vec::new();
+        let regular: Vec<_> = ops
+            .into_iter()
+            .filter(|op| {
+                if let InputEvent::SyncLockKeys {
+                    caps_lock,
+                    num_lock,
+                    scroll_lock,
+                } = *op
+                {
+                    extra.push(ironrdp_input::synchronize_event(
+                        scroll_lock,
+                        num_lock,
+                        caps_lock,
+                        false, // kana_lock — not used
+                    ));
+                    false
+                } else {
+                    true
+                }
+            })
+            .collect();
+
+        // Send the Synchronize PDU first so the host aligns its lock state
+        // before it receives any keystrokes.
+        if !extra.is_empty() {
+            let outputs = self
+                .stage
+                .process_fastpath_input(&mut self.image, &extra)
+                .map_err(|_| ConnectionError::Unexpected)?;
+            let mut ignored = Vec::new();
+            self.handle_outputs(outputs, &mut ignored)?;
+        }
+
+        let ops = regular.into_iter().filter_map(|op| op.into_operation(w, h));
         let events = self.input.apply(ops);
         if events.is_empty() {
             return Ok(());
@@ -880,6 +1025,13 @@ pub enum InputEvent {
         ch: char,
         down: bool,
     },
+    /// Sends the viewer's lock-key state to the host so it can align its own
+    /// keyboard (CapsLock, NumLock, ScrollLock). Called once at session start.
+    SyncLockKeys {
+        caps_lock: bool,
+        num_lock: bool,
+        scroll_lock: bool,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -920,6 +1072,8 @@ impl InputEvent {
             }
             Self::Unicode { ch, down: true } => Operation::UnicodeKeyPressed(ch),
             Self::Unicode { ch, down: false } => Operation::UnicodeKeyReleased(ch),
+            // Handled before this call in send_input; never reaches here.
+            Self::SyncLockKeys { .. } => return None,
         })
     }
 }

@@ -40,6 +40,7 @@
       <ComponentGroupRef Id="AppFiles" />
       <ComponentRef Id="MainExe" />
       <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="GoOnlineShortcut" />
     </Feature>
     <Feature Id="DesktopShortcutFeature" Title="Desktop shortcut" Level="1"
              Description="A shortcut on the desktop.">
@@ -75,6 +76,18 @@
                 Description="Connect securely with Remote Desktop"
                 Target="[INSTALLFOLDER]cipher_desk.exe" WorkingDirectory="INSTALLFOLDER" />
       <RegistryValue Root="HKCU" Key="Software\CipherDesk" Name="StartMenuShortcut"
+                     Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <!-- Turns sharing back on after "Exit" in the tray icon (asks for an
+         administrator's OK). Does nothing useful until the background
+         service is turned on in the app. -->
+    <Component Id="GoOnlineShortcut" Directory="ProgramMenuFolder">
+      <Shortcut Id="GoOnlineLink" Name="Cipher Desk - Go online"
+                Description="Turn screen sharing back on after Exit in the tray icon"
+                Target="[INSTALLFOLDER]cipher-desk-host-service.exe" Arguments="go-online"
+                WorkingDirectory="INSTALLFOLDER" Show="minimized" />
+      <RegistryValue Root="HKCU" Key="Software\CipherDesk" Name="GoOnlineShortcut"
                      Type="integer" Value="1" KeyPath="yes" />
     </Component>
 

@@ -1,6 +1,6 @@
 # CLAUDE.md — Cipher Desk
 
-Secure, open-source Remote Desktop (RDP) viewer by Bensal for Windows, Linux and Android. Public repo (since 30 Oct 2026): write docs and changelog for users, not about the development history. Teal / amber app theme (Material 3, seed colour teal).
+Security-focused, open-source Remote Desktop (RDP) viewer by Bensal for Windows, Linux and Android. Public repo (since 30 Oct 2026): write docs and changelog for users, not about the development history. Teal / amber app theme (Material 3, seed colour teal).
 
 ## Repo layout
 
@@ -40,6 +40,7 @@ Secure, open-source Remote Desktop (RDP) viewer by Bensal for Windows, Linux and
 - Passwords only in the OS vault (Credential Manager / Secret Service / Android Keystore), never in app files, exports, logs or command lines.
 - `sspi`/`picky` logging always off (SF-2: sspi logs the password at debug level; Devolutions classed it as hardening, public PR welcome).
 - Third-party actions pinned to full commit SHAs.
+- Never name other remote-desktop products (e.g. competitor apps) anywhere in the repo, release notes, commit messages or code comments. Say "other remote-access apps" instead.
 
 ## App facts
 
@@ -58,7 +59,13 @@ Secure, open-source Remote Desktop (RDP) viewer by Bensal for Windows, Linux and
 - **Never publish a release before the workflow runs.** The `release.yml` workflow skips all build jobs if the release already exists and is not a draft (`isDraft == false`). The correct flow: push tag → workflow creates a draft → builds attach → Bensal publishes. If a release is accidentally published early, delete it (keep the tag), then re-trigger via `gh api -X POST repos/Bensalk/cipher-desk/actions/workflows/release.yml/dispatches -f ref=vX.Y.Z`.
 - **Tag push is blocked in cloud sessions** (HTTP 403 via GitHub proxy). Workaround: use Chrome automation on the GitHub new-release web UI to create the tag + release form, then trigger the workflow via `gh api` dispatch. Alternative: dispatch the workflow on the **branch** (`ref=connection-methods`) with `inputs[make_release]=true` — when `REF_TYPE=branch` the skip condition doesn't fire, so this avoids the tag-push block entirely.
 - **`gh release view` (GraphQL) vs `gh api` REST discrepancy**: GraphQL may report a release as already published when REST returns 404. Always use `gh api repos/.../releases/tags/vX.Y.Z` to check; never trust the GraphQL result to skip a build.
+- **Each release run creates a new draft**, even if a draft with the same tag exists: delete the old draft first or there are two.
+- **`gh release download` is blocked here (GraphQL)**: fetch assets with `gh api -H "Accept: application/octet-stream" repos/Bensalk/cipher-desk/releases/assets/<id>` and run `sha256sum -c SHA256SUMS`.
 - **`.claude/settings.json`** in the repo root has allow rules for auto-mode: `git push origin v*`, `git tag v*`, `gh release create *`, `gh workflow run *`. Safe to be public — no credentials.
+- **`gh api` cannot create, edit, or delete releases, branches, or tags from this session type** — every such call returns 403 ("not permitted for this session type" or "Write access to this GitHub API path is not permitted through this proxy"). Read-only `gh api` calls (list/get) work fine. For any release edit/delete, branch delete, or tag delete, use Chrome automation on the real GitHub web UI instead (the user's Chrome is signed in).
+- **Never batch-delete releases by matching `/releases/tag/` delete forms loosely.** A real incident: a script matched *every* release delete form on the page (drafts and published alike) and deleted the live v1.0.0 release along with the old drafts it was meant to clean up. Filter strictly to drafts only (check the page for a "Draft" badge per release, not just the form's URL shape) before submitting any delete form via JS/fetch, or delete one at a time with a screenshot check in between.
+- **Recovering an accidentally-deleted release**: deleting a GitHub "release" does NOT delete the underlying git tag. If the tag still exists, dispatch `release.yml` directly against that tag (`-f ref=vX.Y.Z`, an existing tag name, not a branch) to rebuild and recreate the release from the exact same commit — no need to re-push the tag, which would hit the tag-push block anyway.
+- **Setting a release to not-prerelease when the API is blocked**: on the GitHub web "Edit release" page, the relevant control may only offer two choices — "Prerelease" and "none". Pick "none" to clear the pre-release flag (there may be no separate explicit "latest release" option visible).
 
 ## Android / Gradle version requirements
 
@@ -80,7 +87,7 @@ Secure, open-source Remote Desktop (RDP) viewer by Bensal for Windows, Linux and
 
 ## Working style
 
-- Bensal installs from GitHub (APK on his phone, MSI/ZIP on Windows); he doesn't use an IDE. A broken build means no app.
+- Bensal installs from GitHub (MSI/ZIP on Windows). He tests with two Windows PCs: a viewer PC and a host PC. Write all test steps for these two Windows PCs. He does not use an IDE. A broken build means no app.
 - Keep explanations short and non-technical.
 - Start every reply with a `Model:` line (Sonnet for routine/support, Opus for hard coding, design decisions, demanding work) and a one-line reason; Bensal can't judge difficulty himself.
 - About screen: "Created by Bensal" is the last item, small and not highlighted.

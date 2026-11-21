@@ -8,7 +8,7 @@
 #include <memory>
 
 // Files on the Windows clipboard (what Explorer copies and pastes), for copy
-// and paste of files in a remote session, like AnyDesk. Method channel
+// and paste of files in a remote session. Method channel
 // "rdpv/file_clipboard":
 //   sequence()          -> int   clipboard change counter
 //   readFiles()         -> list  paths of copied files (empty if none)

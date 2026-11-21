@@ -23,6 +23,7 @@ import '../src/rust/api/log.dart' as rust_log;
 import '../src/rust/api/pins.dart';
 import '../src/rust/api/session.dart';
 import '../src/rust/api/store.dart' show ConnectionMethod;
+import '../state/lockout_tracker.dart';
 import '../state/profiles.dart';
 import 'connection_methods.dart';
 import 'error_banner.dart';
@@ -117,6 +118,10 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   ErrorInfo? _error;
   bool _ended = false;
   bool _wasConnected = false;
+  /// When the session was first connected (for the wrong-password tracker).
+  DateTime? _connectedAt;
+  /// Share screen: what the wrong-password tracker says after this ending.
+  String? _lockoutHint;
 
   // View: zoom and pan (pinch-zoom), and trackpad mode for touch screens.
   double _zoom = 1;
@@ -168,13 +173,18 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
   Timer? _clipTimer;
   String? _lastLocalClip;
 
-  // Copy and paste of files with Explorer, like AnyDesk (Windows).
+  // Copy and paste of files with Explorer (Windows).
   // Files copied here go to the remote; files from the remote are put on
   // this computer's clipboard. `_fileSeq` is the last clipboard change seen,
   // `_ownFileSeq` the one made by putting received files there.
   int? _fileSeq;
   int? _ownFileSeq;
   String _receiveDir = '';
+
+  /// Files arriving from the remote: fraction done (null when nothing is
+  /// arriving) and "12.0 MB of 1.2 GB".
+  double? _transferProgress;
+  String _transferText = '';
   final List<String> _receivedBatch = [];
   DateTime? _lastReceived;
   Timer? _receivedBatchTimer;
@@ -249,7 +259,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     if (_receiveDir.isNotEmpty && files.every((f) => f.startsWith(_receiveDir))) return;
     _session.sendFiles(paths: files);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    _notice(SnackBar(
       content: Text(files.length == 1
           ? 'Copying "${files.first.split(Platform.pathSeparator).last}" to the remote computer. '
               'Paste it there with Ctrl+V when it has arrived.'
@@ -351,7 +361,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     // already-saved one like this can still be off even after that is
     // turned on — this button fixes THIS connection, with no settings menu.)
     if (clipboard == ClipboardMode.off && widget.profile.method.supportsClipboard) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      _notice(SnackBar(
         duration: const Duration(seconds: 60),
         content: const Text(
           'Copy and paste is off for this connection. '
@@ -430,6 +440,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
         });
         if (u.connected) {
           _wasConnected = true;
+          _connectedAt ??= DateTime.now();
           if (!_serviceStarted) {
             _serviceStarted = true;
             SessionService.start();
@@ -470,27 +481,52 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
         });
       case UpdateKind.remoteClipboardTooLarge:
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        _notice(const SnackBar(
           content: Text('Text copied on the remote computer was larger than 1 MB and was not copied.'),
         ));
       case UpdateKind.filesIncoming:
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        if (u.label == 'progress') {
+          setState(() {
+            _transferProgress = u.x >= 100 ? null : u.x / 100;
+            _transferText = u.text ?? '';
+          });
+          return;
+        }
+        setState(() {
+          _transferProgress = 0;
+          _transferText = u.text ?? '';
+        });
+        _notice(SnackBar(
           content: Text('Receiving ${u.text ?? 'files'} from the remote computer…'),
           duration: const Duration(seconds: 6),
         ));
       case UpdateKind.fileReceived:
         if (!mounted) return;
+        if (_transferProgress != null) setState(() => _transferProgress = null);
         final name = u.text ?? 'a file';
         final path = u.label;
         if (path != null && path.isNotEmpty) _putReceivedOnClipboard(path);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        _notice(SnackBar(
           duration: const Duration(seconds: 10),
           content: Text(FileClipboard.supported
               ? 'Received "$name" — press Ctrl+V in any folder to place it there.'
               : 'Received "$name" into: $_receiveDir'),
         ));
+      case UpdateKind.filesCancelled:
+        if (!mounted) return;
+        setState(() => _transferProgress = null);
+        _notice(const SnackBar(content: Text('Copy cancelled.')));
     }
+  }
+
+  /// Shows a short message at the bottom. A new message replaces the one on
+  /// screen instead of queueing behind it, so a burst of transfers does not
+  /// leave old notices playing for minutes afterwards.
+  void _notice(SnackBar bar) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.showSnackBar(bar);
   }
 
   /// Picks local files and sends them to the remote computer.
@@ -500,7 +536,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     _session.sendFiles(paths: files.map((f) => f.path).toList());
     if (!mounted) return;
     final many = files.length > 1;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    _notice(SnackBar(
       duration: const Duration(seconds: 10),
       content: Text(many
           ? '${files.length} files ready — press Ctrl+V in a folder on the remote computer to paste them there.'
@@ -552,7 +588,9 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     if (_serviceStarted) SessionService.stop();
     if (_ended) return;
     widget.onOutcome?.call(error?.id ?? (_wasConnected ? 'connected' : 'cancelled'));
+    final hint = _trackLockout(error);
     setState(() {
+      _lockoutHint = hint;
       _ended = true;
       _error = error;
       _state = error == null ? RdpConnectionState.disconnected : RdpConnectionState.failed;
@@ -564,13 +602,47 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
     }
   }
 
+  /// Share screen computers refuse a device for a while after too many wrong
+  /// passwords. Keeps count on this side and returns what to tell the user:
+  /// how long the computer will refuse this device, or how many tries are
+  /// left. `null` when there is nothing to say.
+  String? _trackLockout(ErrorInfo? error) {
+    final p = widget.profile;
+    if (p.method != ConnectionMethod.shareScreen) return null;
+    final key = LockoutTracker.keyFor(p.host, p.port);
+    final started = _connectedAt;
+    if (started != null) {
+      lockoutTracker.sessionEnded(key, DateTime.now().difference(started));
+    }
+    if (error?.id == 'WrongCredentials') lockoutTracker.wrongPassword(key);
+    if (error == null) return null;
+    final until = lockoutTracker.lockedUntil(key);
+    if (until != null) {
+      final minutes = lockoutTracker.minutesLeft(key) ?? LockoutTracker.lockout.inMinutes;
+      final at = '${until.hour.toString().padLeft(2, '0')}:'
+          '${until.minute.toString().padLeft(2, '0')}';
+      return 'Too many wrong passwords from this device. That computer refuses it '
+          'for about $minutes more minute${minutes == 1 ? '' : 's'} (until $at). '
+          'The person at that computer can let it try again now: right-click the '
+          'Cipher Desk icon in the taskbar and choose Unblock.';
+    }
+    if (error.id == 'WrongCredentials') {
+      final left = lockoutTracker.triesLeft(key);
+      if (left <= 2) {
+        return '$left more wrong password${left == 1 ? '' : 's'} and that computer '
+            'refuses this device for ${LockoutTracker.lockout.inMinutes} minutes.';
+      }
+    }
+    return null;
+  }
+
   /// Exports the in-memory session log so the user can share it.
   /// Android: share sheet.  Windows/Linux: file-save dialog → Desktop.
   Future<void> _reportProblem() async {
     if (!mounted) return;
     // TODO(next-bump): update this when pubspec version changes.
     // Adding package_info_plus would let us read it at runtime.
-    const version = '0.3.6';
+    const version = '1.0.0';
     final content = rust_log.sessionLogExport(appVersion: version);
     final fileName = 'cipher-desk-log-${DateTime.now().millisecondsSinceEpoch}.txt';
 
@@ -595,7 +667,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
       final file = File(location.path);
       await file.writeAsString(content);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      _notice(
         SnackBar(content: Text('Log saved to ${location.path}')),
       );
     }
@@ -1169,6 +1241,50 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
                     : FilterQuality.medium,
               ),
             ),
+            if (_transferProgress != null)
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                child: Material(
+                  key: const Key('transfer-progress'),
+                  color: Theme.of(context).colorScheme.surface.withAlpha(217),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 6, 4, 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Receiving files… ${(_transferProgress! * 100).round()}%'
+                                '${_transferText.isEmpty ? '' : ' ($_transferText)'}',
+                              ),
+                              const SizedBox(height: 4),
+                              LinearProgressIndicator(value: _transferProgress),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          key: const Key('transfer-cancel'),
+                          icon: const Icon(Icons.close),
+                          tooltip: 'Cancel this copy',
+                          iconSize: 20,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          onPressed: () {
+                            _session.cancelIncomingFiles();
+                            setState(() => _transferProgress = null);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             if (_trackpad)
               Positioned(
                 left: o.dx + _cursor.dx * sx - 2,
@@ -1204,6 +1320,7 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
               ),
             _KeyButton('Esc', () => _pressKey(0x01)),
             _KeyButton('Tab', () => _pressKey(0x0F)),
+            _KeyButton('Caps', () => _pressKey(0x3A)),
             _KeyButton('Win', () => _pressKey(0x5B, extended: true)),
             _KeyButton('Ctrl+Alt+Del', _session.ctrlAltDel),
             _KeyButton('←', () => _pressKey(0x4B, extended: true)),
@@ -1330,6 +1447,20 @@ class _SessionScreenState extends State<SessionScreen> with WidgetsBindingObserv
             Padding(
               padding: const EdgeInsets.all(12),
               child: ErrorBanner(error: _error!),
+            ),
+          if (_error != null && _lockoutHint != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.lock_clock, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(_lockoutHint!, key: const Key('lockout-hint')),
+                  ),
+                ],
+              ),
             ),
           if (changed != null)
             Padding(
@@ -1627,7 +1758,7 @@ class _FingerprintCompare extends StatelessWidget {
   }
 }
 
-/// How the remote screen fits the window (like AnyDesk's view modes).
+/// How the remote screen fits the window.
 enum _ViewMode {
   original,
   shrink,

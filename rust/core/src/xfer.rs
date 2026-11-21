@@ -146,14 +146,26 @@ pub fn read_range(path: &Path, position: u64, len: u64) -> Option<Vec<u8>> {
 
 /// Turns a name received from the other side into a safe base file name, or
 /// `None` if it is unusable. Strips any directory part (both `/` and `\`),
-/// rejects `.`/`..`, empty names, Windows device names, and control characters.
+/// rejects `.`/`..`, empty names, Windows device names, control characters,
+/// characters Windows does not allow in names (a `:` would make `C:name` a
+/// path on drive C:, outside the folder the file belongs in), names ending in
+/// a dot or space, names longer than 255 characters, and names with invisible
+/// text-direction characters (they can make `report\u{202E}fdp.exe` show as
+/// `reportexe.pdf`, hiding that the file is a program).
 pub fn safe_file_name(raw: &str) -> Option<String> {
     // Keep only the last path component, however it was separated.
     let base = raw.rsplit(['/', '\\']).next().unwrap_or(raw).trim();
     if base.is_empty() || base == "." || base == ".." {
         return None;
     }
-    if base.chars().any(|c| c.is_control()) {
+    if base.chars().any(|c| {
+        c.is_control()
+            || is_direction_mark(c)
+            || matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*')
+    }) {
+        return None;
+    }
+    if base.ends_with(['.', ' ']) || base.chars().count() > 255 {
         return None;
     }
     // Reserved Windows device names (CON, NUL, COM1, …) are unsafe to create.
@@ -163,8 +175,49 @@ pub fn safe_file_name(raw: &str) -> Option<String> {
     Some(base.to_owned())
 }
 
+/// Invisible characters that change the direction text is shown in (Unicode
+/// bidirectional controls and marks).
+fn is_direction_mark(c: char) -> bool {
+    matches!(
+        c,
+        '\u{061C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}'
+    )
+}
+
+/// True when `path` is `dir` followed only by plain names (no drive, root,
+/// `..` or `.` parts).
+fn stays_inside(dir: &Path, path: &Path) -> bool {
+    use std::path::Component;
+    path.strip_prefix(dir)
+        .is_ok_and(|rest| rest.components().all(|c| matches!(c, Component::Normal(_))))
+}
+
 /// A path under `dir` for `name` that does not clash with an existing file:
 /// `report.pdf`, then `report (1).pdf`, and so on.
+/// Empties a Received folder before new files arrive: the clipboard now
+/// points at the new files, so earlier ones are no longer needed, and the new
+/// ones keep their own names instead of "name (2)". Links inside are removed
+/// as links, never followed. Returns how many entries were removed.
+pub fn clear_received(dir: &Path) -> usize {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return 0;
+    };
+    let mut removed = 0;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let is_dir = entry.file_type().is_ok_and(|t| t.is_dir());
+        let ok = if is_dir {
+            std::fs::remove_dir_all(&path).is_ok()
+        } else {
+            std::fs::remove_file(&path).is_ok()
+        };
+        if ok {
+            removed += 1;
+        }
+    }
+    removed
+}
+
 pub fn unique_path(dir: &Path, name: &str) -> PathBuf {
     let candidate = dir.join(name);
     if !candidate.exists() {
@@ -249,6 +302,10 @@ pub struct Receiver {
     data_id: Option<u32>,
     /// Total bytes announced (for "receiving …" messages).
     pub total_bytes: u64,
+    /// Bytes written so far, over all files.
+    received: u64,
+    /// Last progress reported ([`Receiver::progress`]), in percent.
+    reported: u8,
 }
 
 impl Receiver {
@@ -283,6 +340,12 @@ impl Receiver {
             for c in &safe[1..] {
                 dest.push(c);
             }
+            // Belt and braces: whatever the names were, the result must be a
+            // plain path inside `dir`.
+            if !stays_inside(dir, &dest) {
+                dests.push(None);
+                continue;
+            }
             if item.is_dir {
                 let _ = std::fs::create_dir_all(&dest);
             } else {
@@ -298,6 +361,8 @@ impl Receiver {
             current: None,
             data_id,
             total_bytes,
+            received: 0,
+            reported: 0,
         };
         let step = r.advance();
         (r, step)
@@ -324,6 +389,7 @@ impl Receiver {
             return Some(self.advance());
         }
         cur.done += bytes.len() as u64;
+        self.received += bytes.len() as u64;
         let finished = match cur.size {
             Some(size) => cur.done >= size || bytes.is_empty(),
             None => (bytes.len() as u64) < u64::from(cur.asked),
@@ -331,13 +397,37 @@ impl Receiver {
         if finished {
             if let Some(cur) = self.current.take() {
                 drop(cur.file);
-                if std::fs::rename(&cur.part, &cur.dest).is_err() {
+                // Never replace a file that is already there.
+                let dest = if cur.dest.exists() {
+                    match (cur.dest.parent(), cur.dest.file_name()) {
+                        (Some(parent), Some(name)) => unique_path(parent, &name.to_string_lossy()),
+                        _ => cur.dest.clone(),
+                    }
+                } else {
+                    cur.dest.clone()
+                };
+                if dest.exists() || std::fs::rename(&cur.part, &dest).is_err() {
                     let _ = std::fs::remove_file(&cur.part);
                 }
             }
             return Some(self.advance());
         }
         Some(Step::Request(self.request()))
+    }
+
+    /// Progress to show, when it moved by at least 2 % since last time:
+    /// `(percent, bytes received, total bytes)`.
+    pub fn progress(&mut self) -> Option<(u8, u64, u64)> {
+        if self.total_bytes == 0 {
+            return None;
+        }
+        let pct = (u128::from(self.received) * 100 / u128::from(self.total_bytes)).min(100);
+        let pct = u8::try_from(pct).unwrap_or(100);
+        if pct >= self.reported.saturating_add(2) || (pct == 100 && self.reported < 100) {
+            self.reported = pct;
+            return Some((pct, self.received, self.total_bytes));
+        }
+        None
     }
 
     /// Drops the file being received.
@@ -703,6 +793,42 @@ mod tests {
         assert_eq!(safe_file_name("   "), None);
         assert_eq!(safe_file_name("CON"), None);
         assert_eq!(safe_file_name("a\u{0007}b"), None);
+        // A drive letter without a slash would point outside the folder.
+        assert_eq!(safe_file_name("C:evil.dll"), None);
+        assert_eq!(safe_file_name(r"x\C:evil.dll"), None);
+        assert_eq!(safe_file_name("file.txt:stream"), None);
+        assert_eq!(safe_file_name("a?b"), None);
+        assert_eq!(safe_file_name("trailing."), None);
+        assert_eq!(safe_file_name(&"a".repeat(256)), None);
+        assert_eq!(safe_file_name(&"a".repeat(255)).map(|n| n.len()), Some(255));
+        // A right-to-left override would show "invoice\u{202E}fdp.exe" as
+        // "invoiceexe.pdf".
+        assert_eq!(safe_file_name("invoice\u{202E}fdp.exe"), None);
+        assert_eq!(safe_file_name("a\u{2067}b.txt"), None);
+        assert_eq!(safe_file_name("a\u{200F}b.txt"), None);
+        // Ordinary non-English names are still fine.
+        assert_eq!(safe_file_name("رسالة.txt").as_deref(), Some("رسالة.txt"));
+        assert_eq!(safe_file_name("Résumé.pdf").as_deref(), Some("Résumé.pdf"));
+    }
+
+    #[test]
+    fn received_paths_stay_inside_the_folder() {
+        let dir = Path::new("received");
+        assert!(stays_inside(dir, &dir.join("a").join("b.txt")));
+        assert!(!stays_inside(dir, &dir.join("..").join("b.txt")));
+        assert!(!stays_inside(dir, Path::new("elsewhere/b.txt")));
+    }
+
+    #[test]
+    fn clear_received_empties_the_folder() {
+        let dir = std::env::temp_dir().join(format!("rdpv-clear-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("sub")).unwrap_or_else(|e| panic!("{e}"));
+        std::fs::write(dir.join("a.txt"), b"x").unwrap_or_else(|e| panic!("{e}"));
+        std::fs::write(dir.join("sub").join("b.txt"), b"y").unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(clear_received(&dir), 2);
+        assert_eq!(std::fs::read_dir(&dir).map(|e| e.count()).unwrap_or(9), 0);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

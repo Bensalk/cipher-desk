@@ -36,7 +36,14 @@ pub struct VncParams {
 const REFRESH_INTERVAL: Duration = Duration::from_millis(50);
 
 /// True for addresses VNC may be used with: this computer, the local network
-/// (private and link-local ranges) and Tailscale / carrier-grade NAT.
+/// (private and link-local ranges) and the IPv4 100.64.0.0/10 block, which
+/// covers both Tailscale and ordinary carrier-grade NAT — some ISPs hand
+/// addresses in this same range to ordinary mobile and broadband customers,
+/// so an address in it is not proof the connection actually goes over
+/// Tailscale, only that it is not a public internet address on its face.
+/// VNC itself has no server identity to check further (see
+/// `docs/THREAT_MODEL.md`, V1/R-8), so this stays a best-effort filter, not
+/// a guarantee.
 pub fn is_private_address(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => {
@@ -549,6 +556,8 @@ impl VncSession {
                 .map(|k| vec![self.key_event(k, false)])
                 .unwrap_or_default(),
             InputEvent::Unicode { ch, down } => vec![self.key_event(keysym_for_char(ch), down)],
+            // VNC has no lock-key sync mechanism; silently ignore.
+            InputEvent::SyncLockKeys { .. } => vec![],
         }
     }
 

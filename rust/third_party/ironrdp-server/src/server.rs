@@ -30,6 +30,28 @@ use rdpsnd::server::{RdpsndServer, RdpsndServerMessage};
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt as _};
 use tokio::net::TcpSocket;
 use tokio::sync::{Mutex, mpsc, oneshot};
+
+/// Cipher Desk: longest a connection may take for each step before the
+/// session starts (TLS, sign-in, setup). The server takes one connection at a
+/// time, so a silent one must not block everyone else.
+const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Cipher Desk: how long a new connection may stay silent before its first
+/// bytes. A real viewer starts talking at once; an "is it online?" check
+/// closes at once; only a connection meant to hold the queue stays silent.
+const FIRST_BYTES_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Cipher Desk: the error a connection handler gets for a connection that
+/// sent nothing within [`FIRST_BYTES_TIMEOUT`].
+pub const SILENT_CONNECTION: &str = "sent nothing after connecting";
+
+/// Cipher Desk: what a new connection did within [`FIRST_BYTES_TIMEOUT`].
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FirstBytes {
+    Arrived,
+    Closed,
+    Silent,
+}
 use tokio::task;
 use tokio_rustls::TlsAcceptor;
 use tracing::{debug, error, trace, warn};
@@ -70,9 +92,16 @@ pub enum PostConnectionAction {
 pub trait ConnectionHandler: Send {
     /// Called after `accept()` returns but before `run_connection()`.
     ///
+    /// `local` is the address of the network interface this particular
+    /// connection arrived on (the accepted stream's own local address, not
+    /// the listener's — the listener may bind to all interfaces). A handler
+    /// can use this to tell a connection that merely *claims* a peer address
+    /// on some trusted network from one that actually arrived through that
+    /// network's own interface.
+    ///
     /// Return `false` to reject the connection (the TCP stream is dropped).
-    fn on_accept(&mut self, peer: SocketAddr) -> bool {
-        let _ = peer;
+    fn on_accept(&mut self, peer: SocketAddr, local: SocketAddr) -> bool {
+        let _ = (peer, local);
         true
     }
 
@@ -839,8 +868,11 @@ impl RdpServer {
 
         self.attach_channels(&mut acceptor);
 
-        let res = ironrdp_acceptor::accept_begin(framed, &mut acceptor)
+        // Cipher Desk: a connection that stops talking before signing in must
+        // not hold the (single) listener: every pre-session step has a time limit.
+        let res = tokio::time::timeout(HANDSHAKE_TIMEOUT, ironrdp_acceptor::accept_begin(framed, &mut acceptor))
             .await
+            .context("handshake timed out")?
             .context("accept_begin failed")?;
 
         match res {
@@ -853,7 +885,10 @@ impl RdpServer {
                         RdpServerSecurity::Hybrid((acceptor, _)) => acceptor,
                         RdpServerSecurity::None => unreachable!(),
                     };
-                    let accept = match tls_acceptor.accept(stream).await {
+                    let accept = match tokio::time::timeout(HANDSHAKE_TIMEOUT, tls_acceptor.accept(stream))
+                        .await
+                        .context("TLS handshake timed out")?
+                    {
                         Ok(accept) => accept,
                         Err(e) => {
                             warn!("Failed to TLS accept: {}", e);
@@ -902,15 +937,19 @@ impl RdpServer {
             // uses this value in practice.
             let client_name = "rdp-client".to_owned();
 
-            ironrdp_acceptor::accept_credssp(
-                &mut framed,
-                &mut acceptor,
-                &mut NoNetwork,
-                client_name.into(),
-                pub_key.clone(),
-                None,
+            tokio::time::timeout(
+                HANDSHAKE_TIMEOUT,
+                ironrdp_acceptor::accept_credssp(
+                    &mut framed,
+                    &mut acceptor,
+                    &mut NoNetwork,
+                    client_name.into(),
+                    pub_key.clone(),
+                    None,
+                ),
             )
-            .await?;
+            .await
+            .context("sign-in timed out")??;
         }
 
         let framed = self.accept_finalize(framed, acceptor).await?;
@@ -986,20 +1025,55 @@ impl RdpServer {
                     debug!(?peer, "Received connection");
                     drop(ev_receiver);
 
+                    // Cipher Desk: the specific interface this connection came in
+                    // on, not just the listener's own (possibly 0.0.0.0) address.
+                    let conn_local = stream.local_addr().unwrap_or(local_addr);
                     let accepted = self.connection_handler
                         .as_mut()
-                        .is_none_or(|h| h.on_accept(peer));
+                        .is_none_or(|h| h.on_accept(peer, conn_local));
+
+                    // Cipher Desk: connections are served one at a time, so
+                    // wait only briefly for the first bytes. One closed at once
+                    // (an "is it online?" check) is dropped quietly; one that
+                    // stays silent is closed and reported to the handler, which
+                    // counts it like a wrong password.
+                    let first = if accepted {
+                        let mut byte = [0u8; 1];
+                        match tokio::time::timeout(FIRST_BYTES_TIMEOUT, stream.peek(&mut byte)).await {
+                            Ok(Ok(n)) if n > 0 => FirstBytes::Arrived,
+                            Ok(_) => FirstBytes::Closed,
+                            Err(_) => FirstBytes::Silent,
+                        }
+                    } else {
+                        FirstBytes::Closed
+                    };
 
                     if !accepted {
                         debug!(?peer, "Connection rejected by handler");
                         drop(stream);
+                    } else if first == FirstBytes::Closed {
+                        debug!(?peer, "Connection closed before sending anything");
+                        drop(stream);
+                    } else if first == FirstBytes::Silent {
+                        warn!(?peer, "Connection sent nothing; closed");
+                        drop(stream);
+                        if let Some(ref mut handler) = self.connection_handler {
+                            let error = anyhow::anyhow!(SILENT_CONNECTION);
+                            let action = handler.on_disconnected(peer, FIRST_BYTES_TIMEOUT, Some(&error));
+                            if action == PostConnectionAction::Stop {
+                                debug!(?peer, "Handler requested stop after disconnect");
+                                break;
+                            }
+                        }
                     } else {
                         let started = tokio::time::Instant::now();
                         let result = self.run_connection(stream).await;
                         let duration = started.elapsed();
 
                         if let Err(ref error) = result {
-                            error!(?error, "Connection error");
+                            // Cipher Desk: one line; probes and dropped
+                            // connections are common and not errors of ours.
+                            warn!(error = %format!("{error:#}"), "Connection ended");
                         }
 
                         self.static_channels = StaticChannelSet::new();
@@ -1434,16 +1508,17 @@ impl RdpServer {
             }
         }
 
+        // Cipher Desk: input a client sends while the connection is still
+        // being finalised is dropped, never applied. Upstream applies it here,
+        // which is before `client_loop` asks the display handler for updates —
+        // and that is where "ask to connect" waits for the person at the
+        // computer to allow the viewer. Applying it would let an unapproved
+        // viewer type on this computer. Real clients do not depend on it.
         if !result.input_events.is_empty() {
-            debug!("Handling input event backlog from acceptor sequence");
-            self.handle_input_backlog(
-                writer,
-                result.io_channel_id,
-                result.user_channel_id,
-                result.message_channel_id,
-                result.input_events,
-            )
-            .await?;
+            warn!(
+                count = result.input_events.len(),
+                "Dropped input sent before the session started"
+            );
         }
 
         self.static_channels = result.static_channels;
@@ -1570,36 +1645,6 @@ impl RdpServer {
             .context("client loop failure")?;
 
         Ok(state)
-    }
-
-    async fn handle_input_backlog(
-        &mut self,
-        writer: &mut impl FramedWrite,
-        io_channel_id: u16,
-        user_channel_id: u16,
-        message_channel_id: Option<u16>,
-        frames: Vec<Vec<u8>>,
-    ) -> Result<()> {
-        for frame in frames {
-            match Action::from_fp_output_header(frame[0]) {
-                Ok(Action::FastPath) => {
-                    let input = decode(&frame)?;
-                    self.handle_fastpath(input).await;
-                }
-
-                Ok(Action::X224) => {
-                    let _ = self
-                        .handle_x224(writer, io_channel_id, user_channel_id, message_channel_id, &frame)
-                        .await;
-                }
-
-                // the frame here is always valid, because otherwise it would
-                // have failed during the acceptor loop
-                Err(_) => unreachable!(),
-            }
-        }
-
-        Ok(())
     }
 
     async fn handle_fastpath(&mut self, input: FastPathInput) {
@@ -1800,9 +1845,13 @@ impl RdpServer {
         S: AsyncRead + AsyncWrite + Sync + Send + Unpin,
     {
         loop {
-            let (new_framed, result) = ironrdp_acceptor::accept_finalize(framed, &mut acceptor)
-                .await
-                .context("failed to accept client during finalize")?;
+            let (new_framed, result) = tokio::time::timeout(
+                HANDSHAKE_TIMEOUT,
+                ironrdp_acceptor::accept_finalize(framed, &mut acceptor),
+            )
+            .await
+            .context("connection setup timed out")?
+            .context("failed to accept client during finalize")?;
 
             let (mut reader, mut writer) = split_tokio_framed(new_framed);
 

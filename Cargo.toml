@@ -3,10 +3,10 @@ resolver = "2"
 members = ["rust/core", "rust/bridge", "rust/host", "rust/host-service"]
 
 [workspace.package]
-version = "0.3.6"
+version = "1.0.0"
 edition = "2021"
 license = "Apache-2.0"
-rust-version = "1.85"
+rust-version = "1.97"
 publish = false
 
 [workspace.dependencies]

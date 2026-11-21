@@ -54,3 +54,9 @@ name = "form_fields"
 path = "fuzz_targets/form_fields.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "safe_file_name"
+path = "fuzz_targets/safe_file_name.rs"
+test = false
+doc = false

@@ -4,14 +4,17 @@
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
 import '../frb_generated.dart';
+
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-
-            
-
-            /// Forgets the trusted certificate for host:port (used when a connection is
+/// Forgets the trusted certificate for host:port (used when a connection is
 /// deleted). Returns false if the pin file could not be read or written.
-bool  forgetCertificate({required String pinsPath , required String host , required int port }) => RustLib.instance.api.crateApiPinsForgetCertificate(pinsPath: pinsPath, host: host, port: port);
-
-            
-            
+bool forgetCertificate({
+  required String pinsPath,
+  required String host,
+  required int port,
+}) => RustLib.instance.api.crateApiPinsForgetCertificate(
+  pinsPath: pinsPath,
+  host: host,
+  port: port,
+);

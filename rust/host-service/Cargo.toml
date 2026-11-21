@@ -15,6 +15,9 @@ path = "src/main.rs"
 anyhow = "1"
 tracing.workspace = true
 
+[dev-dependencies]
+tempfile = "3"
+
 # Windows only: the service, the session launch, and the sign-in-screen host.
 [target.'cfg(windows)'.dependencies]
 rdpv-core = { path = "../core" }
@@ -31,6 +34,16 @@ windows = { version = "0.62", features = [
     "Win32_System_Memory",
     "Win32_System_Diagnostics_Debug",
     "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Shell",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Environment",
+    "Win32_System_Pipes",
+    "Win32_System_IO",
+    "Win32_Storage_FileSystem",
+    "Win32_Security_Authorization",
+    "Win32_Networking_WinSock",
+    "Win32_System_SystemInformation",
 ] }
 
 # Its own lints: unsafe is needed for the Win32 session/token calls.

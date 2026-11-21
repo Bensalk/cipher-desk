@@ -7,426 +7,750 @@ import 'api/errors.dart';
 import 'api/form.dart';
 import 'api/host.dart';
 import 'api/info.dart';
+import 'api/log.dart';
 import 'api/pins.dart';
 import 'api/session.dart';
 import 'api/store.dart';
 import 'api/vault.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi' as ffi;
+
 import 'frb_generated.dart';
+
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
+abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
+  RustLibApiImplPlatform({
+    required super.handler,
+    required super.wire,
+    required super.generalizedFrbRustBinding,
+    required super.portManager,
+  });
+
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_RdpSessionPtr => wire
+      ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSessionPtr;
 
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_ShareHostPtr => wire
+      ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHostPtr;
 
+  @protected
+  AnyhowException dco_decode_AnyhowException(dynamic raw);
 
-                abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
-                  RustLibApiImplPlatform({
-                    required super.handler,
-                    required super.wire,
-                    required super.generalizedFrbRustBinding,
-                    required super.portManager,
-                  });
+  @protected
+  RdpSession
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(
+    dynamic raw,
+  );
 
-                  CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_RdpSessionPtr => wire._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSessionPtr;
+  @protected
+  ShareHost
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
+    dynamic raw,
+  );
 
-CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_ShareHostPtr => wire._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHostPtr;
+  @protected
+  RdpSession
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(
+    dynamic raw,
+  );
 
+  @protected
+  ShareHost
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
+    dynamic raw,
+  );
 
+  @protected
+  RdpSession
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(
+    dynamic raw,
+  );
 
-                  @protected AnyhowException dco_decode_AnyhowException(dynamic raw);
+  @protected
+  ShareHost
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
+    dynamic raw,
+  );
 
-@protected RdpSession dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(dynamic raw);
+  @protected
+  RustStreamSink<HostUpdate> dco_decode_StreamSink_host_update_Sse(dynamic raw);
 
-@protected ShareHost dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(dynamic raw);
+  @protected
+  RustStreamSink<SessionUpdate> dco_decode_StreamSink_session_update_Sse(
+    dynamic raw,
+  );
 
-@protected RdpSession dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(dynamic raw);
+  @protected
+  String dco_decode_String(dynamic raw);
 
-@protected ShareHost dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(dynamic raw);
+  @protected
+  AppTheme dco_decode_app_theme(dynamic raw);
 
-@protected RdpSession dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(dynamic raw);
+  @protected
+  bool dco_decode_bool(dynamic raw);
 
-@protected ShareHost dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(dynamic raw);
+  @protected
+  ErrorInfo dco_decode_box_autoadd_error_info(dynamic raw);
 
-@protected RustStreamSink<HostUpdate> dco_decode_StreamSink_host_update_Sse(dynamic raw);
+  @protected
+  PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw);
 
-@protected RustStreamSink<SessionUpdate> dco_decode_StreamSink_session_update_Sse(dynamic raw);
+  @protected
+  SettingsData dco_decode_box_autoadd_settings_data(dynamic raw);
 
-@protected String dco_decode_String(dynamic raw);
+  @protected
+  int dco_decode_box_autoadd_u_16(dynamic raw);
 
-@protected AppTheme dco_decode_app_theme(dynamic raw);
+  @protected
+  ClipboardMode dco_decode_clipboard_mode(dynamic raw);
 
-@protected bool dco_decode_bool(dynamic raw);
+  @protected
+  ConnectionData dco_decode_connection_data(dynamic raw);
 
-@protected ErrorInfo dco_decode_box_autoadd_error_info(dynamic raw);
+  @protected
+  ConnectionMethod dco_decode_connection_method(dynamic raw);
 
-@protected PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw);
+  @protected
+  ErrorInfo dco_decode_error_info(dynamic raw);
 
-@protected SettingsData dco_decode_box_autoadd_settings_data(dynamic raw);
+  @protected
+  FieldProblem dco_decode_field_problem(dynamic raw);
 
-@protected int dco_decode_box_autoadd_u_16(dynamic raw);
+  @protected
+  FormCheckResult dco_decode_form_check_result(dynamic raw);
 
-@protected ClipboardMode dco_decode_clipboard_mode(dynamic raw);
+  @protected
+  HistoryData dco_decode_history_data(dynamic raw);
 
-@protected ConnectionData dco_decode_connection_data(dynamic raw);
+  @protected
+  HostUpdate dco_decode_host_update(dynamic raw);
 
-@protected ConnectionMethod dco_decode_connection_method(dynamic raw);
+  @protected
+  HostUpdateKind dco_decode_host_update_kind(dynamic raw);
 
-@protected ErrorInfo dco_decode_error_info(dynamic raw);
+  @protected
+  int dco_decode_i_16(dynamic raw);
 
-@protected FieldProblem dco_decode_field_problem(dynamic raw);
+  @protected
+  int dco_decode_i_32(dynamic raw);
 
-@protected FormCheckResult dco_decode_form_check_result(dynamic raw);
+  @protected
+  PlatformInt64 dco_decode_i_64(dynamic raw);
 
-@protected HistoryData dco_decode_history_data(dynamic raw);
+  @protected
+  ImportResult dco_decode_import_result(dynamic raw);
 
-@protected HostUpdate dco_decode_host_update(dynamic raw);
+  @protected
+  List<String> dco_decode_list_String(dynamic raw);
 
-@protected HostUpdateKind dco_decode_host_update_kind(dynamic raw);
+  @protected
+  List<ConnectionData> dco_decode_list_connection_data(dynamic raw);
 
-@protected int dco_decode_i_16(dynamic raw);
+  @protected
+  List<ErrorInfo> dco_decode_list_error_info(dynamic raw);
 
-@protected int dco_decode_i_32(dynamic raw);
+  @protected
+  List<FieldProblem> dco_decode_list_field_problem(dynamic raw);
 
-@protected PlatformInt64 dco_decode_i_64(dynamic raw);
+  @protected
+  List<HistoryData> dco_decode_list_history_data(dynamic raw);
 
-@protected ImportResult dco_decode_import_result(dynamic raw);
+  @protected
+  Uint32List dco_decode_list_prim_u_32_strict(dynamic raw);
 
-@protected List<String> dco_decode_list_String(dynamic raw);
+  @protected
+  Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
-@protected List<ConnectionData> dco_decode_list_connection_data(dynamic raw);
+  @protected
+  List<TrustedComputer> dco_decode_list_trusted_computer(dynamic raw);
 
-@protected List<ErrorInfo> dco_decode_list_error_info(dynamic raw);
+  @protected
+  LoadResult dco_decode_load_result(dynamic raw);
 
-@protected List<FieldProblem> dco_decode_list_field_problem(dynamic raw);
+  @protected
+  String? dco_decode_opt_String(dynamic raw);
 
-@protected List<HistoryData> dco_decode_list_history_data(dynamic raw);
+  @protected
+  ErrorInfo? dco_decode_opt_box_autoadd_error_info(dynamic raw);
 
-@protected Uint32List dco_decode_list_prim_u_32_strict(dynamic raw);
+  @protected
+  PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw);
 
-@protected Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+  @protected
+  int? dco_decode_opt_box_autoadd_u_16(dynamic raw);
 
-@protected List<TrustedComputer> dco_decode_list_trusted_computer(dynamic raw);
+  @protected
+  PictureQuality dco_decode_picture_quality(dynamic raw);
 
-@protected LoadResult dco_decode_load_result(dynamic raw);
+  @protected
+  SessionUpdate dco_decode_session_update(dynamic raw);
 
-@protected String? dco_decode_opt_String(dynamic raw);
+  @protected
+  SettingsData dco_decode_settings_data(dynamic raw);
 
-@protected ErrorInfo? dco_decode_opt_box_autoadd_error_info(dynamic raw);
+  @protected
+  TrustedComputer dco_decode_trusted_computer(dynamic raw);
 
-@protected PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw);
+  @protected
+  int dco_decode_u_16(dynamic raw);
 
-@protected int? dco_decode_opt_box_autoadd_u_16(dynamic raw);
+  @protected
+  int dco_decode_u_32(dynamic raw);
 
-@protected PictureQuality dco_decode_picture_quality(dynamic raw);
+  @protected
+  BigInt dco_decode_u_64(dynamic raw);
 
-@protected SessionUpdate dco_decode_session_update(dynamic raw);
+  @protected
+  int dco_decode_u_8(dynamic raw);
 
-@protected SettingsData dco_decode_settings_data(dynamic raw);
+  @protected
+  void dco_decode_unit(dynamic raw);
 
-@protected TrustedComputer dco_decode_trusted_computer(dynamic raw);
+  @protected
+  UpdateKind dco_decode_update_kind(dynamic raw);
 
-@protected int dco_decode_u_16(dynamic raw);
+  @protected
+  BigInt dco_decode_usize(dynamic raw);
 
-@protected int dco_decode_u_32(dynamic raw);
+  @protected
+  VaultResult dco_decode_vault_result(dynamic raw);
 
-@protected BigInt dco_decode_u_64(dynamic raw);
+  @protected
+  WakeResult dco_decode_wake_result(dynamic raw);
 
-@protected int dco_decode_u_8(dynamic raw);
+  @protected
+  AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
 
-@protected void dco_decode_unit(dynamic raw);
+  @protected
+  RdpSession
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(
+    SseDeserializer deserializer,
+  );
 
-@protected UpdateKind dco_decode_update_kind(dynamic raw);
+  @protected
+  ShareHost
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
+    SseDeserializer deserializer,
+  );
 
-@protected BigInt dco_decode_usize(dynamic raw);
+  @protected
+  RdpSession
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(
+    SseDeserializer deserializer,
+  );
 
-@protected VaultResult dco_decode_vault_result(dynamic raw);
+  @protected
+  ShareHost
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
+    SseDeserializer deserializer,
+  );
 
-@protected WakeResult dco_decode_wake_result(dynamic raw);
+  @protected
+  RdpSession
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(
+    SseDeserializer deserializer,
+  );
 
-@protected AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
+  @protected
+  ShareHost
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
+    SseDeserializer deserializer,
+  );
 
-@protected RdpSession sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(SseDeserializer deserializer);
+  @protected
+  RustStreamSink<HostUpdate> sse_decode_StreamSink_host_update_Sse(
+    SseDeserializer deserializer,
+  );
 
-@protected ShareHost sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(SseDeserializer deserializer);
+  @protected
+  RustStreamSink<SessionUpdate> sse_decode_StreamSink_session_update_Sse(
+    SseDeserializer deserializer,
+  );
 
-@protected RdpSession sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(SseDeserializer deserializer);
+  @protected
+  String sse_decode_String(SseDeserializer deserializer);
 
-@protected ShareHost sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(SseDeserializer deserializer);
+  @protected
+  AppTheme sse_decode_app_theme(SseDeserializer deserializer);
 
-@protected RdpSession sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(SseDeserializer deserializer);
+  @protected
+  bool sse_decode_bool(SseDeserializer deserializer);
 
-@protected ShareHost sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(SseDeserializer deserializer);
+  @protected
+  ErrorInfo sse_decode_box_autoadd_error_info(SseDeserializer deserializer);
 
-@protected RustStreamSink<HostUpdate> sse_decode_StreamSink_host_update_Sse(SseDeserializer deserializer);
+  @protected
+  PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer);
 
-@protected RustStreamSink<SessionUpdate> sse_decode_StreamSink_session_update_Sse(SseDeserializer deserializer);
+  @protected
+  SettingsData sse_decode_box_autoadd_settings_data(
+    SseDeserializer deserializer,
+  );
 
-@protected String sse_decode_String(SseDeserializer deserializer);
+  @protected
+  int sse_decode_box_autoadd_u_16(SseDeserializer deserializer);
 
-@protected AppTheme sse_decode_app_theme(SseDeserializer deserializer);
+  @protected
+  ClipboardMode sse_decode_clipboard_mode(SseDeserializer deserializer);
 
-@protected bool sse_decode_bool(SseDeserializer deserializer);
+  @protected
+  ConnectionData sse_decode_connection_data(SseDeserializer deserializer);
 
-@protected ErrorInfo sse_decode_box_autoadd_error_info(SseDeserializer deserializer);
+  @protected
+  ConnectionMethod sse_decode_connection_method(SseDeserializer deserializer);
 
-@protected PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer);
+  @protected
+  ErrorInfo sse_decode_error_info(SseDeserializer deserializer);
 
-@protected SettingsData sse_decode_box_autoadd_settings_data(SseDeserializer deserializer);
+  @protected
+  FieldProblem sse_decode_field_problem(SseDeserializer deserializer);
 
-@protected int sse_decode_box_autoadd_u_16(SseDeserializer deserializer);
+  @protected
+  FormCheckResult sse_decode_form_check_result(SseDeserializer deserializer);
 
-@protected ClipboardMode sse_decode_clipboard_mode(SseDeserializer deserializer);
+  @protected
+  HistoryData sse_decode_history_data(SseDeserializer deserializer);
 
-@protected ConnectionData sse_decode_connection_data(SseDeserializer deserializer);
+  @protected
+  HostUpdate sse_decode_host_update(SseDeserializer deserializer);
 
-@protected ConnectionMethod sse_decode_connection_method(SseDeserializer deserializer);
+  @protected
+  HostUpdateKind sse_decode_host_update_kind(SseDeserializer deserializer);
 
-@protected ErrorInfo sse_decode_error_info(SseDeserializer deserializer);
+  @protected
+  int sse_decode_i_16(SseDeserializer deserializer);
 
-@protected FieldProblem sse_decode_field_problem(SseDeserializer deserializer);
+  @protected
+  int sse_decode_i_32(SseDeserializer deserializer);
 
-@protected FormCheckResult sse_decode_form_check_result(SseDeserializer deserializer);
+  @protected
+  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
 
-@protected HistoryData sse_decode_history_data(SseDeserializer deserializer);
+  @protected
+  ImportResult sse_decode_import_result(SseDeserializer deserializer);
 
-@protected HostUpdate sse_decode_host_update(SseDeserializer deserializer);
+  @protected
+  List<String> sse_decode_list_String(SseDeserializer deserializer);
 
-@protected HostUpdateKind sse_decode_host_update_kind(SseDeserializer deserializer);
+  @protected
+  List<ConnectionData> sse_decode_list_connection_data(
+    SseDeserializer deserializer,
+  );
 
-@protected int sse_decode_i_16(SseDeserializer deserializer);
+  @protected
+  List<ErrorInfo> sse_decode_list_error_info(SseDeserializer deserializer);
 
-@protected int sse_decode_i_32(SseDeserializer deserializer);
+  @protected
+  List<FieldProblem> sse_decode_list_field_problem(
+    SseDeserializer deserializer,
+  );
 
-@protected PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
+  @protected
+  List<HistoryData> sse_decode_list_history_data(SseDeserializer deserializer);
 
-@protected ImportResult sse_decode_import_result(SseDeserializer deserializer);
+  @protected
+  Uint32List sse_decode_list_prim_u_32_strict(SseDeserializer deserializer);
 
-@protected List<String> sse_decode_list_String(SseDeserializer deserializer);
+  @protected
+  Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
-@protected List<ConnectionData> sse_decode_list_connection_data(SseDeserializer deserializer);
+  @protected
+  List<TrustedComputer> sse_decode_list_trusted_computer(
+    SseDeserializer deserializer,
+  );
 
-@protected List<ErrorInfo> sse_decode_list_error_info(SseDeserializer deserializer);
+  @protected
+  LoadResult sse_decode_load_result(SseDeserializer deserializer);
 
-@protected List<FieldProblem> sse_decode_list_field_problem(SseDeserializer deserializer);
+  @protected
+  String? sse_decode_opt_String(SseDeserializer deserializer);
 
-@protected List<HistoryData> sse_decode_list_history_data(SseDeserializer deserializer);
+  @protected
+  ErrorInfo? sse_decode_opt_box_autoadd_error_info(
+    SseDeserializer deserializer,
+  );
 
-@protected Uint32List sse_decode_list_prim_u_32_strict(SseDeserializer deserializer);
+  @protected
+  PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer);
 
-@protected Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+  @protected
+  int? sse_decode_opt_box_autoadd_u_16(SseDeserializer deserializer);
 
-@protected List<TrustedComputer> sse_decode_list_trusted_computer(SseDeserializer deserializer);
+  @protected
+  PictureQuality sse_decode_picture_quality(SseDeserializer deserializer);
 
-@protected LoadResult sse_decode_load_result(SseDeserializer deserializer);
+  @protected
+  SessionUpdate sse_decode_session_update(SseDeserializer deserializer);
 
-@protected String? sse_decode_opt_String(SseDeserializer deserializer);
+  @protected
+  SettingsData sse_decode_settings_data(SseDeserializer deserializer);
 
-@protected ErrorInfo? sse_decode_opt_box_autoadd_error_info(SseDeserializer deserializer);
+  @protected
+  TrustedComputer sse_decode_trusted_computer(SseDeserializer deserializer);
 
-@protected PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer);
+  @protected
+  int sse_decode_u_16(SseDeserializer deserializer);
 
-@protected int? sse_decode_opt_box_autoadd_u_16(SseDeserializer deserializer);
+  @protected
+  int sse_decode_u_32(SseDeserializer deserializer);
 
-@protected PictureQuality sse_decode_picture_quality(SseDeserializer deserializer);
+  @protected
+  BigInt sse_decode_u_64(SseDeserializer deserializer);
 
-@protected SessionUpdate sse_decode_session_update(SseDeserializer deserializer);
+  @protected
+  int sse_decode_u_8(SseDeserializer deserializer);
 
-@protected SettingsData sse_decode_settings_data(SseDeserializer deserializer);
+  @protected
+  void sse_decode_unit(SseDeserializer deserializer);
 
-@protected TrustedComputer sse_decode_trusted_computer(SseDeserializer deserializer);
+  @protected
+  UpdateKind sse_decode_update_kind(SseDeserializer deserializer);
 
-@protected int sse_decode_u_16(SseDeserializer deserializer);
+  @protected
+  BigInt sse_decode_usize(SseDeserializer deserializer);
 
-@protected int sse_decode_u_32(SseDeserializer deserializer);
+  @protected
+  VaultResult sse_decode_vault_result(SseDeserializer deserializer);
 
-@protected BigInt sse_decode_u_64(SseDeserializer deserializer);
+  @protected
+  WakeResult sse_decode_wake_result(SseDeserializer deserializer);
 
-@protected int sse_decode_u_8(SseDeserializer deserializer);
+  @protected
+  void sse_encode_AnyhowException(
+    AnyhowException self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_decode_unit(SseDeserializer deserializer);
+  @protected
+  void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(
+    RdpSession self,
+    SseSerializer serializer,
+  );
 
-@protected UpdateKind sse_decode_update_kind(SseDeserializer deserializer);
+  @protected
+  void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
+    ShareHost self,
+    SseSerializer serializer,
+  );
 
-@protected BigInt sse_decode_usize(SseDeserializer deserializer);
+  @protected
+  void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(
+    RdpSession self,
+    SseSerializer serializer,
+  );
 
-@protected VaultResult sse_decode_vault_result(SseDeserializer deserializer);
+  @protected
+  void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
+    ShareHost self,
+    SseSerializer serializer,
+  );
 
-@protected WakeResult sse_decode_wake_result(SseDeserializer deserializer);
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(
+    RdpSession self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_AnyhowException(AnyhowException self, SseSerializer serializer);
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
+    ShareHost self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(RdpSession self, SseSerializer serializer);
+  @protected
+  void sse_encode_StreamSink_host_update_Sse(
+    RustStreamSink<HostUpdate> self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(ShareHost self, SseSerializer serializer);
+  @protected
+  void sse_encode_StreamSink_session_update_Sse(
+    RustStreamSink<SessionUpdate> self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(RdpSession self, SseSerializer serializer);
+  @protected
+  void sse_encode_String(String self, SseSerializer serializer);
 
-@protected void sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(ShareHost self, SseSerializer serializer);
+  @protected
+  void sse_encode_app_theme(AppTheme self, SseSerializer serializer);
 
-@protected void sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(RdpSession self, SseSerializer serializer);
+  @protected
+  void sse_encode_bool(bool self, SseSerializer serializer);
 
-@protected void sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(ShareHost self, SseSerializer serializer);
+  @protected
+  void sse_encode_box_autoadd_error_info(
+    ErrorInfo self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_StreamSink_host_update_Sse(RustStreamSink<HostUpdate> self, SseSerializer serializer);
+  @protected
+  void sse_encode_box_autoadd_i_64(
+    PlatformInt64 self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_StreamSink_session_update_Sse(RustStreamSink<SessionUpdate> self, SseSerializer serializer);
+  @protected
+  void sse_encode_box_autoadd_settings_data(
+    SettingsData self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_String(String self, SseSerializer serializer);
+  @protected
+  void sse_encode_box_autoadd_u_16(int self, SseSerializer serializer);
 
-@protected void sse_encode_app_theme(AppTheme self, SseSerializer serializer);
+  @protected
+  void sse_encode_clipboard_mode(ClipboardMode self, SseSerializer serializer);
 
-@protected void sse_encode_bool(bool self, SseSerializer serializer);
+  @protected
+  void sse_encode_connection_data(
+    ConnectionData self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_box_autoadd_error_info(ErrorInfo self, SseSerializer serializer);
+  @protected
+  void sse_encode_connection_method(
+    ConnectionMethod self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_box_autoadd_i_64(PlatformInt64 self, SseSerializer serializer);
+  @protected
+  void sse_encode_error_info(ErrorInfo self, SseSerializer serializer);
 
-@protected void sse_encode_box_autoadd_settings_data(SettingsData self, SseSerializer serializer);
+  @protected
+  void sse_encode_field_problem(FieldProblem self, SseSerializer serializer);
 
-@protected void sse_encode_box_autoadd_u_16(int self, SseSerializer serializer);
+  @protected
+  void sse_encode_form_check_result(
+    FormCheckResult self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_clipboard_mode(ClipboardMode self, SseSerializer serializer);
+  @protected
+  void sse_encode_history_data(HistoryData self, SseSerializer serializer);
 
-@protected void sse_encode_connection_data(ConnectionData self, SseSerializer serializer);
+  @protected
+  void sse_encode_host_update(HostUpdate self, SseSerializer serializer);
 
-@protected void sse_encode_connection_method(ConnectionMethod self, SseSerializer serializer);
+  @protected
+  void sse_encode_host_update_kind(
+    HostUpdateKind self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_error_info(ErrorInfo self, SseSerializer serializer);
+  @protected
+  void sse_encode_i_16(int self, SseSerializer serializer);
 
-@protected void sse_encode_field_problem(FieldProblem self, SseSerializer serializer);
+  @protected
+  void sse_encode_i_32(int self, SseSerializer serializer);
 
-@protected void sse_encode_form_check_result(FormCheckResult self, SseSerializer serializer);
+  @protected
+  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
 
-@protected void sse_encode_history_data(HistoryData self, SseSerializer serializer);
+  @protected
+  void sse_encode_import_result(ImportResult self, SseSerializer serializer);
 
-@protected void sse_encode_host_update(HostUpdate self, SseSerializer serializer);
+  @protected
+  void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
-@protected void sse_encode_host_update_kind(HostUpdateKind self, SseSerializer serializer);
+  @protected
+  void sse_encode_list_connection_data(
+    List<ConnectionData> self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_i_16(int self, SseSerializer serializer);
+  @protected
+  void sse_encode_list_error_info(
+    List<ErrorInfo> self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_i_32(int self, SseSerializer serializer);
+  @protected
+  void sse_encode_list_field_problem(
+    List<FieldProblem> self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
+  @protected
+  void sse_encode_list_history_data(
+    List<HistoryData> self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_import_result(ImportResult self, SseSerializer serializer);
+  @protected
+  void sse_encode_list_prim_u_32_strict(
+    Uint32List self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_list_String(List<String> self, SseSerializer serializer);
+  @protected
+  void sse_encode_list_prim_u_8_strict(
+    Uint8List self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_list_connection_data(List<ConnectionData> self, SseSerializer serializer);
+  @protected
+  void sse_encode_list_trusted_computer(
+    List<TrustedComputer> self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_list_error_info(List<ErrorInfo> self, SseSerializer serializer);
+  @protected
+  void sse_encode_load_result(LoadResult self, SseSerializer serializer);
 
-@protected void sse_encode_list_field_problem(List<FieldProblem> self, SseSerializer serializer);
+  @protected
+  void sse_encode_opt_String(String? self, SseSerializer serializer);
 
-@protected void sse_encode_list_history_data(List<HistoryData> self, SseSerializer serializer);
+  @protected
+  void sse_encode_opt_box_autoadd_error_info(
+    ErrorInfo? self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_list_prim_u_32_strict(Uint32List self, SseSerializer serializer);
+  @protected
+  void sse_encode_opt_box_autoadd_i_64(
+    PlatformInt64? self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_list_prim_u_8_strict(Uint8List self, SseSerializer serializer);
+  @protected
+  void sse_encode_opt_box_autoadd_u_16(int? self, SseSerializer serializer);
 
-@protected void sse_encode_list_trusted_computer(List<TrustedComputer> self, SseSerializer serializer);
+  @protected
+  void sse_encode_picture_quality(
+    PictureQuality self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_load_result(LoadResult self, SseSerializer serializer);
+  @protected
+  void sse_encode_session_update(SessionUpdate self, SseSerializer serializer);
 
-@protected void sse_encode_opt_String(String? self, SseSerializer serializer);
+  @protected
+  void sse_encode_settings_data(SettingsData self, SseSerializer serializer);
 
-@protected void sse_encode_opt_box_autoadd_error_info(ErrorInfo? self, SseSerializer serializer);
+  @protected
+  void sse_encode_trusted_computer(
+    TrustedComputer self,
+    SseSerializer serializer,
+  );
 
-@protected void sse_encode_opt_box_autoadd_i_64(PlatformInt64? self, SseSerializer serializer);
+  @protected
+  void sse_encode_u_16(int self, SseSerializer serializer);
 
-@protected void sse_encode_opt_box_autoadd_u_16(int? self, SseSerializer serializer);
+  @protected
+  void sse_encode_u_32(int self, SseSerializer serializer);
 
-@protected void sse_encode_picture_quality(PictureQuality self, SseSerializer serializer);
+  @protected
+  void sse_encode_u_64(BigInt self, SseSerializer serializer);
 
-@protected void sse_encode_session_update(SessionUpdate self, SseSerializer serializer);
+  @protected
+  void sse_encode_u_8(int self, SseSerializer serializer);
 
-@protected void sse_encode_settings_data(SettingsData self, SseSerializer serializer);
+  @protected
+  void sse_encode_unit(void self, SseSerializer serializer);
 
-@protected void sse_encode_trusted_computer(TrustedComputer self, SseSerializer serializer);
+  @protected
+  void sse_encode_update_kind(UpdateKind self, SseSerializer serializer);
 
-@protected void sse_encode_u_16(int self, SseSerializer serializer);
+  @protected
+  void sse_encode_usize(BigInt self, SseSerializer serializer);
 
-@protected void sse_encode_u_32(int self, SseSerializer serializer);
+  @protected
+  void sse_encode_vault_result(VaultResult self, SseSerializer serializer);
 
-@protected void sse_encode_u_64(BigInt self, SseSerializer serializer);
-
-@protected void sse_encode_u_8(int self, SseSerializer serializer);
-
-@protected void sse_encode_unit(void self, SseSerializer serializer);
-
-@protected void sse_encode_update_kind(UpdateKind self, SseSerializer serializer);
-
-@protected void sse_encode_usize(BigInt self, SseSerializer serializer);
-
-@protected void sse_encode_vault_result(VaultResult self, SseSerializer serializer);
-
-@protected void sse_encode_wake_result(WakeResult self, SseSerializer serializer);
-                }
-                
-
+  @protected
+  void sse_encode_wake_result(WakeResult self, SseSerializer serializer);
+}
 
 // Section: wire_class
 
+class RustLibWire implements BaseWire {
+  factory RustLibWire.fromExternalLibrary(ExternalLibrary lib) =>
+      RustLibWire(lib.ffiDynamicLibrary);
 
-        class RustLibWire implements BaseWire {
+  /// Holds the symbol lookup function.
+  final ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName)
+  _lookup;
 
-            factory RustLibWire.fromExternalLibrary(ExternalLibrary lib) =>
-              RustLibWire(lib.ffiDynamicLibrary);
-        
-            /// Holds the symbol lookup function.
-            final ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName)
-                _lookup;
-  
-            /// The symbols are looked up in [dynamicLibrary].
-            RustLibWire(ffi.DynamicLibrary dynamicLibrary)
-                : _lookup = dynamicLibrary.lookup;
+  /// The symbols are looked up in [dynamicLibrary].
+  RustLibWire(ffi.DynamicLibrary dynamicLibrary)
+    : _lookup = dynamicLibrary.lookup;
 
-            
-            void rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(
-              ffi.Pointer<ffi.Void> ptr,
-            ) {
-              return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(
-                ptr,
-              );
-            }
+  void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(
+      ptr,
+    );
+  }
 
-            late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSessionPtr = _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>('frbgen_cipher_desk_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession');
-            late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession = _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSessionPtr.asFunction<void Function(ffi.Pointer<ffi.Void>)>();
-            
-            void rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(
-              ffi.Pointer<ffi.Void> ptr,
-            ) {
-              return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(
-                ptr,
-              );
-            }
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSessionPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_cipher_desk_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession',
+      );
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession =
+      _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSessionPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
-            late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSessionPtr = _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>('frbgen_cipher_desk_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession');
-            late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession = _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSessionPtr.asFunction<void Function(ffi.Pointer<ffi.Void>)>();
-            
-            void rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
-              ffi.Pointer<ffi.Void> ptr,
-            ) {
-              return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
-                ptr,
-              );
-            }
+  void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession(
+      ptr,
+    );
+  }
 
-            late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHostPtr = _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>('frbgen_cipher_desk_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost');
-            late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost = _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHostPtr.asFunction<void Function(ffi.Pointer<ffi.Void>)>();
-            
-            void rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
-              ffi.Pointer<ffi.Void> ptr,
-            ) {
-              return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
-                ptr,
-              );
-            }
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSessionPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_cipher_desk_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession',
+      );
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSession =
+      _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRdpSessionPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
-            late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHostPtr = _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>('frbgen_cipher_desk_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost');
-            late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost = _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHostPtr.asFunction<void Function(ffi.Pointer<ffi.Void>)>();
-            
-        }
-        
+  void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHostPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_cipher_desk_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost',
+      );
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost =
+      _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHostPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHostPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_cipher_desk_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost',
+      );
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHost =
+      _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerShareHostPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+}

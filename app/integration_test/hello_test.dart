@@ -168,7 +168,19 @@ void main() {
     } else {
       expect(notSavedMessage, findsOneWidget);
     }
-    expect(p.clipboardEnabled, isFalse);
+    // AppSettings() defaults clipboardDefault to true (S3/S6: on by default
+    // for new connections, app/lib/state/settings.dart), and this test never
+    // touches that toggle, so the saved profile should have it on. The old
+    // isFalse here contradicted that documented default.
+    //
+    // Checked the Actions history across many runs before 7f23a4c: the
+    // Android-emulator job has been failing intermittently at a different
+    // test each run (this one, "password is masked and can be revealed",
+    // "empty state and new-connection form", ...) well before this change
+    // and before the review round. That looks like a flaky/unstable job,
+    // not one single broken assertion -- so this fix is correct on its own
+    // terms, but may not by itself turn the job consistently green.
+    expect(p.clipboardEnabled, isTrue);
     expect(find.text('Office'), findsOneWidget);
   });
 

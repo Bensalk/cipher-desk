@@ -51,11 +51,15 @@ pub enum UpdateKind {
     /// A file sent by the remote finished arriving (`text` = its name).
     FileReceived,
     /// Files copied on the remote started arriving; `text` says how many and
-    /// how big (e.g. "3 files, 1.2 GB").
+    /// how big (e.g. "3 files, 1.2 GB"). Also sent while they arrive, with
+    /// `label` = "progress", `x` = percent done and `text` = "12.0 MB of 1.2 GB".
     FilesIncoming,
     /// The network dropped; reconnect attempt `x` of `y` is under way (`label`).
     /// Input is ignored until `Status` with `connected` arrives again.
     Reconnecting,
+    /// A copy of incoming files was cancelled from this side (the partial
+    /// file was removed; anything already fully received was kept).
+    FilesCancelled,
 }
 
 /// Something the UI should show. Only the fields named for its `kind` are set.
@@ -175,6 +179,7 @@ enum Command {
     Input(Vec<InputEvent>),
     OfferClipboard(String),
     SendFiles(Vec<String>),
+    CancelIncomingFiles,
     ApproveCertificate(bool),
     /// End the session: `None` = the user disconnected; otherwise the reason
     /// shown (e.g. the Android background grace period ended).
@@ -383,6 +388,17 @@ impl RdpSession {
         self.send(vec![e]);
     }
 
+    /// Sends the viewer's lock-key state to the host so both keyboards are in
+    /// sync. Call once right after the session connects.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn sync_lock_keys(&self, caps_lock: bool, num_lock: bool, scroll_lock: bool) {
+        self.send(vec![InputEvent::SyncLockKeys {
+            caps_lock,
+            num_lock,
+            scroll_lock,
+        }]);
+    }
+
     /// Types text (on-screen keyboards, IMEs, pasted text is NOT sent this way).
     #[flutter_rust_bridge::frb(sync)]
     pub fn type_text(&self, text: String) {
@@ -435,6 +451,14 @@ impl RdpSession {
     #[flutter_rust_bridge::frb(sync)]
     pub fn send_files(&self, paths: Vec<String>) {
         let _ = self.tx.send(Command::SendFiles(paths));
+    }
+
+    /// Stops a copy of files arriving from the remote computer right now.
+    /// The file still being written is deleted; anything from the same copy
+    /// that already finished is kept. Does nothing if nothing is arriving.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn cancel_incoming_files(&self) {
+        let _ = self.tx.send(Command::CancelIncomingFiles);
     }
 
     /// Answers the certificate prompt.
@@ -490,7 +514,7 @@ impl ClipboardMode {
     }
 }
 
-/// Picture quality of a connection (like AnyDesk's display quality).
+/// Picture quality of a connection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PictureQuality {
     /// Exact pixels with Cipher Desk Host; uses the most data.
@@ -600,6 +624,12 @@ impl Remote {
         match self {
             Self::Rdp(s) => s.send_files(paths.into_iter().map(std::path::PathBuf::from).collect()),
             Self::Vnc(_) => Ok(()),
+        }
+    }
+    fn cancel_incoming_files(&mut self) -> bool {
+        match self {
+            Self::Rdp(s) => s.cancel_incoming_files(),
+            Self::Vnc(_) => false,
         }
     }
     fn clamped(&self, r: Region) -> Option<Region> {
@@ -892,7 +922,12 @@ fn wait_for_approval(rx: &Receiver<Command>) -> Option<bool> {
             Ok(Command::ApproveCertificate(a)) => return Some(a),
             Ok(Command::Disconnect(_)) | Err(_) => return None,
             // Input, clipboard and file offers before the session exists are dropped.
-            Ok(Command::Input(_) | Command::OfferClipboard(_) | Command::SendFiles(_)) => {}
+            Ok(
+                Command::Input(_)
+                | Command::OfferClipboard(_)
+                | Command::SendFiles(_)
+                | Command::CancelIncomingFiles,
+            ) => {}
         }
     }
 }
@@ -958,6 +993,11 @@ fn drive(
                         return ended(e);
                     }
                 }
+                Ok(Command::CancelIncomingFiles) => {
+                    if s.cancel_incoming_files() {
+                        send(SessionUpdate::new(UpdateKind::FilesCancelled));
+                    }
+                }
                 Ok(Command::ApproveCertificate(_)) => {}
                 Ok(Command::Disconnect(reason)) => {
                     s.disconnect();
@@ -1010,6 +1050,22 @@ fn drive(
                         ..SessionUpdate::new(UpdateKind::FilesIncoming)
                     });
                 }
+                SessionEvent::FileProgress {
+                    percent,
+                    done,
+                    total,
+                } => {
+                    send(SessionUpdate {
+                        label: Some("progress".to_owned()),
+                        x: u16::from(percent),
+                        text: Some(format!(
+                            "{} of {}",
+                            describe_size(done),
+                            describe_size(total)
+                        )),
+                        ..SessionUpdate::new(UpdateKind::FilesIncoming)
+                    });
+                }
                 SessionEvent::FileReceived { name, path } => {
                     send(SessionUpdate::file_received(
                         name,
@@ -1048,16 +1104,20 @@ fn describe_files(files: usize, bytes: u64) -> String {
     } else {
         format!("{files} files")
     };
+    format!("{count}, {}", describe_size(bytes))
+}
+
+/// "1.2 GB", "12.0 MB", "40 KB".
+fn describe_size(bytes: u64) -> String {
     #[allow(clippy::cast_precision_loss)]
     let b = bytes as f64;
-    let size = if b >= 1e9 {
+    if b >= 1e9 {
         format!("{:.1} GB", b / 1e9)
     } else if b >= 1e6 {
         format!("{:.1} MB", b / 1e6)
     } else {
         format!("{} KB", bytes.div_ceil(1000))
-    };
-    format!("{count}, {size}")
+    }
 }
 
 /// Shortest time between two screen updates sent to the UI (about 30 per second).

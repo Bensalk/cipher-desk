@@ -2,6 +2,277 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v1.0.0 (17 Nov 2026)
+
+**The first stable release.** It contains everything from the v0.3.33 and v0.3.34 test builds below. What changed since v0.3.31:
+
+### Security
+- **"Ask to connect" can no longer be typed into before you press Allow.** Keys sent by a specially made viewer while sign-in was finishing are now thrown away.
+- **The background service's folder can't be set up by someone else first** on a computer with several accounts; such a folder is moved aside unused.
+- **Two-step verification:** each code works only once, and the "remember this device" key is kept in Windows Credential Manager (or the Linux keyring), not in a file.
+- **File names that disguise their real type are refused.**
+- **A connection that opens and stays silent can no longer hold the computer up.** Connections are served one at a time; a silent one used to block everyone for 30 seconds, again and again. It is now closed after 10 seconds and counted like a wrong password, so a device that keeps doing it is blocked for 15 minutes. Quick "is it online?" checks are not counted.
+
+### Added
+- **Unblock from the tray** after too many wrong passwords, with a pop-up when a device is blocked.
+- **The viewer shows how long it is blocked**, and warns when only one or two tries are left.
+- **Cancel button** on the file-copy progress bar.
+- **Received files no longer linger**: they are deleted once something else replaces them on the clipboard.
+
+### Fixed
+- The "everyone blocked" safety net no longer trips from one device's own wrong passwords.
+- The sharing password is read back reliably right after setting up the always-on service.
+- The "Set your own password" box no longer risks an error while closing.
+
+### Known limits
+- The security review was done by the project itself (with AI help); no independent audit yet. See [SECURITY_REVIEW](https://github.com/Bensalk/cipher-desk/blob/main/docs/SECURITY_REVIEW.md) and [THREAT_MODEL](https://github.com/Bensalk/cipher-desk/blob/main/docs/THREAT_MODEL.md), including the risks kept on purpose (R-15 to R-17).
+
+## v0.3.34 (17 Nov 2026, pre-release)
+
+Test build with the results of a security review.
+
+### Security
+- **"Ask to connect" could be typed into before you allowed it.** Keys and mouse moves a specially made viewer sent while sign-in was finishing reached the computer before the "Allow?" question was answered. They are now thrown away.
+- **The background service's folder is protected against being set up by someone else first.** On a computer with several accounts, another person could create Cipher Desk's folder in ProgramData before the service was installed and keep control of what they put in it. Such a folder is now moved aside unused and a fresh one is made.
+- **Two-step verification:** each code now works only once, and the "remember this device" key is kept in Windows Credential Manager (or the Linux keyring) instead of a file, so a copy of the app's folder cannot skip the code.
+- **File names that hide their real type are refused**, for example a program whose name uses invisible characters to look like a PDF.
+
+### Added
+- **Unblock from the tray.** When a device is blocked after too many wrong passwords, the tray icon says so; right-click it and choose **Unblock** to let the device try again at once.
+- **The viewer says how long it is blocked**, and warns when only one or two tries are left before Share screen blocks this device for 15 minutes.
+- On the Share screen page, a blocked-device message now says that turning sharing off and on lets devices try again.
+- **Received files no longer linger.** Files sent to this computer are deleted from the Received folder as soon as something else replaces them on the clipboard (they can't be pasted any more by then). They were already cleared at the next connection.
+
+## v0.3.33 (17 Nov 2026, pre-release)
+
+Test build before the first stable release.
+
+### Added
+- **Cancel button on the file-transfer progress bar.** Stops the copy from the remote computer right away; the file still being written is deleted, anything already fully received is kept.
+
+### Fixed
+- **The "everyone blocked" safety net could trip from one device's own repeated wrong passwords**, even with successful sign-ins in between, instead of only from a flood of different addresses guessing together as intended. It now counts how many *different* devices tried a wrong password, not how many attempts happened — so retrying from the same PC never locks out both PCs for 15 minutes on its own.
+- **Sharing password after setting up the always-on service.** The app could fail to read back the password (and the service status) right after setup, so setup looked like it had failed.
+- **"Set your own password" box** could, in rare cases, cause an error while closing.
+
+### Changed
+- The documentation now says what the app already does: clipboard sharing is on by default for new connections, and can be turned off in Settings or per connection.
+
+## v0.3.31 (16 Nov 2026)
+
+### Added
+- **Opening Cipher Desk turns sharing back on** after "Exit" or "Go offline" in the tray icon, with no prompt. "Go online" from the tray no longer asks for an administrator either. (Press **Update** on the Share screen page once after installing, so the background service gets this.)
+- **Progress bar for files arriving on the viewer**, with percent and size.
+- **"Ask to connect" shows who is asking** (device name and address), on the background service's question and on the Share screen page.
+- **Always allow this device:** after allowing a device on your Tailscale network, you can choose to always allow it without asking. Turning "Ask to connect" off forgets these devices.
+- **Clearer message when the sharing port is taken by the always-on background sharing.**
+
+### Fixed
+- **Copied files could still arrive again** after sharing was turned off and on, or after an update. Files already sent are remembered until something new is copied.
+- **Received files piled up as "name (2)", "name (3)"…** A new copy now clears the files from earlier copies in the Received folder, so names stay plain.
+
+## v0.3.30 (16 Nov 2026)
+
+### Security
+- **The background service is better protected on the shared computer.** Its program now runs from the Program Files folder, which only administrators can change. Its folder can be read but not changed by other people on that computer, and the sharing password, the two-step key and the certificate's private key are kept where only Windows and administrators can open them. The sharing password is no longer left in a result file. After installing this version, open Cipher Desk on the shared computer, go to **Share screen** and press **Update** once (administrator approval).
+- **Only connections over Tailscale are accepted by default** (and from the computer itself). Turn "Only over Tailscale" off on the Share screen page to allow other networks.
+- **"Ask to connect" is now off by default**, because it lets anyone who reaches the computer ask without a password. Turn it on from the Share screen page when you need it.
+- **A connection that stops responding before signing in is closed after 30 seconds**, so it cannot keep others from connecting.
+- **Only administrators can start, stop or send commands to the service.**
+
+### Changed
+- **Wrong passwords now block only the device that typed them.** After 5 wrong passwords in 10 minutes that device waits 15 minutes; your other devices can still connect, and a successful sign-in forgets earlier typos. If wrong passwords come from many devices at once (20 in 10 minutes), everyone waits 15 minutes.
+- **The tray icon is green when online** (amber when someone is connected, grey when offline).
+- **Logs stay small:** each log is limited to about 1 MB, and entries older than about three weeks are removed, including in the connection history. The tray icon's own log is now in your user folder (`%LOCALAPPDATA%\Cipher Desk\tray.log`).
+
+### Added
+- **Exit in the tray menu:** turns sharing off and removes the icon. Turn it back on with **Cipher Desk - Go online** in the Start menu, or restart the computer.
+- **Missed wrong passwords are shown:** the tray menu lists wrong password attempts, and the next "Connected" pop-up mentions any made while you were away.
+- **Ask to connect** and **Only over Tailscale** switches on the Share screen page.
+
+### Fixed
+- **A file copied before reconnecting arrived again on the viewer.** After reconnecting, files already sent are not sent again; copy them again if you want another copy.
+
+## v0.3.29 (16 Nov 2026)
+
+### Security
+- **Fixed: a crafted file name could place a received file outside the Received folder** (for example into the Windows system folder on the shared computer). Received names are now checked much more strictly, received files never replace existing ones, and the background service works only in its own folder.
+
+### Added
+- **See who connects to the shared computer.** The pop-up and the tray icon show the connecting device's name and address, for example "Office-PC.your-network.ts.net (100.64.0.2)". The name is looked up on the network: inside your Tailscale network it is the device name from your Tailscale account. A device from outside usually has no name, which is worth noticing, and the owner of an internet address can choose its name, so treat names as a hint, not proof.
+- **Warning when someone tries a wrong password.** A warning pop-up shows the device and address that tried. After 5 wrong attempts in 10 minutes, new connections are blocked for 15 minutes (as before), and that is recorded too.
+- **Connection history.** Right-click the tray icon and choose "Connection history" to see every connection, disconnection, wrong password and block, with date and time. It is kept in `connections.log` beside the service logs and holds no passwords.
+
+## v0.3.28 (16 Nov 2026)
+
+### Added
+- **A Windows pop-up on the shared computer when someone connects or disconnects**, so you know without looking at the tray icon.
+
+### Fixed
+- **One copy on the shared computer could reach the viewer two or three times.** Windows sometimes announces a single Ctrl+C more than once; the same files are now sent only once.
+- **Messages at the bottom of the viewer could keep appearing long after a transfer.** Each received file queued its own message; a new message now replaces the one on screen.
+
+## v0.3.27 (16 Nov 2026)
+
+### Added
+- **Cipher Desk icon next to the clock on the shared computer** (Windows, when the background sharing service is installed). Teal: online, waiting for a connection. Amber: someone is connected. Grey: offline. Right-click it for:
+  - **Disconnect viewer**: ends the current connection.
+  - **Go offline**: drops any connection and closes both connection ports, so nobody can connect. Sharing comes back on by itself when the computer restarts.
+  - **Go online…**: turns sharing back on (asks for an administrator's OK).
+
+### Changed
+- **Copying files from the shared computer to the viewer**: the background service runs under the Windows system account, and Windows does not let that account see what the signed-in person copies in File Explorer. The new icon runs as the signed-in person, reads the copied files for the service, and does so only while a viewer is connected.
+- **Files sent to the viewer are opened with the signed-in person's own rights**, never with the system account's. With nobody signed in, no files are sent.
+- **Host logs keep working if a log file is deleted or moved** while the service runs. A new file is started within a few seconds.
+
+## v0.3.26 (15 Nov 2026)
+
+### Changed
+- **Copied files are now also read through Windows' OLE clipboard on the viewer** — on Windows 11, File Explorer can put copied files on the clipboard in a way the basic clipboard check cannot see. The viewer now also asks the OLE clipboard for the file list, as the host already does.
+- **Host tries one more file format** — the host now also asks the OLE clipboard for File Explorer's own file-list format ("Shell IDList Array").
+
+### Diagnostic
+- The host log now lists every format the OLE clipboard offers, by name.
+
+## v0.3.25 (15 Nov 2026)
+
+### Changed
+- **Host files copied in File Explorer are now also read through Windows' OLE clipboard** — on recent Windows 11, File Explorer can put copied files on the clipboard in a way the basic clipboard check cannot see. The host now also asks the OLE clipboard for the file list.
+
+### Diagnostic
+- The host log now shows whether the OLE clipboard is reachable and whether it offers text or files.
+
+## v0.3.24 (15 Nov 2026)
+
+### Changed
+- **Host clipboard text now also read through Windows' OLE clipboard** — some programs put copied text on the clipboard in a way the basic Windows clipboard check cannot see at all (it only ever showed a private placeholder format, never the text). The host now also asks Windows' OLE clipboard interface for the text, which can see it regardless of how the source program copied it.
+
+## v0.3.23 (15 Nov 2026)
+
+### Changed
+- **Host clipboard text is read sooner** — the host now checks for newly copied text every 15 ms instead of every 400 ms, and keeps a copy for the viewer.
+
+### Diagnostic
+- **Host log shows what is on the clipboard** — when no text is found after a copy, the host log now lists each clipboard format by name and the program that owns the clipboard. Clipboard contents are never logged.
+
+## v0.3.22 (15 Nov 2026)
+
+### Fixed
+- **Host→viewer file transfer** — files copied on the host PC before (or at the moment) the viewer connects were invisible to the viewer because the clipboard poller only detects changes after the connection is established. The host now checks the clipboard for files at connection time and offers them immediately.
+
+## v0.3.21 (15 Nov 2026)
+
+### Improved
+- **Host clipboard quiet-window narrowed** — after the viewer sent files to the host, the host's clipboard poller suppressed ALL clipboard changes for 5 seconds (including genuine text copies by the user). Now the suppression only applies to file-clipboard echoes; if the clipboard holds text during the quiet window, the viewer is notified immediately.
+
+### Diagnostic
+- **Host clipboard advertising is now logged** — the host log now shows every time it tells the viewer what is on the clipboard (`has_text=true` or `has_text=false`). Previously `advertise()` was completely silent; this made it impossible to tell from logs whether text was ever sent to the viewer.
+
+## v0.3.20 (15 Nov 2026)
+
+### Diagnostic
+- **Host→viewer clipboard — deeper diagnostics** — the session log now records every step of the host→viewer text paste path: whether the FormatDataRequest was sent, whether the host responded with data (and how many bytes), whether unicode decoding succeeded, and whether the host returned an error response. This pinpoints exactly where the flow breaks when copying text on the host PC and pasting on the viewer.
+
+## v0.3.19 (15 Nov 2026)
+
+### Diagnostic
+- **Clipboard direction diagnostic** — the session log now records which clipboard policy is active at connect time (`local_to_host`, `host_to_local`) and logs every host clipboard change event with whether it was processed or skipped by the policy. Use **Export session log** to capture this after a failed host→viewer paste so the cause can be pinpointed.
+
+## v0.3.18 (15 Nov 2026)
+
+### Fixed
+- **Viewer→host file paste — CF_HDROP wiped before you could paste** — after the received files were written to the Windows clipboard (CF_HDROP), the RDP CLIPRDR protocol was triggering a round-trip that called `EmptyClipboard` and replaced CF_HDROP with the viewer's format before you could press Ctrl+V in Explorer. The 5-second quiet window in v0.3.16 suppressed the log but did not stop the overwrite. The real fix: when CF_HDROP has just been written, the host worker now blocks the CLIPRDR callback (`on_remote_copy`) from starting a new paste from the viewer. The block is lifted as soon as you copy something new on the host, so normal clipboard use is not affected.
+
+## v0.3.17 (15 Nov 2026)
+
+### Fixed
+- **CapsLock desync on Windows** — if your keyboard had CapsLock **on** before connecting, the viewer was sending an extra synchronise signal to the host at connect time. This caused the host's CapsLock state to get out of step with the viewer, so pressing CapsLock once more would leave them in opposite states (viewer off, host on). The sync-at-connect call has been removed; both sides now track CapsLock independently through the normal key presses, which is the standard RDP behaviour. Use the **Caps** button in the key bar if you need to toggle CapsLock on the host from a touchscreen.
+
+## v0.3.16 (15 Nov 2026)
+
+### Fixed
+- **CapsLock toggle from Android / touch keyboards** — a **Caps** button has been added to the key bar so you can toggle CapsLock on the remote PC even when your device has no physical CapsLock key (phone, tablet, Chromebook touchscreen).
+- **Host→viewer file clipboard — files overwritten after paste** — after Cipher Desk writes the received files to the Windows clipboard (CF_HDROP), a cascade of internal clipboard notifications was overwriting the entry before you could paste. The host worker now ignores all clipboard changes for 5 seconds after writing CF_HDROP, so the file remains available for pasting.
+
+## v0.3.15 (14 Nov 2026)
+
+### Fixed
+- **Paste to host (viewer→host file clipboard) — "Access is denied." fix** — the Windows host worker retries opening the clipboard for up to 4 seconds now (up from 0.5 s). Windows Clipboard History, clipboard managers, and antivirus software can hold the clipboard lock for over 500 ms; the old limit caused `OpenClipboard` to give up and silently discard the pasted files. The error `write_files (CF_HDROP) FAILED — Access is denied.` should no longer appear.
+
+## v0.3.14 (14 Nov 2026)
+
+### Fixed
+- **CapsLock / NumLock / ScrollLock sync** — when you connect to a remote PC, Cipher Desk now sends your keyboard's current lock-key state to the host immediately. The host adjusts its own lock keys to match, so typing is correct from the first keystroke. Previously the host ignored the viewer's lock state, causing CapsLock or NumLock to appear active on the remote even when it was off locally (or vice versa).
+
+## v0.3.13 (14 Nov 2026)
+
+Fix Windows build: correct `ILCombine` and `SHGetPathFromIDListW` call signatures for
+`windows` crate 0.62 — `ILCombine` takes `Option<*const ITEMIDLIST>` (not bare pointer),
+`SHGetPathFromIDListW` takes `&mut [u16; 260]` (not `PWSTR`). This should make
+host→viewer file clipboard work on Windows.
+
+## v0.3.12 (14 Nov 2026)
+
+Diagnostic build: adds a direct `cargo build` step before the Flutter build so the actual
+Rust compile error is visible in CI annotations (Cargokit/MSBuild previously swallowed it).
+No functional change.
+
+## v0.3.11 (14 Nov 2026)
+
+Builds on v0.3.10. The About screen shows **0.3.11**.
+
+- **Fix Windows build** (Shell IDList Array code now compiles on the Windows runner — corrected `SHGetPathFromIDListW` return-type handling and `ILFree` argument; added `Win32_UI_Shell_Common` feature).
+
+## v0.3.10 (14 Nov 2026)
+
+Builds on v0.3.9. The About screen shows **0.3.10**.
+
+- **Fix host→viewer file clipboard (second attempt).** Windows 11 Explorer
+  puts files on the clipboard using the Shell IDList Array format
+  (`CFSTR_SHELLIDLIST`) rather than `CF_HDROP`. The host poller now reads
+  the Shell IDList Array as a fallback: each item is a PIDL that
+  `SHGetPathFromIDListW` converts to a full path. `CF_HDROP` is still tried
+  first for compatibility with older Windows versions. When `CF_HDROP` is
+  absent the log now lists every format that *is* on the clipboard, which
+  confirmed the root cause and will help diagnose edge cases.
+
+---
+
+## v0.3.9 (14 Nov 2026)
+
+Builds on v0.3.8. The About screen shows **0.3.9**.
+
+- **Fix host→viewer file clipboard.** On modern Windows (10 22H2+ / 11),
+  Explorer stores copied files using virtual clipboard formats; CF_HDROP
+  is synthesised on demand the first time `GetClipboardData` is called.
+  The host clipboard poller was checking `IsClipboardFormatAvailable(CF_HDROP)`
+  first and exiting early when it returned false, so it never triggered the
+  synthesis and always missed host-side file copies. Fixed by opening the
+  clipboard and calling `GetClipboardData(CF_HDROP)` directly, which causes
+  Windows to synthesise CF_HDROP from the shell format.
+- **Auto-clean Received folder.** Files received from the viewer are now
+  deleted at the start of each new session, so the Received folder no longer
+  accumulates duplicates across connections.
+
+## v0.3.8 (14 Nov 2026)
+
+Builds on v0.3.7. The About screen shows **0.3.8**.
+
+- **More host clipboard diagnostics.** Adds detailed logging to the host-side
+  clipboard poller to show exactly whether the poller starts, detects the
+  clipboard change, finds CF_HDROP files, and sends them to the viewer.
+  Needed to pinpoint the host→viewer file clipboard failure.
+
+## v0.3.7 (13 Nov 2026)
+
+Builds on v0.3.6. The About screen shows **0.3.7**.
+
+- **File clipboard diagnostics.** Adds detailed logging throughout the
+  clipboard file-transfer path (both directions) to identify why
+  Explorer Ctrl+C → Ctrl+V between two Windows PCs is not working.
+  Check the WORKER.LOG on both the viewer and host after attempting a
+  file copy to see which step is failing.
+
 ## v0.3.6 (9 Nov 2026, pre-release)
 
 Builds on v0.3.5. The About screen shows **0.3.6**.
@@ -114,7 +385,7 @@ Builds on v0.2.8. The About screen shows **0.2.9**.
 
 - File copy and paste now handles **folders** (with everything inside them)
   and **files of any size**. Files travel in small pieces written straight to
-  disk, like AnyDesk, so large downloads and .zip files work too. The viewer
+  disk, so large downloads and .zip files work too. The viewer
   shows "Receiving … from the remote computer" with the number and size of the
   files; paste with Ctrl+V once they have arrived. An unfinished file is never
   left behind if the copy stops half-way.
@@ -125,7 +396,7 @@ Builds on v0.2.8. The About screen shows **0.2.9**.
 
 Builds on v0.2.7. The About screen shows **0.2.8**.
 
-- **Copy and paste files, like AnyDesk** (Share screen, Windows): copy files in
+- **Copy and paste files** (Share screen, Windows): copy files in
   File Explorer with **Ctrl+C** on either computer, then press **Ctrl+V** in a
   folder on the other one. Works both ways while a session is open, also with
   the Cipher Desk window minimised. The connection's *Clipboard* setting must
@@ -143,7 +414,7 @@ Builds on v0.2.7. The About screen shows **0.2.8**.
 
 Builds on v0.2.6. The About screen shows **0.2.7**.
 
-- **Ask to connect (no password)**, like AnyDesk: for a *Share screen*
+- **Ask to connect (no password)**: for a *Share screen*
   connection, choose **Ask to connect** in its ⋮ menu. On the other computer,
   where always-on sharing is turned on, a popup asks whether to allow it. The
   screen appears only after someone there clicks **Yes**; **No**, or no answer
@@ -172,7 +443,7 @@ Builds on v0.2.4. The About screen shows **0.2.5**.
 
 Builds on v0.2.3. The About screen shows **0.2.4**.
 
-- **Picture quality** setting per connection, like AnyDesk: *Best quality*,
+- **Picture quality** setting per connection: *Best quality*,
   *Balanced* (the default) or *Speed*. Change it in the connection's settings or
   from the quality button in the session toolbar (changing it reconnects).
   - *Best quality* with Share screen is lossless: every pixel arrives exactly
