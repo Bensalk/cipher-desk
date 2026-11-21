@@ -2,6 +2,11 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v1.0.1 (21 Nov 2026)
+
+### Security
+- **A built-in connection-compression helper is updated.** A flaw was found in it after v1.0.0 shipped — it could corrupt memory in rare conditions during a connection. Found by routine automated scanning, not by any report of misuse. No other changes in this release.
+
 ## v1.0.0 (17 Nov 2026)
 
 **The first stable release.** It contains everything from the v0.3.33 and v0.3.34 test builds below. What changed since v0.3.31:
