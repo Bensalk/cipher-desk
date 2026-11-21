@@ -88,17 +88,47 @@ class HostService {
     return map;
   }
 
-  /// Reads (and then deletes) the result file written by the last command.
+  /// Reads the result file written by the last command, and always tries to
+  /// delete it afterwards (it can hold the sharing password or a two-step
+  /// key) — even if reading or parsing it failed.
   static Future<Map<String, String>> _readResult() async {
     final file = File(_resultPath);
     if (!await file.exists()) return {};
+    var map = <String, String>{};
     try {
-      final map = _parse(await file.readAsString());
-      await file.delete(); // don't leave a password on disk
-      return map;
+      map = _parse(await file.readAsString());
     } on FileSystemException {
-      return {};
+      // Leave map empty; still fall through to delete the file below.
     }
+    await _deleteSecretFile(file);
+    return map;
+  }
+
+  /// Deletes a file that may hold a secret, retrying once on failure. Never
+  /// logs the file's content, only that a delete did not go through.
+  static Future<void> _deleteSecretFile(File file) async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        if (await file.exists()) await file.delete();
+        return;
+      } on FileSystemException {
+        // Try once more before giving up.
+      }
+    }
+    if (await file.exists()) {
+      stderr.writeln('Cipher Desk: could not remove a leftover file in '
+          '${file.parent.path}. Delete it by hand if it is still there.');
+    }
+  }
+
+  /// Removes any `service-result.txt` or `pending-password.bin` left behind
+  /// by a previous run that was closed or crashed before it could clean up
+  /// (both can hold a secret). Call once at app startup; safe to call even
+  /// when the service was never installed.
+  static Future<void> cleanupLeftoverSecrets() async {
+    if (!supported) return;
+    await _deleteSecretFile(File(_resultPath));
+    await _deleteSecretFile(File('$_ownDir\\pending-password.bin'));
   }
 
   static HostServiceStatus _statusFrom(Map<String, String> m) {
@@ -246,9 +276,14 @@ class HostService {
     await _readResult();
   }
 
-  /// Sets a password the user typed. The app machine-encrypts it to a pending
-  /// file (never plain text, never on the command line); the elevated service
-  /// imports and stores it. Returns true on success.
+  /// Sets a password the user typed. Never plain text and never on the
+  /// command line: the app writes it to a pending file in this person's own
+  /// app folder, encrypted with Windows DPAPI at machine scope (any process
+  /// on this computer could decrypt it — the real protection is the file's
+  /// short lifetime and its folder's normal per-account permissions, not
+  /// the encryption itself). The elevated service deletes the file the
+  /// moment it has read it, whether that succeeds or fails. Returns true on
+  /// success.
   static Future<bool> setOwnPassword(String password) async {
     if (!supported) return false;
     final pending = '$_ownDir\\pending-password.bin';
@@ -257,13 +292,9 @@ class HostService {
     }
     await _elevated('import-password "$pending"');
     final ok = (await _readResult())['PASSWORD_SET'] == '1';
-    // Best effort: the service deletes the pending file; remove any leftover.
-    try {
-      final f = File(pending);
-      if (await f.exists()) await f.delete();
-    } on FileSystemException {
-      // ignore
-    }
+    // The service deletes the pending file once it has imported it; remove
+    // any leftover (for example if it failed before reaching that step).
+    await _deleteSecretFile(File(pending));
     return ok;
   }
 }

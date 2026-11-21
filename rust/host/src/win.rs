@@ -201,7 +201,7 @@ fn send(inputs: &[INPUT]) -> u32 {
         use std::sync::atomic::{AtomicU64, Ordering};
         static REJECTED: AtomicU64 = AtomicU64::new(0);
         let total = REJECTED.fetch_add(1, Ordering::Relaxed) + 1;
-        if total == 1 || total % 200 == 0 {
+        if total == 1 || total.is_multiple_of(200) {
             tracing::warn!(sent, wanted = inputs.len(), error = ?err, total, "SendInput rejected input");
         }
     }

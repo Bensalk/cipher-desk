@@ -149,17 +149,20 @@ pub fn read_range(path: &Path, position: u64, len: u64) -> Option<Vec<u8>> {
 /// rejects `.`/`..`, empty names, Windows device names, control characters,
 /// characters Windows does not allow in names (a `:` would make `C:name` a
 /// path on drive C:, outside the folder the file belongs in), names ending in
-/// a dot or space, and names longer than 255 characters.
+/// a dot or space, names longer than 255 characters, and names with invisible
+/// text-direction characters (they can make `report\u{202E}fdp.exe` show as
+/// `reportexe.pdf`, hiding that the file is a program).
 pub fn safe_file_name(raw: &str) -> Option<String> {
     // Keep only the last path component, however it was separated.
     let base = raw.rsplit(['/', '\\']).next().unwrap_or(raw).trim();
     if base.is_empty() || base == "." || base == ".." {
         return None;
     }
-    if base
-        .chars()
-        .any(|c| c.is_control() || matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*'))
-    {
+    if base.chars().any(|c| {
+        c.is_control()
+            || is_direction_mark(c)
+            || matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*')
+    }) {
         return None;
     }
     if base.ends_with(['.', ' ']) || base.chars().count() > 255 {
@@ -170,6 +173,15 @@ pub fn safe_file_name(raw: &str) -> Option<String> {
         return None;
     }
     Some(base.to_owned())
+}
+
+/// Invisible characters that change the direction text is shown in (Unicode
+/// bidirectional controls and marks).
+fn is_direction_mark(c: char) -> bool {
+    matches!(
+        c,
+        '\u{061C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}'
+    )
 }
 
 /// True when `path` is `dir` followed only by plain names (no drive, root,
@@ -789,6 +801,14 @@ mod tests {
         assert_eq!(safe_file_name("trailing."), None);
         assert_eq!(safe_file_name(&"a".repeat(256)), None);
         assert_eq!(safe_file_name(&"a".repeat(255)).map(|n| n.len()), Some(255));
+        // A right-to-left override would show "invoice\u{202E}fdp.exe" as
+        // "invoiceexe.pdf".
+        assert_eq!(safe_file_name("invoice\u{202E}fdp.exe"), None);
+        assert_eq!(safe_file_name("a\u{2067}b.txt"), None);
+        assert_eq!(safe_file_name("a\u{200F}b.txt"), None);
+        // Ordinary non-English names are still fine.
+        assert_eq!(safe_file_name("رسالة.txt").as_deref(), Some("رسالة.txt"));
+        assert_eq!(safe_file_name("Résumé.pdf").as_deref(), Some("Résumé.pdf"));
     }
 
     #[test]

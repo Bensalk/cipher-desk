@@ -16,8 +16,8 @@ A step-by-step guide, from installing the app to your first secure connection. B
 
 Before you start, choose a [connection method](CONNECTION-METHODS.md) and follow
 its tutorial to set up the computer you want to connect to:
-[Private Remote Desktop](methods/PRIVATE-REMOTE-DESKTOP.md) ·
-[Share screen](methods/SHARE-SCREEN.md) · [VNC](methods/VNC.md).
+[Share screen](methods/SHARE-SCREEN.md) ·
+[Private Remote Desktop](methods/PRIVATE-REMOTE-DESKTOP.md) · [VNC](methods/VNC.md).
 Only connect over your own network or a VPN such as Tailscale.
 
 ## 1. Install
@@ -48,7 +48,7 @@ empty for the method's usual port) and the username (`user`, `DOMAIN\user` or
   in the app's files. Windows asks for Windows Hello and Android for your
   fingerprint/face/screen lock before it is used. Without it, you type the password
   each time you connect.
-- **Copy and paste (text and files)** (Private Remote Desktop and Share screen) — off by
+- **Copy and paste (text and files)** (Share screen and Private Remote Desktop) — off by
   default, except that a new Share screen connection starts with it on. When it is on,
   text you copy on this device is sent to the remote computer and text the remote
   computer copies appears on this device, and files and folders copied in File Explorer

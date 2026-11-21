@@ -4,44 +4,53 @@
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
 import '../frb_generated.dart';
+
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-
-            // These functions are ignored because they are not marked as `pub`: `error_info`
+// These functions are ignored because they are not marked as `pub`: `error_info`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`
 
+/// Every error the app can show, for the help screen and for looking up by id.
+List<ErrorInfo> allConnectionErrors() =>
+    RustLib.instance.api.crateApiErrorsAllConnectionErrors();
 
-            /// Every error the app can show, for the help screen and for looking up by id.
-List<ErrorInfo>  allConnectionErrors() => RustLib.instance.api.crateApiErrorsAllConnectionErrors();
+/// Text for one kind of connection error.
+class ErrorInfo {
+  /// Stable identifier, e.g. "WrongCredentials".
+  final String id;
+  final String title;
+  final String advice;
 
-            /// Text for one kind of connection error.
-class ErrorInfo  {
-                /// Stable identifier, e.g. "WrongCredentials".
-final String id;
-final String title;
-final String advice;
-/// Show with warning colours and an icon.
-final bool securityWarning;
-/// Offer a one-tap "Reconnect" after this error.
-final bool canReconnect;
+  /// Show with warning colours and an icon.
+  final bool securityWarning;
 
-                const ErrorInfo({required this.id ,required this.title ,required this.advice ,required this.securityWarning ,required this.canReconnect ,});
+  /// Offer a one-tap "Reconnect" after this error.
+  final bool canReconnect;
 
+  const ErrorInfo({
+    required this.id,
+    required this.title,
+    required this.advice,
+    required this.securityWarning,
+    required this.canReconnect,
+  });
 
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      title.hashCode ^
+      advice.hashCode ^
+      securityWarning.hashCode ^
+      canReconnect.hashCode;
 
-
-
-        @override
-        int get hashCode => id.hashCode^title.hashCode^advice.hashCode^securityWarning.hashCode^canReconnect.hashCode;
-
-
-
-        @override
-        bool operator ==(Object other) =>
-            identical(this, other) ||
-            other is ErrorInfo &&
-                runtimeType == other.runtimeType
-                && id == other.id&& title == other.title&& advice == other.advice&& securityWarning == other.securityWarning&& canReconnect == other.canReconnect;
-
-            }
-            
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ErrorInfo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          title == other.title &&
+          advice == other.advice &&
+          securityWarning == other.securityWarning &&
+          canReconnect == other.canReconnect;
+}

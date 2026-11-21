@@ -11,7 +11,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 SECS=${1:-60}; shift || true
 TARGETS=("$@")
-[ ${#TARGETS[@]} -eq 0 ] && TARGETS=(server_text clipboard_text certificate desktop_size files form_fields)
+[ ${#TARGETS[@]} -eq 0 ] && TARGETS=(server_text clipboard_text certificate desktop_size files form_fields safe_file_name)
 TRIPLE=$(rustc -vV | sed -n 's/^host: //p')
 export RUSTFLAGS="-Cllvm-args=-sanitizer-coverage-level=4 \
 -Cllvm-args=-sanitizer-coverage-inline-8bit-counters -Cllvm-args=-sanitizer-coverage-pc-table \

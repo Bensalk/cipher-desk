@@ -57,6 +57,9 @@ pub enum UpdateKind {
     /// The network dropped; reconnect attempt `x` of `y` is under way (`label`).
     /// Input is ignored until `Status` with `connected` arrives again.
     Reconnecting,
+    /// A copy of incoming files was cancelled from this side (the partial
+    /// file was removed; anything already fully received was kept).
+    FilesCancelled,
 }
 
 /// Something the UI should show. Only the fields named for its `kind` are set.
@@ -176,6 +179,7 @@ enum Command {
     Input(Vec<InputEvent>),
     OfferClipboard(String),
     SendFiles(Vec<String>),
+    CancelIncomingFiles,
     ApproveCertificate(bool),
     /// End the session: `None` = the user disconnected; otherwise the reason
     /// shown (e.g. the Android background grace period ended).
@@ -449,6 +453,14 @@ impl RdpSession {
         let _ = self.tx.send(Command::SendFiles(paths));
     }
 
+    /// Stops a copy of files arriving from the remote computer right now.
+    /// The file still being written is deleted; anything from the same copy
+    /// that already finished is kept. Does nothing if nothing is arriving.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn cancel_incoming_files(&self) {
+        let _ = self.tx.send(Command::CancelIncomingFiles);
+    }
+
     /// Answers the certificate prompt.
     #[flutter_rust_bridge::frb(sync)]
     pub fn approve_certificate(&self, approve: bool) {
@@ -612,6 +624,12 @@ impl Remote {
         match self {
             Self::Rdp(s) => s.send_files(paths.into_iter().map(std::path::PathBuf::from).collect()),
             Self::Vnc(_) => Ok(()),
+        }
+    }
+    fn cancel_incoming_files(&mut self) -> bool {
+        match self {
+            Self::Rdp(s) => s.cancel_incoming_files(),
+            Self::Vnc(_) => false,
         }
     }
     fn clamped(&self, r: Region) -> Option<Region> {
@@ -904,7 +922,12 @@ fn wait_for_approval(rx: &Receiver<Command>) -> Option<bool> {
             Ok(Command::ApproveCertificate(a)) => return Some(a),
             Ok(Command::Disconnect(_)) | Err(_) => return None,
             // Input, clipboard and file offers before the session exists are dropped.
-            Ok(Command::Input(_) | Command::OfferClipboard(_) | Command::SendFiles(_)) => {}
+            Ok(
+                Command::Input(_)
+                | Command::OfferClipboard(_)
+                | Command::SendFiles(_)
+                | Command::CancelIncomingFiles,
+            ) => {}
         }
     }
 }
@@ -968,6 +991,11 @@ fn drive(
                 Ok(Command::SendFiles(paths)) => {
                     if let Err(e) = s.send_files(paths) {
                         return ended(e);
+                    }
+                }
+                Ok(Command::CancelIncomingFiles) => {
+                    if s.cancel_incoming_files() {
+                        send(SessionUpdate::new(UpdateKind::FilesCancelled));
                     }
                 }
                 Ok(Command::ApproveCertificate(_)) => {}

@@ -17,7 +17,7 @@ with the reporter.
 
 ## Supported versions
 
-Only the latest release receives security fixes until version 1.0.
+Only the latest release receives security fixes.
 
 ## Security design summary
 
@@ -27,11 +27,15 @@ Only the latest release receives security fixes until version 1.0.
   approves them on first connection. A changed certificate blocks the
   connection before any credentials are sent. The IronRDP option that accepts
   any certificate is never used (checked in CI by `scripts/check-policy.sh`).
-- **Passwords are stored only in the operating system's vault**
-  (Windows Credential Manager, Linux Secret Service, Android Keystore),
-  never in files, logs or error messages. If no vault exists, the password is
-  not saved. Using a saved password needs Windows Hello on Windows, the
-  fingerprint/face/screen-lock prompt on Android, and an unlocked keyring on Linux.
+- **Saved connection passwords are stored only in the operating system's
+  vault** (Windows Credential Manager, Linux Secret Service, Android
+  Keystore), never in files, logs or error messages. If no vault exists, the
+  password is not saved. Using a saved password needs Windows Hello on
+  Windows, the fingerprint/face/screen-lock prompt on Android, and an
+  unlocked keyring on Linux. Setting up or changing Share screen's own
+  sharing password is a separate, short handoff (see R-11 in
+  `docs/THREAT_MODEL.md`): the password briefly sits in a locked-down,
+  short-lived file in your own app folder, not the OS vault.
 - **Logging is capped at `info` in release builds** and the authentication
   library's (`sspi`) logs are always disabled, because at debug level it
   records credential buffers.
@@ -50,6 +54,12 @@ Only the latest release receives security fixes until version 1.0.
   notifications only.
 - Outside access is intended **only through a VPN** (e.g. WireGuard or
   Tailscale). Never expose RDP port 3389 to the internet.
+- **File transfer** (Share screen's copy-paste, Private Remote Desktop's
+  "Send file") reads the file names and data sent by whoever is on the other
+  end of the connection. That data is treated as untrusted: file names are
+  checked against path traversal and reserved names before anything is
+  written to disk, and the binary file list the remote side sends is
+  bounds-checked before it is parsed.
 
 See also `docs/THREAT_MODEL.md` (threats and accepted risks),
 `docs/SECURITY_REVIEW.md` (verification of each requirement) and

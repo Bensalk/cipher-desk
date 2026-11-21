@@ -11,6 +11,7 @@
 
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -134,8 +135,15 @@ fn show_ip(addr: SocketAddr) -> String {
     }
 }
 
-/// True for addresses on a Tailscale network (100.64.0.0/10 and
-/// fd7a:115c:a1e0::/48) and for this computer itself.
+/// True for addresses on a Tailscale network and for this computer itself.
+/// The IPv6 range (`fd7a:115c:a1e0::/48`) is Tailscale's own prefix, so it is
+/// a real check. The IPv4 range (`100.64.0.0/10`) is not: it is the whole
+/// IANA carrier-grade-NAT block, which some ISPs also hand out to ordinary
+/// mobile and broadband customers, so an address in it does not prove the
+/// peer is actually on this Tailscale network — only that it looks like it
+/// could be. The listener binds to all interfaces, so this is the only
+/// check standing between "Tailscale only" and a non-Tailscale peer whose
+/// address happens to fall in the same IPv4 block.
 pub fn is_tailnet_or_local(ip: std::net::IpAddr) -> bool {
     use std::net::IpAddr;
     let ip = match ip {
@@ -154,12 +162,32 @@ pub fn is_tailnet_or_local(ip: std::net::IpAddr) -> bool {
     }
 }
 
+/// Whether a connection that arrived on network interface `local` should be
+/// accepted when "Tailscale only" is (or isn't) turned on.
+///
+/// `is_tailnet_or_local` on the *peer*'s address only checks whether the peer
+/// *claims* an address in Tailscale's own IPv4 block — which a device on
+/// ordinary carrier-grade NAT can also have, with nothing to do with
+/// Tailscale. This checks the *local* side instead: which of this computer's
+/// own network interfaces actually received the connection. A connection
+/// that arrived on a LAN or public interface is refused in Tailscale-only
+/// mode even if the peer's address happens to look like a Tailscale one; one
+/// that arrived on this computer's own Tailscale interface (or on loopback)
+/// is accepted. When Tailscale-only mode is off, every interface is allowed,
+/// same as before.
+pub fn local_address_allowed(local: std::net::IpAddr, tailnet_only: bool) -> bool {
+    !tailnet_only || is_tailnet_or_local(local)
+}
+
 pub(crate) struct Limiter {
     devices: HashMap<IpAddr, Counter>,
     all: AllCounter,
     events: mpsc::Sender<HostEvent>,
     peer: Peer,
     tailnet_only: bool,
+    /// Set by the person at this computer (see [`crate::Unblocker`]): forget
+    /// every wrong-password block before the next connection is checked.
+    unblock: Arc<AtomicBool>,
 }
 
 /// What a wrong password led to.
@@ -173,17 +201,28 @@ enum Lock {
 }
 
 impl Limiter {
-    pub(crate) fn new(events: mpsc::Sender<HostEvent>, peer: Peer, tailnet_only: bool) -> Self {
+    pub(crate) fn new(
+        events: mpsc::Sender<HostEvent>,
+        peer: Peer,
+        tailnet_only: bool,
+        unblock: Arc<AtomicBool>,
+    ) -> Self {
         Self {
             devices: HashMap::new(),
             all: AllCounter::default(),
             events,
             peer,
             tailnet_only,
+            unblock,
         }
     }
 
     fn locked(&mut self, ip: IpAddr, now: Instant) -> bool {
+        if self.unblock.swap(false, Ordering::SeqCst) {
+            self.devices.clear();
+            self.all = AllCounter::default();
+            tracing::info!("wrong-password blocks cleared by the person at this computer");
+        }
         self.all.locked(now) || self.devices.get_mut(&ip).is_some_and(|c| c.locked(now))
     }
 
@@ -223,9 +262,17 @@ impl Limiter {
 }
 
 impl ConnectionHandler for Limiter {
-    fn on_accept(&mut self, peer: SocketAddr) -> bool {
+    fn on_accept(&mut self, peer: SocketAddr, local: SocketAddr) -> bool {
         if self.tailnet_only && !is_tailnet_or_local(peer.ip()) {
             tracing::info!(address = %show_ip(peer), "refused: not from the Tailscale network");
+            return false;
+        }
+        if !local_address_allowed(local.ip(), self.tailnet_only) {
+            tracing::info!(
+                address = %show_ip(peer),
+                local = %show_ip(local),
+                "refused: did not arrive on the Tailscale interface"
+            );
             return false;
         }
         let allowed = !self.locked(peer.ip(), Instant::now());
@@ -245,11 +292,13 @@ impl ConnectionHandler for Limiter {
         error: Option<&anyhow::Error>,
     ) -> PostConnectionAction {
         let _ = self.events.send(HostEvent::ViewerDisconnected);
-        // Only credential failures count toward lockout. TLS noise from relay
-        // networks (accept_begin failed, UnknownCA) and post-auth network drops
-        // must not trigger the 15-minute lockout: they are not password guesses.
-        let failed = is_credential_failure(error);
-        if failed {
+        // Only credential failures, and connections that stayed silent to hold
+        // the one-at-a-time queue, count toward lockout. TLS noise from relay
+        // networks (accept_begin failed, UnknownCA), "is it online?" checks and
+        // post-auth network drops must not trigger the 15-minute lockout.
+        let wrong_password = is_credential_failure(error);
+        let failed = wrong_password || is_silent_connection(error);
+        if wrong_password {
             let _ = self.events.send(HostEvent::SignInFailed {
                 address: show_ip(peer),
             });
@@ -272,6 +321,12 @@ impl ConnectionHandler for Limiter {
 /// True only when the error chain contains evidence of a failed sign-in
 /// (wrong password / wrong user). Pure TLS errors, early connection drops, and
 /// network noise return false and are not counted against the lockout budget.
+/// A connection that sent nothing for several seconds after connecting: it
+/// held up everyone else (connections are served one at a time).
+fn is_silent_connection(error: Option<&anyhow::Error>) -> bool {
+    error.is_some_and(|e| format!("{e:#}").contains(ironrdp_server::SILENT_CONNECTION))
+}
+
 fn is_credential_failure(error: Option<&anyhow::Error>) -> bool {
     let Some(err) = error else { return false };
     // The CredSSP server reports "LogonDenied" when NLA credentials are wrong.
@@ -316,9 +371,56 @@ mod tests {
             );
         }
         let (tx, _rx) = mpsc::channel();
-        let mut l = Limiter::new(tx, Peer::default(), true);
-        assert!(!l.on_accept("192.168.1.5:5000".parse().unwrap_or_else(|_| panic!())));
-        assert!(l.on_accept("100.112.147.20:5000".parse().unwrap_or_else(|_| panic!())));
+        let mut l = Limiter::new(tx, Peer::default(), true, Arc::default());
+        let any_local: SocketAddr = "100.64.0.9:3389".parse().unwrap_or_else(|_| panic!());
+        assert!(!l.on_accept(
+            "192.168.1.5:5000".parse().unwrap_or_else(|_| panic!()),
+            any_local
+        ));
+        assert!(l.on_accept(
+            "100.112.147.20:5000".parse().unwrap_or_else(|_| panic!()),
+            any_local
+        ));
+    }
+
+    #[test]
+    fn local_address_allowed_checks_which_interface_the_connection_arrived_on() {
+        // Tailscale-only: a Tailscale or loopback local address is fine...
+        assert!(local_address_allowed(ip("100.64.0.1"), true));
+        assert!(local_address_allowed(ip("fd7a:115c:a1e0::1"), true));
+        assert!(local_address_allowed(ip("127.0.0.1"), true));
+        // ...but a LAN or public local address is refused, even though it
+        // would pass a check on the *peer*'s address alone.
+        assert!(!local_address_allowed(ip("192.168.1.5"), true));
+        assert!(!local_address_allowed(ip("10.0.0.2"), true));
+        assert!(!local_address_allowed(ip("8.8.8.8"), true));
+        // Carrier-grade NAT overlaps Tailscale's own IPv4 block, so a local
+        // address in it is treated the same as a real Tailscale one here —
+        // this check is about which interface received the connection, not
+        // about telling Tailscale apart from CGNAT on the IP alone.
+        assert!(local_address_allowed(ip("100.112.147.20"), true));
+        // "Any network": every interface is allowed, same as before.
+        assert!(local_address_allowed(ip("192.168.1.5"), false));
+        assert!(local_address_allowed(ip("8.8.8.8"), false));
+    }
+
+    #[test]
+    fn on_accept_refuses_a_connection_that_did_not_arrive_on_the_tailscale_interface() {
+        let (tx, _rx) = mpsc::channel();
+        let mut l = Limiter::new(tx, Peer::default(), true, Arc::default());
+        // The peer's address alone looks like Tailscale/CGNAT, but the
+        // connection actually came in on this computer's plain LAN address —
+        // refused.
+        assert!(!l.on_accept(
+            "100.112.147.20:5000".parse().unwrap_or_else(|_| panic!()),
+            "192.168.1.10:3389".parse().unwrap_or_else(|_| panic!())
+        ));
+        // Same peer address, but arriving on the Tailscale interface this
+        // time — accepted.
+        assert!(l.on_accept(
+            "100.112.147.20:5001".parse().unwrap_or_else(|_| panic!()),
+            "100.64.0.5:3389".parse().unwrap_or_else(|_| panic!())
+        ));
     }
 
     fn ip(s: &str) -> IpAddr {
@@ -328,7 +430,7 @@ mod tests {
     #[test]
     fn five_quick_failures_lock_that_device_only_and_the_lock_expires() {
         let (tx, _rx) = mpsc::channel();
-        let mut l = Limiter::new(tx, Peer::default(), false);
+        let mut l = Limiter::new(tx, Peer::default(), false, Arc::default());
         let (a, b) = (ip("100.64.0.1"), ip("100.64.0.2"));
         let t0 = Instant::now();
         let s1 = Duration::from_secs(1);
@@ -350,9 +452,59 @@ mod tests {
     }
 
     #[test]
+    fn only_wrong_passwords_and_silent_connections_count() {
+        let silent = anyhow::anyhow!(ironrdp_server::SILENT_CONNECTION);
+        assert!(is_silent_connection(Some(&silent)));
+        assert!(!is_credential_failure(Some(&silent)));
+
+        // An unanswered or declined "Allow?", relay noise and an online check
+        // that sent nothing and closed are not counted.
+        for not_counted in [
+            "client loop failure: viewer was not allowed",
+            "accept_begin failed: [read frame by hint] custom error: not enough bytes",
+            "TLS handshake failed: UnknownCA",
+        ] {
+            let e = anyhow::anyhow!(not_counted);
+            assert!(!is_silent_connection(Some(&e)), "{not_counted}");
+            assert!(!is_credential_failure(Some(&e)), "{not_counted}");
+        }
+        assert!(!is_silent_connection(None));
+    }
+
+    #[test]
+    fn unblock_clears_device_and_everyone_blocks_once() {
+        let (tx, _rx) = mpsc::channel();
+        let unblock = Arc::new(AtomicBool::new(false));
+        let mut l = Limiter::new(tx, Peer::default(), false, Arc::clone(&unblock));
+        let t0 = Instant::now();
+        let s1 = Duration::from_secs(1);
+        let a = ip("100.64.0.1");
+        for _ in 0..MAX_FAILURES {
+            l.record(a, t0, s1, true);
+        }
+        for i in 0..MAX_FAILURES_ALL {
+            l.record(ip(&format!("100.64.1.{i}")), t0, s1, true);
+        }
+        assert!(l.locked(a, t0 + s1));
+        assert!(l.locked(ip("100.64.9.9"), t0 + s1));
+
+        crate::Unblocker(Arc::clone(&unblock)).unblock();
+        assert!(!l.locked(a, t0 + s1));
+        assert!(!l.locked(ip("100.64.9.9"), t0 + s1));
+        assert!(!unblock.load(Ordering::SeqCst), "the request is used up");
+
+        // Counting starts again from zero: it takes a full set of new wrong
+        // passwords to block that device again.
+        for _ in 0..MAX_FAILURES - 1 {
+            assert_eq!(l.record(a, t0 + s1, s1, true), Lock::None);
+        }
+        assert_eq!(l.record(a, t0 + s1, s1, true), Lock::Device);
+    }
+
+    #[test]
     fn many_devices_guessing_together_lock_everyone() {
         let (tx, _rx) = mpsc::channel();
-        let mut l = Limiter::new(tx, Peer::default(), false);
+        let mut l = Limiter::new(tx, Peer::default(), false, Arc::default());
         let t0 = Instant::now();
         let s1 = Duration::from_secs(1);
         let mut last = Lock::None;
@@ -367,7 +519,7 @@ mod tests {
     #[test]
     fn old_failures_and_long_sessions_do_not_count() {
         let (tx, _rx) = mpsc::channel();
-        let mut l = Limiter::new(tx, Peer::default(), false);
+        let mut l = Limiter::new(tx, Peer::default(), false, Arc::default());
         let a = ip("100.64.0.1");
         let t0 = Instant::now();
         let s1 = Duration::from_secs(1);
@@ -406,7 +558,7 @@ mod tests {
     #[test]
     fn a_flood_of_devices_does_not_grow_without_bound_or_panic() {
         let (tx, _rx) = mpsc::channel();
-        let mut l = Limiter::new(tx, Peer::default(), false);
+        let mut l = Limiter::new(tx, Peer::default(), false, Arc::default());
         let t0 = Instant::now();
         let s1 = Duration::from_secs(1);
         for i in 0..20_000u32 {
@@ -431,7 +583,7 @@ mod tests {
     #[test]
     fn repeated_reconnect_cycles_do_not_leave_a_stuck_lock() {
         let (tx, _rx) = mpsc::channel();
-        let mut l = Limiter::new(tx, Peer::default(), false);
+        let mut l = Limiter::new(tx, Peer::default(), false, Arc::default());
         let a = ip("100.64.5.5");
         let mut t = Instant::now();
         let s1 = Duration::from_secs(1);

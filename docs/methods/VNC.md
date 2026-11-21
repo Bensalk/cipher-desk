@@ -54,6 +54,9 @@ computer. Tailscale does this for you, which is another reason to use it.
 - **Keyboard:** keys are sent for a US keyboard layout. Text typed with the
   phone's keyboard (or **Type text**) is sent as characters, so accents work.
 - **Clipboard sharing** is not available with VNC.
+- **No file transfer**, either direction. VNC itself doesn't support it. If you
+  need to move files, use a shared network drive, USB, or
+  [Share screen](SHARE-SCREEN.md) instead.
 - **Speed:** Cipher Desk uses compressed updates (Tight and ZRLE) when the VNC
   program offers them.
 

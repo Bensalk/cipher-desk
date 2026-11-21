@@ -122,11 +122,18 @@ pub struct HostHandle {
     stop: Option<tokio::sync::oneshot::Sender<()>>,
     thread: Option<std::thread::JoinHandle<()>>,
     approvals: tokio::sync::mpsc::UnboundedSender<bool>,
+    unblock: Arc<std::sync::atomic::AtomicBool>,
     #[cfg(windows)]
     clip: Option<clipboard::ClipHandle>,
 }
 
 impl HostHandle {
+    /// A handle the person at this computer can use (from another thread) to
+    /// let devices blocked after too many wrong passwords try again at once.
+    pub fn unblocker(&self) -> Unblocker {
+        Unblocker(Arc::clone(&self.unblock))
+    }
+
     /// Allows (`true`) or refuses (`false`) a viewer waiting after
     /// [`HostEvent::ApprovalRequested`]. Ignored if nothing is waiting.
     pub fn approve(&self, allow: bool) {
@@ -167,6 +174,19 @@ impl HostHandle {
     }
 }
 
+/// Clears wrong-password blocks; see [`HostHandle::unblocker`]. Only for the
+/// person at this computer: never wire it to anything a viewer can reach.
+#[derive(Clone)]
+pub struct Unblocker(Arc<std::sync::atomic::AtomicBool>);
+
+impl Unblocker {
+    /// Every blocked device may try again; the counts start from zero. Takes
+    /// effect at the next connection attempt.
+    pub fn unblock(&self) {
+        self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 /// Answers [`HostEvent::ApprovalRequested`]; see [`HostHandle::approver`].
 #[derive(Clone)]
 pub struct Approver(tokio::sync::mpsc::UnboundedSender<bool>);
@@ -190,7 +210,7 @@ pub fn generate_password() -> anyhow::Result<SecretString> {
     const ALPHABET: &[u8] = b"abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let rng = ring::rand::SystemRandom::new();
     let mut out = String::with_capacity(19);
-    let mut i = 0;
+    let mut i = 0usize;
     while i < 16 {
         let mut b = [0u8; 1];
         ring::rand::SecureRandom::fill(&rng, &mut b)
@@ -200,7 +220,7 @@ pub fn generate_password() -> anyhow::Result<SecretString> {
         if usize::from(b[0]) >= limit {
             continue;
         }
-        if i > 0 && i % 4 == 0 {
+        if i > 0 && i.is_multiple_of(4) {
             out.push('-');
         }
         out.push(char::from(ALPHABET[usize::from(b[0]) % ALPHABET.len()]));
@@ -281,7 +301,13 @@ where
     let username = config.username.trim().to_owned();
     let password = config.password;
     let second_factor = config.second_factor;
-    let limiter = limiter::Limiter::new(events.clone(), peer, config.tailnet_only);
+    let unblock = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let limiter = limiter::Limiter::new(
+        events.clone(),
+        peer,
+        config.tailnet_only,
+        Arc::clone(&unblock),
+    );
 
     // Text + file clipboard bridge (Windows only). Files the viewer sends land
     // in a "Received" folder beside the app's data; `clip` lets the app offer
@@ -357,6 +383,7 @@ where
         stop: Some(stop),
         thread: Some(thread),
         approvals: approve_tx,
+        unblock,
         #[cfg(windows)]
         clip,
     })

@@ -4,252 +4,318 @@
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
 import '../frb_generated.dart';
+
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
+
 import 'session.dart';
 
-
-            // These functions are ignored because they are not marked as `pub`: `from_core`, `method_from_core`, `method_to_core`, `to_core`, `to_mode`, `to_setting`
+// These functions are ignored because they are not marked as `pub`: `from_core`, `method_from_core`, `method_to_core`, `to_core`, `to_mode`, `to_setting`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
+/// Port used when the port field is left empty, for each method.
+int defaultPortFor({required ConnectionMethod method}) =>
+    RustLib.instance.api.crateApiStoreDefaultPortFor(method: method);
 
-            /// Port used when the port field is left empty, for each method.
-int  defaultPortFor({required ConnectionMethod method }) => RustLib.instance.api.crateApiStoreDefaultPortFor(method: method);
-
-LoadResult  connectionsLoad({required String path }) => RustLib.instance.api.crateApiStoreConnectionsLoad(path: path);
+LoadResult connectionsLoad({required String path}) =>
+    RustLib.instance.api.crateApiStoreConnectionsLoad(path: path);
 
 /// Saves connections and history. Returns false if the file could not be written.
-bool  connectionsSave({required String path , required List<ConnectionData> connections , required List<HistoryData> history }) => RustLib.instance.api.crateApiStoreConnectionsSave(path: path, connections: connections, history: history);
+bool connectionsSave({
+  required String path,
+  required List<ConnectionData> connections,
+  required List<HistoryData> history,
+}) => RustLib.instance.api.crateApiStoreConnectionsSave(
+  path: path,
+  connections: connections,
+  history: history,
+);
 
 /// Export text (no passwords, ids, saved-password flags or history).
-String  connectionsExport({required List<ConnectionData> connections }) => RustLib.instance.api.crateApiStoreConnectionsExport(connections: connections);
+String connectionsExport({required List<ConnectionData> connections}) => RustLib
+    .instance
+    .api
+    .crateApiStoreConnectionsExport(connections: connections);
 
-ImportResult  connectionsImport({required String text }) => RustLib.instance.api.crateApiStoreConnectionsImport(text: text);
+ImportResult connectionsImport({required String text}) =>
+    RustLib.instance.api.crateApiStoreConnectionsImport(text: text);
 
-SettingsData  settingsLoad({required String path }) => RustLib.instance.api.crateApiStoreSettingsLoad(path: path);
+SettingsData settingsLoad({required String path}) =>
+    RustLib.instance.api.crateApiStoreSettingsLoad(path: path);
 
-bool  settingsSave({required String path , required SettingsData data }) => RustLib.instance.api.crateApiStoreSettingsSave(path: path, data: data);
+bool settingsSave({required String path, required SettingsData data}) =>
+    RustLib.instance.api.crateApiStoreSettingsSave(path: path, data: data);
 
 /// Idle-disconnect choices in minutes (0 = never).
-Uint32List  idleMinuteChoices() => RustLib.instance.api.crateApiStoreIdleMinuteChoices();
+Uint32List idleMinuteChoices() =>
+    RustLib.instance.api.crateApiStoreIdleMinuteChoices();
 
 /// Computers whose certificate the user has approved.
-List<TrustedComputer>  trustedComputers({required String pinsPath }) => RustLib.instance.api.crateApiStoreTrustedComputers(pinsPath: pinsPath);
+List<TrustedComputer> trustedComputers({required String pinsPath}) =>
+    RustLib.instance.api.crateApiStoreTrustedComputers(pinsPath: pinsPath);
 
 /// Forgets a trusted computer by its "host:port" key.
-bool  forgetTrustedComputer({required String pinsPath , required String endpoint }) => RustLib.instance.api.crateApiStoreForgetTrustedComputer(pinsPath: pinsPath, endpoint: endpoint);
+bool forgetTrustedComputer({
+  required String pinsPath,
+  required String endpoint,
+}) => RustLib.instance.api.crateApiStoreForgetTrustedComputer(
+  pinsPath: pinsPath,
+  endpoint: endpoint,
+);
 
 /// The portable data folder when running as a portable copy (Windows portable
 /// ZIP with `portable.txt`, or an AppImage with a `.data` folder next to it);
 /// `None` for an installed copy, which uses the normal per-user folders.
-String?  portableDataDir() => RustLib.instance.api.crateApiStorePortableDataDir();
+String? portableDataDir() =>
+    RustLib.instance.api.crateApiStorePortableDataDir();
 
-bool  isValidMac({required String text }) => RustLib.instance.api.crateApiStoreIsValidMac(text: text);
+bool isValidMac({required String text}) =>
+    RustLib.instance.api.crateApiStoreIsValidMac(text: text);
 
 /// Sends a Wake-on-LAN packet on the local network.
-WakeResult  wakeOnLan({required String mac }) => RustLib.instance.api.crateApiStoreWakeOnLan(mac: mac);
+WakeResult wakeOnLan({required String mac}) =>
+    RustLib.instance.api.crateApiStoreWakeOnLan(mac: mac);
 
 /// Whether VNC may be used with this host: all its addresses are on the own
 /// network, this computer or Tailscale. Looks the name up, so it may take a moment.
-Future<bool>  vncAddressAllowed({required String host }) => RustLib.instance.api.crateApiStoreVncAddressAllowed(host: host);
+Future<bool> vncAddressAllowed({required String host}) =>
+    RustLib.instance.api.crateApiStoreVncAddressAllowed(host: host);
 
 /// Whether the computer accepts connections on its RDP port (sends no data).
-Future<bool>  checkReachable({required String host , required int port , required int timeoutMs }) => RustLib.instance.api.crateApiStoreCheckReachable(host: host, port: port, timeoutMs: timeoutMs);
+Future<bool> checkReachable({
+  required String host,
+  required int port,
+  required int timeoutMs,
+}) => RustLib.instance.api.crateApiStoreCheckReachable(
+  host: host,
+  port: port,
+  timeoutMs: timeoutMs,
+);
 
-            enum AppTheme {
-                    system,
-light,
-dark,
-                    ;
-                    
-                }
+enum AppTheme { system, light, dark }
 
 /// A saved connection (no password).
-class ConnectionData  {
-                final String id;
-final String name;
-final String host;
-final int port;
-final String username;
-final bool savePassword;
-final ClipboardMode clipboard;
-/// Unix seconds.
-final PlatformInt64? lastUsed;
-final String? wakeMac;
-final ConnectionMethod method;
-final PictureQuality quality;
+class ConnectionData {
+  final String id;
+  final String name;
+  final String host;
+  final int port;
+  final String username;
+  final bool savePassword;
+  final ClipboardMode clipboard;
 
-                const ConnectionData({required this.id ,required this.name ,required this.host ,required this.port ,required this.username ,required this.savePassword ,required this.clipboard ,this.lastUsed ,this.wakeMac ,required this.method ,required this.quality ,});
+  /// Unix seconds.
+  final PlatformInt64? lastUsed;
+  final String? wakeMac;
+  final ConnectionMethod method;
+  final PictureQuality quality;
 
+  const ConnectionData({
+    required this.id,
+    required this.name,
+    required this.host,
+    required this.port,
+    required this.username,
+    required this.savePassword,
+    required this.clipboard,
+    this.lastUsed,
+    this.wakeMac,
+    required this.method,
+    required this.quality,
+  });
 
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      name.hashCode ^
+      host.hashCode ^
+      port.hashCode ^
+      username.hashCode ^
+      savePassword.hashCode ^
+      clipboard.hashCode ^
+      lastUsed.hashCode ^
+      wakeMac.hashCode ^
+      method.hashCode ^
+      quality.hashCode;
 
-
-
-        @override
-        int get hashCode => id.hashCode^name.hashCode^host.hashCode^port.hashCode^username.hashCode^savePassword.hashCode^clipboard.hashCode^lastUsed.hashCode^wakeMac.hashCode^method.hashCode^quality.hashCode;
-
-
-
-        @override
-        bool operator ==(Object other) =>
-            identical(this, other) ||
-            other is ConnectionData &&
-                runtimeType == other.runtimeType
-                && id == other.id&& name == other.name&& host == other.host&& port == other.port&& username == other.username&& savePassword == other.savePassword&& clipboard == other.clipboard&& lastUsed == other.lastUsed&& wakeMac == other.wakeMac&& method == other.method&& quality == other.quality;
-
-            }
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ConnectionData &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          host == other.host &&
+          port == other.port &&
+          username == other.username &&
+          savePassword == other.savePassword &&
+          clipboard == other.clipboard &&
+          lastUsed == other.lastUsed &&
+          wakeMac == other.wakeMac &&
+          method == other.method &&
+          quality == other.quality;
+}
 
 /// How a connection is made.
 enum ConnectionMethod {
-                    /// Windows Remote Desktop: the computer's own screen locks while you work.
-privateRemoteDesktop,
-/// Cipher Desk Host on the computer: the same screen at both ends.
-shareScreen,
-/// A VNC server on the computer: the same screen at both ends (local network or VPN only).
-vnc,
-                    ;
-                    
-                }
+  /// Windows Remote Desktop: the computer's own screen locks while you work.
+  privateRemoteDesktop,
 
-class HistoryData  {
-                final String connectionId;
-final PlatformInt64 time;
-final String outcome;
+  /// Cipher Desk Host on the computer: the same screen at both ends.
+  shareScreen,
 
-                const HistoryData({required this.connectionId ,required this.time ,required this.outcome ,});
+  /// A VNC server on the computer: the same screen at both ends (local network or VPN only).
+  vnc,
+}
 
+class HistoryData {
+  final String connectionId;
+  final PlatformInt64 time;
+  final String outcome;
 
+  const HistoryData({
+    required this.connectionId,
+    required this.time,
+    required this.outcome,
+  });
 
+  @override
+  int get hashCode => connectionId.hashCode ^ time.hashCode ^ outcome.hashCode;
 
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HistoryData &&
+          runtimeType == other.runtimeType &&
+          connectionId == other.connectionId &&
+          time == other.time &&
+          outcome == other.outcome;
+}
 
-        @override
-        int get hashCode => connectionId.hashCode^time.hashCode^outcome.hashCode;
+class ImportResult {
+  /// Valid connections with empty ids (the app assigns new ones).
+  final List<ConnectionData> connections;
+  final int skipped;
+  final bool notAnExport;
 
+  const ImportResult({
+    required this.connections,
+    required this.skipped,
+    required this.notAnExport,
+  });
 
+  @override
+  int get hashCode =>
+      connections.hashCode ^ skipped.hashCode ^ notAnExport.hashCode;
 
-        @override
-        bool operator ==(Object other) =>
-            identical(this, other) ||
-            other is HistoryData &&
-                runtimeType == other.runtimeType
-                && connectionId == other.connectionId&& time == other.time&& outcome == other.outcome;
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ImportResult &&
+          runtimeType == other.runtimeType &&
+          connections == other.connections &&
+          skipped == other.skipped &&
+          notAnExport == other.notAnExport;
+}
 
-            }
+class LoadResult {
+  final List<ConnectionData> connections;
+  final List<HistoryData> history;
 
-class ImportResult  {
-                /// Valid connections with empty ids (the app assigns new ones).
-final List<ConnectionData> connections;
-final int skipped;
-final bool notAnExport;
+  /// The file was damaged and the previous good version was used.
+  final bool restoredFromBackup;
 
-                const ImportResult({required this.connections ,required this.skipped ,required this.notAnExport ,});
+  /// The file and its backup were damaged; they were kept aside and the list is empty.
+  final bool damagedAndReset;
 
+  /// Invalid entries that were skipped.
+  final int skipped;
 
+  /// The file could not be read at all (e.g. permissions).
+  final bool readError;
 
+  const LoadResult({
+    required this.connections,
+    required this.history,
+    required this.restoredFromBackup,
+    required this.damagedAndReset,
+    required this.skipped,
+    required this.readError,
+  });
 
+  @override
+  int get hashCode =>
+      connections.hashCode ^
+      history.hashCode ^
+      restoredFromBackup.hashCode ^
+      damagedAndReset.hashCode ^
+      skipped.hashCode ^
+      readError.hashCode;
 
-        @override
-        int get hashCode => connections.hashCode^skipped.hashCode^notAnExport.hashCode;
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LoadResult &&
+          runtimeType == other.runtimeType &&
+          connections == other.connections &&
+          history == other.history &&
+          restoredFromBackup == other.restoredFromBackup &&
+          damagedAndReset == other.damagedAndReset &&
+          skipped == other.skipped &&
+          readError == other.readError;
+}
 
+class SettingsData {
+  final AppTheme theme;
+  final bool blockScreenshots;
+  final bool clipboardDefault;
+  final bool confirmSavedPassword;
+  final int idleMinutes;
 
+  const SettingsData({
+    required this.theme,
+    required this.blockScreenshots,
+    required this.clipboardDefault,
+    required this.confirmSavedPassword,
+    required this.idleMinutes,
+  });
 
-        @override
-        bool operator ==(Object other) =>
-            identical(this, other) ||
-            other is ImportResult &&
-                runtimeType == other.runtimeType
-                && connections == other.connections&& skipped == other.skipped&& notAnExport == other.notAnExport;
+  @override
+  int get hashCode =>
+      theme.hashCode ^
+      blockScreenshots.hashCode ^
+      clipboardDefault.hashCode ^
+      confirmSavedPassword.hashCode ^
+      idleMinutes.hashCode;
 
-            }
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SettingsData &&
+          runtimeType == other.runtimeType &&
+          theme == other.theme &&
+          blockScreenshots == other.blockScreenshots &&
+          clipboardDefault == other.clipboardDefault &&
+          confirmSavedPassword == other.confirmSavedPassword &&
+          idleMinutes == other.idleMinutes;
+}
 
-class LoadResult  {
-                final List<ConnectionData> connections;
-final List<HistoryData> history;
-/// The file was damaged and the previous good version was used.
-final bool restoredFromBackup;
-/// The file and its backup were damaged; they were kept aside and the list is empty.
-final bool damagedAndReset;
-/// Invalid entries that were skipped.
-final int skipped;
-/// The file could not be read at all (e.g. permissions).
-final bool readError;
+class TrustedComputer {
+  /// "host:port".
+  final String endpoint;
+  final String fingerprint;
 
-                const LoadResult({required this.connections ,required this.history ,required this.restoredFromBackup ,required this.damagedAndReset ,required this.skipped ,required this.readError ,});
+  const TrustedComputer({required this.endpoint, required this.fingerprint});
 
+  @override
+  int get hashCode => endpoint.hashCode ^ fingerprint.hashCode;
 
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TrustedComputer &&
+          runtimeType == other.runtimeType &&
+          endpoint == other.endpoint &&
+          fingerprint == other.fingerprint;
+}
 
-
-
-        @override
-        int get hashCode => connections.hashCode^history.hashCode^restoredFromBackup.hashCode^damagedAndReset.hashCode^skipped.hashCode^readError.hashCode;
-
-
-
-        @override
-        bool operator ==(Object other) =>
-            identical(this, other) ||
-            other is LoadResult &&
-                runtimeType == other.runtimeType
-                && connections == other.connections&& history == other.history&& restoredFromBackup == other.restoredFromBackup&& damagedAndReset == other.damagedAndReset&& skipped == other.skipped&& readError == other.readError;
-
-            }
-
-class SettingsData  {
-                final AppTheme theme;
-final bool blockScreenshots;
-final bool clipboardDefault;
-final bool confirmSavedPassword;
-final int idleMinutes;
-
-                const SettingsData({required this.theme ,required this.blockScreenshots ,required this.clipboardDefault ,required this.confirmSavedPassword ,required this.idleMinutes ,});
-
-
-
-
-
-        @override
-        int get hashCode => theme.hashCode^blockScreenshots.hashCode^clipboardDefault.hashCode^confirmSavedPassword.hashCode^idleMinutes.hashCode;
-
-
-
-        @override
-        bool operator ==(Object other) =>
-            identical(this, other) ||
-            other is SettingsData &&
-                runtimeType == other.runtimeType
-                && theme == other.theme&& blockScreenshots == other.blockScreenshots&& clipboardDefault == other.clipboardDefault&& confirmSavedPassword == other.confirmSavedPassword&& idleMinutes == other.idleMinutes;
-
-            }
-
-class TrustedComputer  {
-                /// "host:port".
-final String endpoint;
-final String fingerprint;
-
-                const TrustedComputer({required this.endpoint ,required this.fingerprint ,});
-
-
-
-
-
-        @override
-        int get hashCode => endpoint.hashCode^fingerprint.hashCode;
-
-
-
-        @override
-        bool operator ==(Object other) =>
-            identical(this, other) ||
-            other is TrustedComputer &&
-                runtimeType == other.runtimeType
-                && endpoint == other.endpoint&& fingerprint == other.fingerprint;
-
-            }
-
-enum WakeResult {
-                    sent,
-invalidMac,
-sendFailed,
-                    ;
-                    
-                }
-            
+enum WakeResult { sent, invalidMac, sendFailed }
