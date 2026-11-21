@@ -3,24 +3,57 @@
 Read this with `CLAUDE.md` at the start of a new chat. Update it at the end of
 every working session (newest state first; drop what is no longer true).
 
-_Last updated: 17 Nov 2026._
+_Last updated: 22 Nov 2026._
 
 ## Current branch and build
 
-- **main**, commit `66f30ef`.
-- **v1.0.0 is PUBLISHED and LIVE.** Not a draft, not a pre-release:
-  https://github.com/Bensalk/cipher-desk/releases/tag/v1.0.0 — tag `v1.0.0`
-  points at commit `5370aec`. This is Cipher Desk's first stable release.
-- Mid-cleanup, a script by mistake deleted the *published* v1.0.0 release
-  itself (along with old test drafts it was meant to remove). The git tag
-  was never touched, so the release was rebuilt from the same commit
-  (`gh api -X POST .../workflows/release.yml/dispatches -f ref=v1.0.0 -F
-  'inputs[make_release]=true'`), re-verified against SHA256SUMS, and
-  republished. If anything about the release looks inconsistent, re-check
-  it against the tag/commit above — the asset/release ids from earlier in
-  this session's own notes are stale.
+- **main**, commit `7bd7f0f`.
+- **v1.0.1 is PUBLISHED and LIVE** (set as Latest, not a pre-release):
+  https://github.com/Bensalk/cipher-desk/releases/tag/v1.0.1 — tag `v1.0.1`
+  points at commit `782e2a1`. This is a security-only patch over v1.0.0
+  (one dependency fix, nothing else changed — see Release notes below).
+- v1.0.0 (commit `5370aec`) is still published too, just no longer "Latest".
 
-## Done this session
+## Done this session (22 Nov 2026)
+
+- Reviewed and merged all 3 open Dependabot PRs: x509-cert 0.3.0, sha2
+  0.11.1, local_auth 3.0.2. Hit and resolved a real `Cargo.toml` merge
+  conflict between the first two (both touched adjacent dependency lines).
+  Documented 9 new heapless advisories (RUSTSEC-2026-0574..0582) across all
+  three `osv-scanner.toml` files as an accepted, unreachable-code risk
+  (heapless only reached via sspi → winscard → iso7816, smart-card code
+  this app never calls); re-review by 31 Jan 2027.
+- Found, while doing the above, that **RUSTSEC-2026-0544** (libz-sys/zlib
+  heap overflow) was already shipped in v1.0.0 and unfixed — a prior
+  session's fix only updated the root lockfile, missing
+  `tools/rdp-test-host/Cargo.lock`. Fixed both.
+- Released **v1.0.1**: version bump (`Cargo.toml` workspace version +
+  `app/pubspec.yaml`), CHANGELOG entry, built and published on all 3
+  platforms, set as Latest.
+- Found and fixed a real gap: **README.md still pointed at v1.0.0** (badge,
+  "Latest" line, all 5 download links) after v1.0.1 was published — nobody
+  had updated it. Fixed and pushed. Added a reminder to `CLAUDE.md`'s
+  release steps so this isn't missed on the next release either.
+- Repo security review at Bensal's request — turned on **Secret Protection**
+  (secret scanning) and **Push protection** (blocks a push that contains
+  something that looks like a password/key/token before it lands), on top
+  of what was already on (Dependabot alerts + auto-fix PRs, private
+  vulnerability reporting, dependency graph, CodeQL). Confirmed "Automatic
+  dependency submission" is correctly left off — not needed, since
+  `Cargo.lock`/`pubspec.lock` are already parsed natively.
+- Checked for anything to delete: no stale branches, no junk files
+  committed to the repo. (5 leftover untracked scratch `.md` report files
+  sitting in the sandbox working copy — never committed — were deleted;
+  irrelevant to the actual GitHub repo.)
+
+## Waiting for test results
+
+Bensal is going to install v1.0.1 on his PC and do a quick connect +
+file-transfer sanity check (not a full regression — this patch only
+touched one internal compression helper, no features changed). Not yet
+confirmed done as of this handoff.
+
+## Previously done (17 Nov 2026 session)
 
 - **v1.0.0 security fixes** (all tested and shipped): the global
   "many devices guessing together" lockout now counts distinct devices, not
@@ -57,11 +90,6 @@ _Last updated: 17 Nov 2026._
   tool via a temporary GitHub Actions job (not by hand), fixing drift from
   earlier hand-written additions. One unused `_syncLockKeys` removed; two
   stale clipboard-default test assertions corrected.
-
-## Waiting for test results
-
-Nothing pending right now — v1.0.0 is tested and live. See "1.0.1 backlog"
-below for what's queued next, none of it started.
 
 ## Next features Bensal asked for, in priority order
 
