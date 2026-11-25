@@ -2,6 +2,11 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v1.0.2 (25 Nov 2026)
+
+### Security
+- **A web-address-parsing helper is updated.** A newly published flaw could make it crash by overflowing memory when fed a very specially crafted address. No other changes in this release.
+
 ## v1.0.1 (21 Nov 2026)
 
 ### Security
