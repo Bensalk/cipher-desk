@@ -23,7 +23,7 @@ $rtf = "{\rtf1\ansi\deff0{\fonttbl{\f0 Consolas;}}\f0\fs16 $escaped}"
 $license = Join-Path $out 'License.rtf'
 Set-Content -Path $license -Value $rtf -Encoding ascii
 
-$msi = Join-Path $out "CipherDesk-$Version-x64.msi"
+$msi = Join-Path $out "cipher-desk-$Version-windows-x64.msi"
 wix build "$PSScriptRoot\CipherDesk.wxs" -arch x64 -ext WixToolset.UI.wixext `
   -d "Version=$Version" -d "BundleDir=$bundle" -d "RepoDir=$repo" -d "LicenseRtf=$license" `
   -o $msi

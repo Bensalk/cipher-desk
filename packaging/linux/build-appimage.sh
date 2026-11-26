@@ -21,4 +21,4 @@ HERE=$(dirname "$(readlink -f "$0")")
 exec "$HERE/usr/bin/cipher_desk" "$@"
 APPRUN
 chmod 755 "$APPDIR/AppRun"
-ARCH=$(uname -m) "$TOOL" --no-appstream "$APPDIR" "$OUT/Cipher_Desk-${VERSION}-$(uname -m).AppImage"
+ARCH=$(uname -m) "$TOOL" --no-appstream "$APPDIR" "$OUT/cipher-desk-${VERSION}-$(uname -m).AppImage"

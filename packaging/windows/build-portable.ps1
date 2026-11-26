@@ -38,7 +38,7 @@ Run cipher_desk.exe. No installation or administrator rights are needed.
 - Read docs/HOW-TO-USE.md on the project page for more.
 "@ | Set-Content -Path "$stage\README-portable.txt" -Encoding utf8
 
-$zip = Join-Path (Resolve-Path $OutDir).Path "CipherDesk-$Version-windows-x64-portable.zip"
+$zip = Join-Path (Resolve-Path $OutDir).Path "cipher-desk-$Version-windows-x64-portable.zip"
 if (Test-Path $zip) { Remove-Item $zip }
 Compress-Archive -Path $stage -DestinationPath $zip
 Remove-Item -Recurse -Force $stage

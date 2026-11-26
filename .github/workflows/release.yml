@@ -256,7 +256,7 @@ jobs:
           flutter pub get
           bash ../scripts/ci-run.sh "Android release build" flutter build apk --release
           mkdir -p ../dist
-          cp build/app/outputs/flutter-apk/app-release.apk "../dist/CipherDesk-${VERSION}-android.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "../dist/cipher-desk-${VERSION}-android.apk"
           rm -f "$RUNNER_TEMP/release.jks"
       - name: Signature check (never the debug key) and certificate fingerprint
         env:
@@ -311,7 +311,7 @@ jobs:
           cp artifacts/linux/*.deb artifacts/linux/*.AppImage artifacts/windows/*.msi \
              artifacts/windows/*.zip artifacts/android/*.apk \
              artifacts/android/android-signing-certificate.txt release/
-          cd release && sha256sum -- * > SHA256SUMS && cat SHA256SUMS
+          cd release && sha256sum -- * > SHA256SUMS.txt && cat SHA256SUMS.txt
       - name: Create a draft release (the owner reviews and publishes it)
         env:
           GH_TOKEN: ${{ github.token }}
@@ -325,7 +325,7 @@ jobs:
             echo "**Which file?** Android: the .apk. Windows: the .msi (installer) or the portable .zip."
             echo "Debian/Ubuntu: the .deb. Other Linux: the .AppImage. Setup: [How to use](https://github.com/${REPO}/blob/main/docs/HOW-TO-USE.md)."
             echo
-            echo "Verify downloads with: sha256sum -c SHA256SUMS"
+            echo "Verify downloads with: sha256sum -c SHA256SUMS.txt"
             echo
             echo "Android signing certificate:"; echo '```'; cat release/android-signing-certificate.txt; echo '```'
           } > notes.md

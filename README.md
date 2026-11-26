@@ -108,11 +108,11 @@ Latest: **v1.0.2** – all files and checksums are on the [Releases page](https:
 
 | System | Download | |
 |---|---|---|
-| **Android 10+** | [CipherDesk-1.0.2-android.apk](https://github.com/Bensalk/cipher-desk/releases/download/v1.0.2/CipherDesk-1.0.2-android.apk) | Allow installing from your browser or file manager when asked |
-| **Windows 10/11** (installer) | [CipherDesk-1.0.2-x64.msi](https://github.com/Bensalk/cipher-desk/releases/download/v1.0.2/CipherDesk-1.0.2-x64.msi) | Installs for your user only; no administrator rights needed |
-| **Windows** (portable) | [CipherDesk-1.0.2-windows-x64-portable.zip](https://github.com/Bensalk/cipher-desk/releases/download/v1.0.2/CipherDesk-1.0.2-windows-x64-portable.zip) | Unzip anywhere and run `cipher_desk.exe` |
+| **Android 10+** | [cipher-desk-1.0.2-android.apk](https://github.com/Bensalk/cipher-desk/releases/download/v1.0.2/cipher-desk-1.0.2-android.apk) | Allow installing from your browser or file manager when asked |
+| **Windows 10/11** (installer) | [cipher-desk-1.0.2-windows-x64.msi](https://github.com/Bensalk/cipher-desk/releases/download/v1.0.2/cipher-desk-1.0.2-windows-x64.msi) | Installs for your user only; no administrator rights needed |
+| **Windows** (portable) | [cipher-desk-1.0.2-windows-x64-portable.zip](https://github.com/Bensalk/cipher-desk/releases/download/v1.0.2/cipher-desk-1.0.2-windows-x64-portable.zip) | Unzip anywhere and run `cipher_desk.exe` |
 | **Debian / Ubuntu** | [cipher-desk_1.0.2_amd64.deb](https://github.com/Bensalk/cipher-desk/releases/download/v1.0.2/cipher-desk_1.0.2_amd64.deb) | `sudo apt install ./cipher-desk_1.0.2_amd64.deb` |
-| **Other Linux** | [Cipher_Desk-1.0.2-x86_64.AppImage](https://github.com/Bensalk/cipher-desk/releases/download/v1.0.2/Cipher_Desk-1.0.2-x86_64.AppImage) | Make it executable and run it |
+| **Other Linux** | [cipher-desk-1.0.2-x86_64.AppImage](https://github.com/Bensalk/cipher-desk/releases/download/v1.0.2/cipher-desk-1.0.2-x86_64.AppImage) | Make it executable and run it |
 
 - Check a download with `SHA256SUMS` from the same release (`sha256sum -c SHA256SUMS`, or `Get-FileHash` on Windows).
 - The Windows files are not code-signed yet, so Windows SmartScreen may warn you: choose *More info → Run anyway* after checking the checksum.
