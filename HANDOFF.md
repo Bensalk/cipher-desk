@@ -3,16 +3,91 @@
 Read this with `CLAUDE.md` at the start of a new chat. Update it at the end of
 every working session (newest state first; drop what is no longer true).
 
-_Last updated: 22 Nov 2026._
+_Last updated: 27 Nov 2026._
 
 ## Current branch and build
 
-- **main**, commit `7bd7f0f`.
-- **v1.0.1 is PUBLISHED and LIVE** (set as Latest, not a pre-release):
-  https://github.com/Bensalk/cipher-desk/releases/tag/v1.0.1 — tag `v1.0.1`
-  points at commit `782e2a1`. This is a security-only patch over v1.0.0
-  (one dependency fix, nothing else changed — see Release notes below).
-- v1.0.0 (commit `5370aec`) is still published too, just no longer "Latest".
+- **main**, commit `9306cdf` (head as of this handoff).
+- **v1.0.2 is PUBLISHED and LIVE** (set as Latest, not a pre-release):
+  https://github.com/Bensalk/cipher-desk/releases/tag/v1.0.2 — tag `v1.0.2`
+  points at commit `2e657be`. Security-only patch over v1.0.1 (one dependency
+  fix — RUSTSEC-2026-0592, `url` crate stack-overflow DoS — nothing else
+  changed). All 14 CI checks passed; Bensal published the draft himself.
+- **Important**: commit `9306cdf` (26 Nov 2026, a *different* session, done
+  together with Hive work) landed **after** v1.0.2 was built, so v1.0.2's
+  actual uploaded asset files still use the **old** CamelCase names
+  (`CipherDesk-1.0.2-android.apk`, etc.) and `SHA256SUMS` (no `.txt`). The new
+  lowercase-hyphenated names + `SHA256SUMS.txt` (see `CLAUDE.md`'s "Asset
+  filenames are a contract with Hive" note) only take effect starting with
+  the **next** release build — not retroactively on v1.0.2. Don't be
+  surprised if v1.0.2's assets don't match the new naming scheme; that's
+  expected, not a bug.
+- v1.0.1 (commit `782e2a1`) and v1.0.0 (commit `5370aec`) are still published
+  too, just no longer "Latest".
+
+## Done this session (25 Nov 2026)
+
+- Cleared a stale GitHub Security-tab "CodeQL configuration error" (Bensal
+  reported "1 error" under `language:actions`). Root cause: a CodeQL job used
+  to live inside `.github/workflows/security.yml`; it was later split out
+  into its own `codeql.yml` (which is the one that actually runs and passes),
+  but GitHub kept an orphaned "Security" setup-type record pointing at the
+  now-nonexistent job, stuck failing since its last real scan 3 weeks
+  earlier. Deleted that dead configuration (both its `language:rust` and
+  `language:actions` halves) via Chrome on the GitHub Security tab —
+  `Delete configuration` only removes the tracking record for a job that no
+  longer exists; it does not touch or weaken the real, working CodeQL setup.
+  Confirmed clean afterward: one green CodeQL setup type, both languages
+  100% scanned.
+- Bensal asked to check/replace outdated screenshots (UI had changed since
+  they were taken — new Caps Lock key-bar button, file-transfer cancel
+  button, lockout countdown banner, none reflected in the committed PNGs).
+  Dispatched `screenshots.yml`; it partially failed (one tablet-layout test
+  couldn't find the Save button — the same flake noted below) but had
+  already pushed 34 freshly captured PNGs to the `screenshots` branch before
+  failing. Pulled the 19 matching files from there, confirmed they show the
+  current build, replaced all of `docs/screenshots/*.png`, committed and
+  pushed. The `screenshots` branch itself was deleted afterward at Bensal's
+  request (it's disposable output, recreated by the workflow each run — no
+  need to merge it into `main`, there's no shared history).
+- Found and fixed a real vulnerability, unrelated to the screenshots commit:
+  CI's OSV-Scanner and cargo-deny jobs both failed right after the
+  screenshots push on **RUSTSEC-2026-0592**, a stack-overflow DoS in the
+  `url` crate (<= 2.5.8) reachable via `Url::origin()` on a crafted nested
+  `blob:` URL. `cargo update` can't run here (no network to crates.io's
+  index API, only to the static download host), so fixed it by hand: pulled
+  `url 2.5.9` + the `form_urlencoded 1.2.3` it now requires from the
+  crates.io sparse index (`https://index.crates.io/...`) to get the correct
+  version + checksum, edited all three `Cargo.lock` files directly (root,
+  `rust/fuzz/`, `tools/rdp-test-host/`). Verified `percent-encoding` was
+  already compatible, no further cascade. All 14 CI checks passed.
+- Bensal asked to ship the fix: bumped to **v1.0.2** (same release steps as
+  always — `pubspec.yaml`, `Cargo.toml`, `CHANGELOG.md`, `README.md`),
+  dispatched the release build, Bensal published the draft himself once it
+  finished.
+- Discussed turning on GitHub's "require status checks to pass before
+  merging" for `main` (prompted by the red X on the screenshots commit,
+  which only showed up *after* landing on `main`). That setting would block
+  a direct push until the exact same commit had already passed CI on some
+  other branch first — so every future change, even a one-line doc fix,
+  would need branch + PR instead of a direct push; a brand-new commit cannot
+  have already passed CI on another branch it hasn't been pushed to. **Decided
+  to leave it off** (Bensal's call, after discussion): it's just the two of
+  us, CI already surfaces problems right after every push and we react to
+  them quickly (the `url` fix above is the concrete example), so the extra
+  branch+PR overhead isn't worth it for how this repo is actually worked on.
+  Revisit only if Bensal explicitly asks to turn it on later. Nothing was
+  changed — this setting was never on to begin with.
+- Bensal asked for a general security sweep beyond CodeQL: 0 open Dependabot
+  alerts; all 5 workflows correctly default to `permissions: contents: read`
+  with write access scoped only to the specific jobs that need it (release
+  publish, screenshot branch push, SARIF upload); no code logs
+  passwords/secrets anywhere (there's even a dedicated test for this,
+  `live_host.rs`); force-push to `main` is blocked. Couldn't check the
+  secret-scanning alerts list or the org-level default Action token
+  permissions via `gh api` (both return 403 through this session's proxy);
+  would need Chrome to check those — not done yet, no reason to think
+  they're a problem, just unverified.
 
 ## Done this session (22 Nov 2026)
 
@@ -48,10 +123,21 @@ _Last updated: 22 Nov 2026._
 
 ## Waiting for test results
 
-Bensal is going to install v1.0.1 on his PC and do a quick connect +
-file-transfer sanity check (not a full regression — this patch only
-touched one internal compression helper, no features changed). Not yet
-confirmed done as of this handoff.
+Nothing currently outstanding. v1.0.1's quick connect + file-transfer sanity
+check was never explicitly confirmed back, but it's now superseded by
+v1.0.2 anyway. v1.0.2 itself is a dependency-only security patch (same
+`url`-crate fix described above, no feature or UI change), so a full
+regression pass isn't expected — but if Bensal does install it, a normal
+connect + file-transfer check is the right sanity test.
+
+## Previously done (26 Nov 2026 session, Hive integration)
+
+- **Different session, working on `Bensalk/hive`** (the app launcher/updater)
+  alongside Cipher Desk: renamed every release asset to match the pattern
+  Hive expects. See `CLAUDE.md`'s "Asset filenames are a contract with Hive"
+  note and "Current branch and build" above — this is a standing rule for
+  every future release, not a one-off. Commit `9306cdf`, co-authored by a
+  different Claude session (model Sonnet 4.6).
 
 ## Previously done (17 Nov 2026 session)
 
@@ -193,3 +279,13 @@ Update this when bumping pubspec.yaml (currently kept in sync manually).
 - A dispatched workflow run can occasionally get stuck reporting `status:
   queued` indefinitely, with `gh api .../cancel` rejecting with HTTP 409. This
   is a GitHub-side anomaly — don't fight it; just dispatch a fresh run.
+- **Known intermittent flake, not yet root-caused**: `integration_test` (both
+  `hello_test.dart` on the Android-emulator CI job and `screenshots_test.dart`
+  in `screenshots.yml`) occasionally fails with "Found 0 widgets with key
+  `button-save`" on the connection form's Save button — seen on both the
+  tablet screenshot width and the Android 10 emulator, with zero code changes
+  between a passing run and a failing one, so it's timing/flakiness, not a
+  regression. Re-running the job alone has cleared it before. If it keeps
+  recurring, look at `_save`/`_revalidate` in `app/lib/ui/connection_form.dart`
+  and whether `tapVisible`'s `ensureVisible` scroll races an async
+  Rust-core validation call.
