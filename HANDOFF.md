@@ -3,11 +3,11 @@
 Read this with `CLAUDE.md` at the start of a new chat. Update it at the end of
 every working session (newest state first; drop what is no longer true).
 
-_Last updated: 27 Nov 2026._
+_Last updated: 27 Nov 2026 (session 2)._
 
 ## Current branch and build
 
-- **main**, commit `9306cdf` (head as of this handoff).
+- **main**, commit `c1f051c` (head as of this handoff).
 - **v1.0.2 is PUBLISHED and LIVE** (set as Latest, not a pre-release):
   https://github.com/Bensalk/cipher-desk/releases/tag/v1.0.2 — tag `v1.0.2`
   points at commit `2e657be`. Security-only patch over v1.0.1 (one dependency
@@ -24,6 +24,12 @@ _Last updated: 27 Nov 2026._
   expected, not a bug.
 - v1.0.1 (commit `782e2a1`) and v1.0.0 (commit `5370aec`) are still published
   too, just no longer "Latest".
+
+## Done this session (27 Nov 2026)
+
+- Fixed hardcoded version string in Report Problem log (`session_screen.dart` line 645):
+  was `'1.0.0'`, now `'1.0.2'`. No version bump needed — fix goes into next release.
+  Commit `c1f051c`. Known issue in HANDOFF is now resolved.
 
 ## Done this session (25 Nov 2026)
 
@@ -232,8 +238,8 @@ Bensal said "note it down, do it after v1.0 later." No code written yet.
 
 ## Known issue: version string in Report Problem
 
-`app/lib/ui/session_screen.dart` has `const version = '...'` hardcoded.
-Update this when bumping pubspec.yaml (currently kept in sync manually).
+~~Fixed in commit `c1f051c` (27 Nov 2026). Now reads `'1.0.2'`. Remember to update
+this string as part of every future version bump.~~
 
 ## Sandbox gotchas (Claude's cloud workspace)
 
