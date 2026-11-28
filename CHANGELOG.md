@@ -2,6 +2,11 @@
 
 Download any version from the [Releases page](https://github.com/Bensalk/cipher-desk/releases).
 
+## v1.0.3 (28 Nov 2026)
+
+### Fix
+- **Hive launcher now correctly detects Cipher Desk as installed.** The Windows installer was writing the wrong publisher name to the registry, so Hive showed the app as not installed even after a fresh install. Reinstall this version to fix the detection.
+
 ## v1.0.2 (25 Nov 2026)
 
 ### Security
