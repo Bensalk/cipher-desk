@@ -12,7 +12,7 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package Name="Cipher Desk"
-           Manufacturer="Cipher Desk contributors"
+           Manufacturer="Bensal K"
            Version="$(var.Version)"
            UpgradeCode="{E56EAB74-3E6E-4A89-948B-8E6CC77A3275}"
            Scope="perUserOrMachine"
